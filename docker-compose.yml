@@ -1,13 +1,11 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15-alpine
     restart: always
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=node_postg_db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=mypassword
+      - POSTGRES_DB=mirror_db
     ports:
       - '5432:5432'
     volumes:
