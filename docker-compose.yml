@@ -7,7 +7,7 @@ services:
       - POSTGRES_PASSWORD=mypassword
       - POSTGRES_DB=mirror_db
     ports:
-      - '5432:5432'
+      - '5440:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -21,7 +21,7 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://admin:mypassword@db:5432/mirror_db?schema=public
+      - DATABASE_URL=postgresql://admin:mypassword@db:5440/mirror_db?schema=public
       - REDIS_HOST=redis
 
   redis:
