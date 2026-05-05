@@ -140,13 +140,31 @@ const schema = Joi.object({
 
 ## 10. Response Shape
 
-The codebase is currently inconsistent here. **For new endpoints, use:**
+**All JSON responses use this envelope. No exceptions.**
 
+Success:
 ```json
 { "status": "success", "data": <payload>, "message": "<optional>" }
 ```
 
-Errors always follow the central handler shape (`status: "error"`, `statusCode`, `message`). Do not invent new envelopes per route.
+Error (produced by the central error middleware):
+```json
+{ "status": "error", "statusCode": <number>, "message": "<human readable>" }
+```
+
+Rules:
+- `data` is always present on success, even if it's `null` or `{}`. Don't omit the key.
+- `message` is optional on success; include it for actions where the client benefits from confirmation text (create, delete, password reset, etc.).
+- Never return a bare object, array, or string at the top level (e.g. `res.json(user)` is not allowed — use `res.json({ status: 'success', data: user })`).
+- Legacy controllers still returning `{ message, data }` should be migrated to this envelope when touched.
+
+Example controller success path:
+```ts
+return res.status(200).json({
+  status: 'success',
+  data: user,
+});
+```
 
 ---
 

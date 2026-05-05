@@ -1,36 +1,31 @@
 services:
-  db:
-    image: postgres:15-alpine
-    restart: always
+  postgres:
+    image: postgres:15
+    container_name: mirror_postgres
     environment:
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=mypassword
-      - POSTGRES_DB=mirror_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mirror_db
     ports:
       - '5440:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
-  api:
-    build: .
-    ports:
-      - '3007:3007'
-    depends_on:
-      - db
-      - redis
-    env_file:
-      - .env
-    environment:
-      - DATABASE_URL=postgresql://admin:mypassword@db:5440/mirror_db?schema=public
-      - REDIS_HOST=redis
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d mirror_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
-    restart: always
+    image: redis:7
+    container_name: mirror_redis
     ports:
-      - '6377:6379'
+      - "6377:6379"
+    command: [ "redis-server", "--appendonly", "yes" ]
     volumes:
       - redis_data:/data
+    restart: unless-stopped
 
 volumes:
   postgres_data:

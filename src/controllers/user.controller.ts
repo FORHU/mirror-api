@@ -7,9 +7,7 @@ export default class UserController {
    */
   static async getMe(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
-
+      const userId = (req as any).user.id;
       const user = await UserService.getUser(userId);
       return res.json({ status: "success", data: user });
     } catch (error) {

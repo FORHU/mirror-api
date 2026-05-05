@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import AuthSvc from "../services/auth.service";
 
+const validationError = (message: string) => ({ status: 400, message });
+
 export default class AuthController {
   /**
    * Register a new user
@@ -14,13 +16,17 @@ export default class AuthController {
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.message });
+    if (error) return next(validationError(error.message));
 
     try {
       const data = await AuthSvc.register(value);
-      return res.status(201).json({ message: "User created successfully", data });
-    } catch (error) {
-      next(error);
+      return res.status(201).json({
+        status: "success",
+        data,
+        message: "User created successfully",
+      });
+    } catch (err) {
+      next(err);
     }
   }
 
@@ -34,13 +40,17 @@ export default class AuthController {
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.message });
+    if (error) return next(validationError(error.message));
 
     try {
       const data = await AuthSvc.login(value);
-      return res.json({ message: "Login successful", data });
-    } catch (error) {
-      next(error);
+      return res.json({
+        status: "success",
+        data,
+        message: "Login successful",
+      });
+    } catch (err) {
+      next(err);
     }
   }
 
@@ -53,13 +63,13 @@ export default class AuthController {
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.message });
+    if (error) return next(validationError(error.message));
 
     try {
       const data = await AuthSvc.refreshToken(value.refreshToken);
-      return res.json(data);
-    } catch (error) {
-      next(error);
+      return res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
     }
   }
 
@@ -67,13 +77,23 @@ export default class AuthController {
    * Logout
    */
   static async logout(req: Request, res: Response, next: NextFunction) {
+    const schema = Joi.object({
+      refreshToken: Joi.string().required(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return next(validationError(error.message));
+
     try {
-      const { refreshToken } = req.body;
       const userId = (req as any).user?.id;
-      const result = await AuthSvc.logout(userId, refreshToken);
-      return res.json(result);
-    } catch (error) {
-      next(error);
+      const data = await AuthSvc.logout(userId, value.refreshToken);
+      return res.json({
+        status: "success",
+        data,
+        message: "Logged out successfully",
+      });
+    } catch (err) {
+      next(err);
     }
   }
 }

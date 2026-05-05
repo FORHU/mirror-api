@@ -18,6 +18,7 @@ model User {
   isDeleted           Boolean                @default(false)
   avatar              File?                  @relation("UserAvatar", fields: [avatarId], references: [id])
   sessions            Session[]
+  outfits             Outfit[]
 }
 
 model Session {
@@ -43,4 +44,82 @@ model File {
   deletedAt DateTime?
   metaData  Json?
   users     User[]    @relation("UserAvatar")
+}
+
+
+// 2. The individual piece of clothing
+model Garment {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  imageUrl     String
+  
+  // High-level distinction
+  bodyPart     BodyPart @default(UPPER_BODY)
+  
+  // Specific category (e.g., "Flannel", "Skinny Jeans")
+  categoryId   String
+  category     Category @relation(fields: [categoryId], references: [id])
+
+  // Physical attributes for the AI/Canvas
+  color        String
+  scaleFactor  Float    @default(1.0)
+  zIndex       Int      @default(1) // Helps overlay clothes: Jacket (2) over Shirt (1)
+
+  // Relationships
+  outfits      GarmentInOutfit[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// 3. The "Parent" table for dynamic categories/tags
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique // e.g., "Streetwear", "Vintage", "Formal"
+  garments Garment[]
+}
+
+// 4. The actual Outfit (The curated look)
+model Outfit {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Summer Wedding Look"
+  description String?
+  
+  // Many-to-many: An outfit has many garments, and a garment can be in many outfits
+  items       GarmentInOutfit[]
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  interactions Interaction[]
+}
+
+// Join table for the many-to-many relationship
+model GarmentInOutfit {
+  garmentId String
+  outfitId  String
+  garment   Garment @relation(fields: [garmentId], references: [id])
+  outfit    Outfit  @relation(fields: [outfitId], references: [id])
+
+  @@id([garmentId, outfitId])
+}
+
+model Interaction {
+  id        String   @id @default(cuid())
+  message   String
+  response  String
+  intent    String?
+  outfitId  String?
+  outfit    Outfit?  @relation(fields: [outfitId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// 1. Define where on the body the item goes
+enum BodyPart {
+  HEAD        // Hats, Beanies
+  UPPER_BODY  // Shirts, Jackets
+  LOWER_BODY  // Pants, Skirts
+  FEET        // Shoes, Socks
+  FULL_BODY   // Dresses, Jumpsuits
+  ACCESSORIES // Watches, Belts
 }
