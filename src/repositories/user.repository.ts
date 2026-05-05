@@ -1,5 +1,4 @@
 import { prisma } from '../utils/prisma';
-import { UserRole } from '@prisma/client';
 
 export default class UserRepository {
   /**
@@ -45,7 +44,7 @@ export default class UserRepository {
   static async softDelete(id: string) {
     return prisma.user.update({
       where: { id },
-      data: { isDeleted: true, isActive: false },
+      data: { isDeleted: true },
     });
   }
 

@@ -18,7 +18,6 @@ export default class AuthSvc {
     email: string;
     password: string;
     username: string;
-    name?: string;
   }) {
     // Check if user already exists
     const existingUser = await AuthRepo.findUserByEmailOrUsername(data.email, data.username);
@@ -39,7 +38,6 @@ export default class AuthSvc {
       email: data.email,
       password: hashedPassword,
       username: data.username,
-      name: data.name,
     });
 
     logger.info(`User registered: ${user.email}`);
@@ -66,9 +64,7 @@ export default class AuthSvc {
 
     if (storedHash !== hash) throw { status: 401, message: "Invalid credentials" };
 
-    // Update login status and return response
-    const updatedUser = await AuthRepo.updateUserLoginStatus(user.id);
-    return this.generateAuthResponse(updatedUser || user, "local");
+    return this.generateAuthResponse(user, "local");
   }
 
   /**
@@ -94,10 +90,7 @@ export default class AuthSvc {
           id: user.id,
           email: user.email,
           username: user.username,
-          name: user.name,
-          role: user.role,
-          avatar: user.avatar?.fileUrl,
-          onboardingCompleted: user.onboardingCompleted,
+          avatar: user.avatar?.fileUrl ?? null,
         },
       };
     } catch (error) {
@@ -132,12 +125,16 @@ export default class AuthSvc {
 
     await AuthRepo.createSession({
       userId: user.id,
+      accessToken,
       refreshToken,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-      provider,
+      platform: provider,
     });
 
-    await CacheUtil.set(`user:${user.id}`, user);
+    const { password: _pw, ...userForCache } = user as Record<string, unknown> & {
+      password?: string;
+    };
+    await CacheUtil.set(`user:${user.id}`, userForCache);
 
     return {
       accessToken,
@@ -146,10 +143,7 @@ export default class AuthSvc {
         id: user.id,
         email: user.email,
         username: user.username,
-        name: user.name,
-        role: user.role,
-        avatar: user.avatar?.fileUrl,
-        onboardingCompleted: user.onboardingCompleted,
+        avatar: user.avatar?.fileUrl ?? null,
       },
     };
   }

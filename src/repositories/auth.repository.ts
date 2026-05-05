@@ -14,24 +14,17 @@ export default class AuthRepo {
     email: string;
     password?: string;
     username: string;
-    name?: string;
   }) {
     return prisma.user.create({
       data: {
         email: data.email,
         password: data.password,
         username: data.username,
-        name: data.name,
-        isEmailVerified: true,
       },
       select: {
         id: true,
         email: true,
         username: true,
-        name: true,
-        role: true,
-        isEmailVerified: true,
-        onboardingCompleted: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -54,42 +47,20 @@ export default class AuthRepo {
     });
   }
 
-  static async updateUserLoginStatus(userId: string) {
-    return prisma.user.update({
-      where: {
-        id: userId,
-        isDeleted: false,
-      },
-      data: {
-        isActive: true,
-        lastLoginAt: new Date(),
-        updatedAt: new Date(),
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        role: true,
-        isActive: true,
-        avatar: {
-          select: {
-            fileUrl: true,
-          },
-        },
-        lastLoginAt: true,
-        onboardingCompleted: true,
-      },
-    });
-  }
-
   static async findUserById(userId: string) {
     return prisma.user.findFirst({
       where: {
         id: userId,
         isDeleted: false,
       },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        createdAt: true,
+        updatedAt: true,
+        avatarId: true,
+        isDeleted: true,
         avatar: {
           select: {
             fileUrl: true,
@@ -110,16 +81,13 @@ export default class AuthRepo {
 
   static async createSession(data: {
     userId: string;
+    accessToken: string;
     refreshToken: string;
     expiresAt: Date;
-    provider?: string;
-    providerUserId?: string;
-    providerAvatarUrl?: string;
+    platform: string;
   }) {
     return prisma.session.create({
-      data: {
-        ...data,
-      },
+      data,
     });
   }
 
@@ -156,16 +124,14 @@ export default class AuthRepo {
 
   static async getAuthUser(userId: string) {
     return prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
+      where: { id: userId },
       select: {
         id: true,
-        name: true,
-        avatar: true,
         username: true,
-        role: true,
-        onboardingCompleted: true,
+        email: true,
+        avatar: {
+          select: { fileUrl: true },
+        },
       },
     });
   }
