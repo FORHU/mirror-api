@@ -14,21 +14,21 @@ services:
   api:
     build: .
     ports:
-      - '3002:3002'
+      - '3007:3007'
     depends_on:
       - db
       - redis
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://user:password@db:5432/node_postg_db?schema=public
+      - DATABASE_URL=postgresql://admin:mypassword@db:5432/mirror_db?schema=public
       - REDIS_HOST=redis
 
   redis:
     image: redis:7-alpine
     restart: always
     ports:
-      - '6379:6379'
+      - '6377:6379'
     volumes:
       - redis_data:/data
 
