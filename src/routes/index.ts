@@ -3,9 +3,9 @@ import express from 'express';
 // Remote Routes (Mobile Web)
 import remoteAuthRoute from './remote/auth.route';
 import remoteUserRoute from './shared/user.route';
+import remoteKioskRoute from './remote/kiosk.route';
 
 // Mirror Routes (Kiosk Web)
-import mirrorKioskRoute from './mirror/kiosk.route';
 import mirrorTryOnRoute from './mirror/tryOn.route';
 import mirrorGarmentRoute from './shared/garment.route';
 import mirrorOutfitRoute from './shared/outfit.route';
@@ -23,9 +23,9 @@ router.get('/', (_, res) => {
 // Remote endpoints
 router.use('/remote/auth', remoteAuthRoute);
 router.use('/remote/users', remoteUserRoute);
+router.use('/remote/kiosks', remoteKioskRoute);
 
 // Mirror endpoints
-router.use('/mirror/kiosks', mirrorKioskRoute);
 router.use('/mirror/try-on', mirrorTryOnRoute);
 router.use('/mirror/garments', mirrorGarmentRoute);
 router.use('/mirror/outfits', mirrorOutfitRoute);

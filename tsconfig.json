@@ -18,6 +18,6 @@
     "sourceMap": true,
     "declaration": true
   },
-  "include": ["src/**/*.ts", "prisma/**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

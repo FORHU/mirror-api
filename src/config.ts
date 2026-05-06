@@ -24,4 +24,7 @@ export const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME || "";
 export const FASHN_API_KEY = process.env.FASHN_API_KEY || "";
 export const FASHN_BASE_URL = process.env.FASHN_BASE_URL || "https://api.fashn.ai/v1";
 
+export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+export const CHAT_WONDER_API_URL = process.env.CHAT_WONDER_API_URL || "";
+
 export const isDev = NODE_ENV === "development";

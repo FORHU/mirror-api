@@ -1,5 +1,5 @@
 import express from "express";
-import KioskController from "../../controllers/mirror/kiosk.controller";
+import KioskController from "../../controllers/remote/kiosk.controller";
 import { authenticate } from "../../middleware/auth.middleware";
 
 const router = express.Router();
