@@ -20,6 +20,21 @@ export default class RedisUtil {
   }
 
   /**
+   * Get duplicate clients for Socket.IO Redis Adapter
+   */
+  static getAdapterClients() {
+    const pubClient = createClient({
+      password: REDIS_PASSWORD,
+      socket: {
+        host: REDIS_HOST,
+        port: REDIS_PORT,
+      },
+    });
+    const subClient = pubClient.duplicate();
+    return { pubClient, subClient };
+  }
+
+  /**
    * Simple fixed-window rate limiter
    */
   static async isRateLimited(key: string, limit: number, windowSeconds: number): Promise<boolean> {

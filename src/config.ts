@@ -21,4 +21,7 @@ export const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || "";
 export const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || "";
 export const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME || "";
 
+export const FASHN_API_KEY = process.env.FASHN_API_KEY || "";
+export const FASHN_BASE_URL = process.env.FASHN_BASE_URL || "https://api.fashn.ai/v1";
+
 export const isDev = NODE_ENV === "development";
