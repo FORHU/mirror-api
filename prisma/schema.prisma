@@ -8,118 +8,192 @@ datasource db {
 }
 
 model User {
-  id                  String                 @id @default(uuid())
-  email               String                 @unique
-  username            String                 @unique
-  password            String?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-  avatarId            String?
-  isDeleted           Boolean                @default(false)
-  avatar              File?                  @relation("UserAvatar", fields: [avatarId], references: [id])
-  sessions            Session[]
-  outfits             Outfit[]
+  id        String  @id @default(uuid())
+  email     String  @unique
+  username  String  @unique
+  password  String?
+  avatarId  String?
+  isDeleted Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  avatar   File?     @relation("UserAvatar", fields: [avatarId], references: [id])
+  sessions Session[]
+  outfits  Outfit[]
 }
 
 model Session {
-  id                String   @id @default(uuid())
-  userId            String
-  createdAt         DateTime @default(now())
-  platform          String
-  expiresAt         DateTime
-  accessToken       String
-  refreshToken      String   @unique
+  id           String   @id @default(uuid())
+  userId       String
+  platform     String
+  expiresAt    DateTime
+  accessToken  String
+  refreshToken String   @unique
 
-  user              User      @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }
 
 model File {
-  id        String    @id @default(uuid())
-  filename  String?
-  fileUrl   String?
+  id       String  @id @default(uuid())
+  filename String?
+  fileUrl  String?
+  metaData Json?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
-  metaData  Json?
-  users     User[]    @relation("UserAvatar")
+
+  users User[] @relation("UserAvatar")
 }
 
-
-// 2. The individual piece of clothing
 model Garment {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?
-  imageUrl     String
-  
-  // High-level distinction
-  bodyPart     BodyPart @default(UPPER_BODY)
-  
-  // Specific category (e.g., "Flannel", "Skinny Jeans")
-  categoryId   String
-  category     Category @relation(fields: [categoryId], references: [id])
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  imageUrl    String
 
-  // Physical attributes for the AI/Canvas
-  color        String
-  scaleFactor  Float    @default(1.0)
-  zIndex       Int      @default(1) // Helps overlay clothes: Jacket (2) over Shirt (1)
+  bodyPart BodyPart  @default(None)
+  category Category?
 
-  // Relationships
-  outfits      GarmentInOutfit[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  colorName   String?
+  colorHex    String?
+  scaleFactor Float   @default(1.0)
+  zIndex      Int     @default(1)
+
+  deletedAt DateTime?
+
+  outfits GarmentInOutfit[]
+  tags    Tag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-// 3. The "Parent" table for dynamic categories/tags
-model Category {
-  id       String    @id @default(cuid())
-  name     String    @unique // e.g., "Streetwear", "Vintage", "Formal"
+model Tag {
+  id   String @id @default(cuid())
+  name String @unique
+
   garments Garment[]
 }
 
-// 4. The actual Outfit (The curated look)
 model Outfit {
-  id          String   @id @default(cuid())
-  name        String   // e.g., "Summer Wedding Look"
+  id          String  @id @default(cuid())
+  name        String
   description String?
-  
-  // Many-to-many: An outfit has many garments, and a garment can be in many outfits
-  items       GarmentInOutfit[]
-  
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  items        GarmentInOutfit[]
   interactions Interaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-// Join table for the many-to-many relationship
 model GarmentInOutfit {
   garmentId String
   outfitId  String
-  garment   Garment @relation(fields: [garmentId], references: [id])
-  outfit    Outfit  @relation(fields: [outfitId], references: [id])
+  order     Int    @default(0)
+
+  garment Garment @relation(fields: [garmentId], references: [id])
+  outfit  Outfit  @relation(fields: [outfitId], references: [id])
 
   @@id([garmentId, outfitId])
 }
 
 model Interaction {
-  id        String   @id @default(cuid())
-  message   String
-  response  String
-  intent    String?
-  outfitId  String?
-  outfit    Outfit?  @relation(fields: [outfitId], references: [id])
+  id       String  @id @default(cuid())
+  message  String
+  response String
+  intent   String?
+
+  outfitId String?
+  outfit   Outfit? @relation(fields: [outfitId], references: [id])
+
   createdAt DateTime @default(now())
 }
 
-// 1. Define where on the body the item goes
 enum BodyPart {
-  HEAD        // Hats, Beanies
-  UPPER_BODY  // Shirts, Jackets
-  LOWER_BODY  // Pants, Skirts
-  FEET        // Shoes, Socks
-  FULL_BODY   // Dresses, Jumpsuits
-  ACCESSORIES // Watches, Belts
+  None
+
+  // Headwear
+  Hat
+  Beanie
+  Cap
+  Headband
+
+  // Upper Body
+  Shirt
+  TShirt
+  Polo
+  Blouse
+  Hoodie
+  Sweater
+  Jacket
+  Coat
+  Blazer
+
+  // Lower Body
+  Pants
+  Jeans
+  Shorts
+  Skirt
+
+  // Full Body
+  Dress
+  Jumpsuit
+  Romper
+  Suit
+
+  // Footwear
+  Shoes
+  Sneakers
+  Sandals
+  Boots
+  Heels
+  Socks
+
+  // Accessories
+  Watch
+  Belt
+  Sunglasses
+  Bag
+  Backpack
+  Necklace
+  Bracelet
+  Ring
+  Earrings
+  Scarf
+  Gloves
+}
+
+enum Category {
+  Streetwear // Urban-inspired fashion (hoodies, sneakers, oversized fits, hype culture)
+  Casual // Everyday relaxed clothing (jeans, tees, simple outfits)
+  Formal // Strict dress code outfits (suits, tuxedos, formal dresses)
+  Business // Office/professional attire (blazers, slacks, business dresses)
+  SmartCasual // Hybrid of casual + formal (polished but relaxed looks)
+
+  Sportswear // Clothing designed for sports activities (jerseys, training gear)
+  Activewear // Gym/workout-focused clothing (performance fabrics, leggings)
+  Athleisure // Sport + lifestyle wear (leggings, joggers worn casually)
+
+  Winterwear // Cold-weather clothing (coats, jackets, heavy layers)
+  Summerwear // Hot-weather clothing (light fabrics, shorts, breathable outfits)
+  Rainwear // Waterproof clothing (raincoats, waterproof jackets)
+
+  Vintage // Retro-inspired styles from past decades
+  Minimalist // Clean, simple, neutral, low-design outfits
+  Luxury // High-end fashion, premium brands, expensive styling
+  AvantGarde // Experimental, artistic, runway-style fashion
+
+  Traditional // Heritage or culturally rooted clothing (e.g. barong, kimono)
+  Cultural // Broader cultural-inspired outfits (non-ceremonial ethnic wear)
+  Uniform // Standardized outfits (school, military, work uniforms)
 }
