@@ -1,11 +1,10 @@
 import express from "express";
-import { upload } from "../middleware/upload.middleware";
 import FileUploadController from "../controllers/fileUpload.controller";
-
 import { authenticate } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
-router.post("/upload", authenticate, upload.single("file"), FileUploadController.upload);
+router.get("/presign", authenticate, FileUploadController.presign);
+router.post("/confirm", authenticate, FileUploadController.confirm);
 
 export default router;
