@@ -12,59 +12,26 @@ import {
 
 export default class AuthSvc {
   /**
-   * Register a new user
+   * Login or Auto-Register with Email
    */
-  static async register(data: {
-    email: string;
-    password: string;
-    username: string;
-  }) {
-    // Check if user already exists
-    const existingUser = await AuthRepo.findUserByEmailOrUsername(data.email, data.username);
-    if (existingUser) {
-      if (existingUser.email === data.email) throw { status: 400, message: "User with this email already exists" };
-      throw { status: 400, message: "Username is already taken" };
+  static async login(email: string, platform?: string) {
+    let user = await AuthRepo.findUserByEmail(email);
+
+    if (!user) {
+      // Auto-register new user
+      const baseUsername = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "");
+      const randomSuffix = crypto.randomBytes(2).toString("hex");
+      const username = `${baseUsername}_${randomSuffix}`;
+
+      user = await AuthRepo.createUser({
+        email,
+        username,
+      }) as any;
+      
+      logger.info(`New user registered via simple login: ${email}`);
     }
 
-    // Hash password using PBKDF2 (salt:hash)
-    const salt = crypto.randomBytes(16).toString("hex");
-    const hash = crypto
-      .pbkdf2Sync(data.password, salt, 1000, 64, "sha512")
-      .toString("hex");
-    const hashedPassword = `${salt}:${hash}`;
-
-    // Create user (verified by default in simple boilerplate)
-    const user = await AuthRepo.createUser({
-      email: data.email,
-      password: hashedPassword,
-      username: data.username,
-    });
-
-    logger.info(`User registered: ${user.email}`);
-    
-    return this.generateAuthResponse(user, "local");
-  }
-
-  /**
-   * Login with email/password
-   */
-  static async login(data: { email: string; password: string }) {
-    const user = await AuthRepo.findUserByEmail(data.email);
-    if (!user) throw { status: 401, message: "Invalid credentials" };
-
-    if (!user.password) throw { status: 401, message: "Account uses social login" };
-
-    // Verify password
-    const [salt, storedHash] = user.password.split(":");
-    if (!salt || !storedHash) throw { status: 500, message: "Invalid password format" };
-
-    const hash = crypto
-      .pbkdf2Sync(data.password, salt, 1000, 64, "sha512")
-      .toString("hex");
-
-    if (storedHash !== hash) throw { status: 401, message: "Invalid credentials" };
-
-    return this.generateAuthResponse(user, "local");
+    return this.generateAuthResponse(user, platform || "local");
   }
 
   /**

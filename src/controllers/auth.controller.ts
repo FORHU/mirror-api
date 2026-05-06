@@ -6,44 +6,19 @@ const validationError = (message: string) => ({ status: 400, message });
 
 export default class AuthController {
   /**
-   * Register a new user
-   */
-  static async register(req: Request, res: Response, next: NextFunction) {
-    const schema = Joi.object({
-      email: Joi.string().email().required(),
-      password: Joi.string().min(6).required(),
-      username: Joi.string().required(),
-    });
-
-    const { error, value } = schema.validate(req.body);
-    if (error) return next(validationError(error.message));
-
-    try {
-      const data = await AuthSvc.register(value);
-      return res.status(201).json({
-        status: "success",
-        data,
-        message: "User created successfully",
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  /**
-   * Login with email/password
+   * Login/Register with email only
    */
   static async login(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
       email: Joi.string().email().required(),
-      password: Joi.string().required(),
     });
 
     const { error, value } = schema.validate(req.body);
     if (error) return next(validationError(error.message));
 
     try {
-      const data = await AuthSvc.login(value);
+      const platform = req.headers["x-platform"] as string;
+      const data = await AuthSvc.login(value.email, platform);
       return res.json({
         status: "success",
         data,
