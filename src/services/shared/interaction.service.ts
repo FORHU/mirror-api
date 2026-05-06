@@ -1,4 +1,4 @@
-import InteractionRepo from "../../repositories/shared/interaction.repository";
+import InteractionRepo from "../../repositories/interaction.repository";
 
 export default class InteractionService {
   static async getOutfitInteractions(outfitId: string, query: any) {

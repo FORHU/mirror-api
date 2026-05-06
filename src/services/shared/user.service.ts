@@ -1,4 +1,4 @@
-import UserRepository from "../../repositories/shared/user.repository";
+import UserRepository from "../../repositories/user.repository";
 import logger from "../../utils/logger";
 
 export default class UserService {

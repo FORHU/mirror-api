@@ -1,4 +1,4 @@
-import { prisma } from "../../utils/prisma";
+import { prisma } from "../utils/prisma";
 
 export default class InteractionRepo {
   static async findByOutfitId(outfitId: string, page: number = 1, limit: number = 20) {

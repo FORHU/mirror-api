@@ -1,4 +1,4 @@
-import OutfitRepo from "../../repositories/shared/outfit.repository";
+import OutfitRepo from "../../repositories/outfit.repository";
 
 export default class OutfitService {
   static async getUserOutfits(userId: string, query: any) {

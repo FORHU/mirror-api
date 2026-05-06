@@ -1,4 +1,4 @@
-import GarmentRepo from "../../repositories/shared/garment.repository";
+import GarmentRepo from "../../repositories/garment.repository";
 import { BodyPart, Category, Prisma } from "@prisma/client";
 
 export default class GarmentService {

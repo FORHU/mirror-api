@@ -1,4 +1,4 @@
-import { prisma } from "../../utils/prisma";
+import { prisma } from "../utils/prisma";
 
 export default class OutfitRepo {
   static async findByUserId(userId: string, page: number = 1, limit: number = 20) {

@@ -1,4 +1,4 @@
-import AuthRepo from "../../repositories/shared/auth.repository";
+import AuthRepo from "../../repositories/auth.repository";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import logger from "../../utils/logger";
