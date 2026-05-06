@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import AuthRepo from "../repositories/auth.repository";
+import AuthRepo from "../repositories/shared/auth.repository";
 import { ACCESS_TOKEN_SECRET } from "../config";
 
 declare global {

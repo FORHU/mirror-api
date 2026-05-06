@@ -1,12 +1,16 @@
 import express from 'express';
-import authRoute from './auth.route';
-import userRoute from './user.route';
-import fileUploadRoute from './fileUpload.route';
-import garmentRoute from './garment.route';
-import outfitRoute from './outfit.route';
-import interactionRoute from './interaction.route';
-import kioskRoute from './kiosk.route';
-import tryOnRoute from './tryOn.route';
+
+// Remote Routes (Mobile Web)
+import remoteAuthRoute from './remote/auth.route';
+import remoteUserRoute from './shared/user.route';
+
+// Mirror Routes (Kiosk Web)
+import mirrorKioskRoute from './mirror/kiosk.route';
+import mirrorTryOnRoute from './mirror/tryOn.route';
+import mirrorGarmentRoute from './shared/garment.route';
+import mirrorOutfitRoute from './shared/outfit.route';
+import mirrorInteractionRoute from './shared/interaction.route';
+import mirrorFileUploadRoute from './shared/fileUpload.route';
 
 const router = express.Router();
 
@@ -16,13 +20,16 @@ router.get('/v1', (_, res) => {
   });
 });
 
-router.use('/v1/auth', authRoute);
-router.use('/v1/users', userRoute);
-router.use('/v1/file-uploads', fileUploadRoute);
-router.use('/v1/garments', garmentRoute);
-router.use('/v1/outfits', outfitRoute);
-router.use('/v1/interactions', interactionRoute);
-router.use('/v1/kiosks', kioskRoute);
-router.use('/v1/try-on', tryOnRoute);
+// Remote endpoints
+router.use('/v1/remote/auth', remoteAuthRoute);
+router.use('/v1/remote/users', remoteUserRoute);
+
+// Mirror endpoints
+router.use('/v1/mirror/kiosks', mirrorKioskRoute);
+router.use('/v1/mirror/try-on', mirrorTryOnRoute);
+router.use('/v1/mirror/garments', mirrorGarmentRoute);
+router.use('/v1/mirror/outfits', mirrorOutfitRoute);
+router.use('/v1/mirror/interactions', mirrorInteractionRoute);
+router.use('/v1/mirror/file-uploads', mirrorFileUploadRoute);
 
 export default router;
