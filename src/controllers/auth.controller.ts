@@ -11,6 +11,7 @@ export default class AuthController {
   static async login(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
       email: Joi.string().email().required(),
+      username: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -18,7 +19,7 @@ export default class AuthController {
 
     try {
       const platform = req.headers["x-platform"] as string;
-      const data = await AuthSvc.login(value.email, platform);
+      const data = await AuthSvc.login(value.email, platform, value.username);
       return res.json({
         status: "success",
         data,

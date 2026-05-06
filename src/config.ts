@@ -16,4 +16,9 @@ export const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6377");
 export const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
 export const REDIS_TTL_SECONDS = parseInt(process.env.REDIS_TTL_SECONDS || "3600");
 
+export const AWS_REGION = process.env.AWS_REGION || "ap-southeast-1";
+export const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || "";
+export const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || "";
+export const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME || "";
+
 export const isDev = NODE_ENV === "development";

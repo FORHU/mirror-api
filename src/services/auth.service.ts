@@ -14,14 +14,24 @@ export default class AuthSvc {
   /**
    * Login or Auto-Register with Email
    */
-  static async login(email: string, platform?: string) {
+  static async login(email: string, platform?: string, providedUsername?: string) {
     let user = await AuthRepo.findUserByEmail(email);
 
     if (!user) {
-      // Auto-register new user
-      const baseUsername = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "");
-      const randomSuffix = crypto.randomBytes(2).toString("hex");
-      const username = `${baseUsername}_${randomSuffix}`;
+      let username = providedUsername;
+      
+      if (!username) {
+        // Auto-generate username
+        const baseUsername = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "");
+        const randomSuffix = crypto.randomBytes(2).toString("hex");
+        username = `${baseUsername}_${randomSuffix}`;
+      } else {
+        // Check if provided username is already taken
+        const existingUser = await AuthRepo.findUserByUsername(username);
+        if (existingUser) {
+          throw { status: 400, message: "Username is already taken" };
+        }
+      }
 
       user = await AuthRepo.createUser({
         email,
