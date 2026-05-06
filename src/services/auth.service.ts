@@ -98,10 +98,7 @@ export default class AuthSvc {
       platform: provider,
     });
 
-    const { password: _pw, ...userForCache } = user as Record<string, unknown> & {
-      password?: string;
-    };
-    await CacheUtil.set(`user:${user.id}`, userForCache);
+    await CacheUtil.set(`user:${user.id}`, user);
 
     return {
       accessToken,

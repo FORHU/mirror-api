@@ -12,13 +12,11 @@ export default class AuthRepo {
 
   static async createUser(data: {
     email: string;
-    password?: string;
     username: string;
   }) {
     return prisma.user.create({
       data: {
         email: data.email,
-        password: data.password,
         username: data.username,
       },
       select: {

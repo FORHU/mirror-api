@@ -10,8 +10,7 @@ export default class UserService {
     if (!user) {
       throw { status: 404, message: "User not found" };
     }
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return user;
   }
 
   /**
