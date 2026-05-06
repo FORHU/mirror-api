@@ -14,22 +14,22 @@ import mirrorFileUploadRoute from './shared/fileUpload.route';
 
 const router = express.Router();
 
-router.get('/v1', (_, res) => {
+router.get('/', (_, res) => {
   res.json({
     message: 'Welcome to mirror-api',
   });
 });
 
 // Remote endpoints
-router.use('/v1/remote/auth', remoteAuthRoute);
-router.use('/v1/remote/users', remoteUserRoute);
+router.use('/remote/auth', remoteAuthRoute);
+router.use('/remote/users', remoteUserRoute);
 
 // Mirror endpoints
-router.use('/v1/mirror/kiosks', mirrorKioskRoute);
-router.use('/v1/mirror/try-on', mirrorTryOnRoute);
-router.use('/v1/mirror/garments', mirrorGarmentRoute);
-router.use('/v1/mirror/outfits', mirrorOutfitRoute);
-router.use('/v1/mirror/interactions', mirrorInteractionRoute);
-router.use('/v1/mirror/file-uploads', mirrorFileUploadRoute);
+router.use('/mirror/kiosks', mirrorKioskRoute);
+router.use('/mirror/try-on', mirrorTryOnRoute);
+router.use('/mirror/garments', mirrorGarmentRoute);
+router.use('/mirror/outfits', mirrorOutfitRoute);
+router.use('/mirror/interactions', mirrorInteractionRoute);
+router.use('/mirror/file-uploads', mirrorFileUploadRoute);
 
 export default router;
