@@ -186,6 +186,8 @@ enum Category {
   Winterwear // Cold-weather clothing (coats, jackets, heavy layers)
   Summerwear // Hot-weather clothing (light fabrics, shorts, breathable outfits)
   Rainwear // Waterproof clothing (raincoats, waterproof jackets)
+  Springwear // Spring-appropriate clothing (light layers, transitional pieces)
+  Autumnwear // Autumn-appropriate clothing (warm layers, cozy textures)
 
   Vintage // Retro-inspired styles from past decades
   Minimalist // Clean, simple, neutral, low-design outfits
