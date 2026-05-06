@@ -46,15 +46,15 @@ The API follows a **Client-Specific Layered Architecture** to cleanly separate t
 ## 📡 API Endpoint Map
 
 ### Remote (Mobile)
-- `POST /api/v1/remote/auth/login`: Login/Register.
-- `GET /api/v1/remote/users/me`: Get profile.
+- `POST /remote/auth/login`: Login/Register.
+- `GET /remote/users/me`: Get profile.
+- `POST /remote/kiosks/connect`: Pair phone to mirror.
+- `POST /remote/kiosks/disconnect`: Unpair.
+- `POST /remote/kiosks/command`: Send remote action (Capture, Toggle UI, etc).
 
 ### Mirror (Kiosk)
-- `POST /api/v1/mirror/kiosks/connect`: Pair phone to mirror.
-- `POST /api/v1/mirror/kiosks/disconnect`: Unpair.
-- `POST /api/v1/mirror/kiosks/command`: Send remote action (Capture, Toggle UI, etc).
-- `POST /api/v1/mirror/try-on/run`: Initiate AI Virtual Try-On.
-- `GET /api/v1/mirror/file-uploads/presign`: Get S3 upload ticket.
+- `POST /mirror/try-on/run`: Initiate AI Virtual Try-On.
+- `GET /mirror/file-uploads/presign`: Get S3 upload ticket.
 
 ---
 
