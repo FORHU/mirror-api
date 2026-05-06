@@ -14,9 +14,10 @@
       "*": ["node_modules/*", "src/*"]
     },
     "typeRoots": ["node_modules/@types", "src/types"],
+    "types": ["node"],
     "sourceMap": true,
     "declaration": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "prisma/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
