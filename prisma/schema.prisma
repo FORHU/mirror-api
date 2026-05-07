@@ -68,13 +68,13 @@ model Garment {
   description String?
   imageUrl    String
   fileId      String?
-  file        File?               @relation("GarmentFile", fields: [fileId], references: [id])
+  file        File?   @relation("GarmentFile", fields: [fileId], references: [id])
 
-  garmentType GarmentTypes      @default(None)
-  fittingSlot FittingSlots      @default(None)
-  category    Category[]
-  gender      Gender            @default(UNISEX)
-  layerLevel  LayerLevel        @default(BASE)
+  garmentType GARMENTTYPES      @default(None)
+  fittingSlot FITINGSLOTS       @default(None)
+  category    CATEGORY[]
+  gender      GENDER            @default(UNISEX)
+  layerLevel  LAYERLEVEL        @default(BASE)
   metaData    Json?
   outfits     GarmentInOutfit[]
   tags        Tag[]
@@ -129,19 +129,18 @@ model Interaction {
   createdAt DateTime @default(now())
 }
 
-
 /// Represents the Z-index stacking order for garments on the mirror.
 /// Lower levels (INNER) are rendered first, higher levels (OVER) are rendered last.
-enum LayerLevel {
+enum LAYERLEVEL {
   INNER // 0: Undergarments, socks
-  BASE  // 1: T-shirts, light shirts, leggings
-  MID   // 2: Sweaters, hoodies, cardigans
+  BASE // 1: T-shirts, light shirts, leggings
+  MID // 2: Sweaters, hoodies, cardigans
   OUTER // 3: Jackets, coats, blazers
-  OVER  // 4: Scarves, raincoats, protective gear
+  OVER // 4: Scarves, raincoats, protective gear
 }
 
 /// Target gender for the garment classification.
-enum Gender {
+enum GENDER {
   MALE
   FEMALE
   UNISEX
@@ -149,30 +148,30 @@ enum Gender {
 
 /// Defines where on the body the garment or accessory is anchored.
 /// Critical for the 2.5D rendering engine to position assets correctly.
-enum FittingSlots {
+enum FITINGSLOTS {
   None
 
   // Head & Face
-  HeadGarment    // Hats, beanies, helmets
-  Glasses        // Spectacles, sunglasses
-  Earrings       // Ear accessories
+  HeadGarment // Hats, beanies, helmets
+  Glasses // Spectacles, sunglasses
+  Earrings // Ear accessories
 
   // Torso & Legs
-  UpperGarment   // Tops, shirts, jackets
-  LowerGarment   // Pants, skirts, shorts
-  FullGarment    // Dresses, jumpsuits, overalls
+  UpperGarment // Tops, shirts, jackets
+  LowerGarment // Pants, skirts, shorts
+  FullGarment // Dresses, jumpsuits, overalls
 
   // Extremities
-  FootGarment    // Shoes, boots, sneakers
+  FootGarment // Shoes, boots, sneakers
 
   // Accessories
   LeftHandAccessory
   RightHandAccessory
-  NeckAccessory  // Necklaces, ties, scarves
+  NeckAccessory // Necklaces, ties, scarves
   WaistAccessory // Belts, chains
 }
 
-enum GarmentTypes {
+enum GARMENTTYPES {
   None
 
   // Headwear
@@ -229,7 +228,7 @@ enum GarmentTypes {
   Uniform
 }
 
-enum Category {
+enum CATEGORY {
   Streetwear
   Casual
   Formal
