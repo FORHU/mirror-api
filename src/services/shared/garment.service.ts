@@ -44,6 +44,10 @@ export default class GarmentService {
       garmentData.file = {
         create: data.file,
       };
+    } else if (data.fileId) {
+      garmentData.file = {
+        connect: { id: data.fileId },
+      };
     }
 
     if (data.tags && Array.isArray(data.tags)) {
@@ -79,6 +83,10 @@ export default class GarmentService {
           create: data.file,
           update: data.file,
         },
+      };
+    } else if (data.fileId) {
+      garmentData.file = {
+        connect: { id: data.fileId },
       };
     }
 

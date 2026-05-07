@@ -1,14 +1,15 @@
 import express from "express";
 import GarmentController from "../../controllers/shared/garment.controller";
-import { authenticate } from "../../middleware/auth.middleware";
+import { upload } from "../../middleware/upload.middleware";
 
 const router = express.Router();
 
 router.get("/", GarmentController.index);
 router.get("/:id", GarmentController.show);
 
-router.post("/", authenticate, GarmentController.create);
-router.patch("/:id", authenticate, GarmentController.update);
-router.delete("/:id", authenticate, GarmentController.destroy);
+// Publicly accessible for administration
+router.post("/", upload.single("file"), GarmentController.create);
+router.patch("/:id", upload.single("file"), GarmentController.update);
+router.delete("/:id", GarmentController.destroy);
 
 export default router;

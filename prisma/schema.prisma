@@ -130,38 +130,46 @@ model Interaction {
 }
 
 
+/// Represents the Z-index stacking order for garments on the mirror.
+/// Lower levels (INNER) are rendered first, higher levels (OVER) are rendered last.
 enum LayerLevel {
-  INNER
-  BASE
-  MID
-  OUTER
-  OVER
+  INNER // 0: Undergarments, socks
+  BASE  // 1: T-shirts, light shirts, leggings
+  MID   // 2: Sweaters, hoodies, cardigans
+  OUTER // 3: Jackets, coats, blazers
+  OVER  // 4: Scarves, raincoats, protective gear
 }
 
+/// Target gender for the garment classification.
 enum Gender {
   MALE
   FEMALE
   UNISEX
 }
 
+/// Defines where on the body the garment or accessory is anchored.
+/// Critical for the 2.5D rendering engine to position assets correctly.
 enum FittingSlots {
   None
 
-  HeadGarment
-  Glasses
-  Earrings
+  // Head & Face
+  HeadGarment    // Hats, beanies, helmets
+  Glasses        // Spectacles, sunglasses
+  Earrings       // Ear accessories
 
-  UpperGarment
-  LowerGarment
-  FullGarment
+  // Torso & Legs
+  UpperGarment   // Tops, shirts, jackets
+  LowerGarment   // Pants, skirts, shorts
+  FullGarment    // Dresses, jumpsuits, overalls
 
-  FootGarment
+  // Extremities
+  FootGarment    // Shoes, boots, sneakers
 
+  // Accessories
   LeftHandAccessory
   RightHandAccessory
-
-  NeckAccessory
-  WaistAccessory
+  NeckAccessory  // Necklaces, ties, scarves
+  WaistAccessory // Belts, chains
 }
 
 enum GarmentTypes {

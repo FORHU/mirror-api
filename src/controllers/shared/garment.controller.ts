@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import GarmentService from "../../services/shared/garment.service";
+import FileService from "../../services/shared/file.service";
 import { GarmentTypes, FittingSlots, Category, Gender, LayerLevel } from "@prisma/client";
 
 const validationError = (message: string) => ({ status: 400, message });
@@ -55,7 +56,28 @@ export default class GarmentController {
     if (error) return next(validationError(error.message));
 
     try {
-      const data = await GarmentService.createGarment(value);
+      // 1. Parse JSON fields if they are strings (typical for form-data)
+      let finalValue = { ...value };
+      
+      if (typeof req.body.file === 'string') {
+        try { finalValue.file = JSON.parse(req.body.file); } catch (e) {}
+      } else if (req.body.file) {
+        finalValue.file = req.body.file;
+      }
+
+      if (typeof req.body.tags === 'string') {
+        try { finalValue.tags = JSON.parse(req.body.tags); } catch (e) {}
+      }
+
+      // 2. If a physical file was uploaded, process it
+      if (req.file) {
+        const manualFileSpecs = finalValue.file || {};
+        const fileRecord = await FileService.uploadFile(req.file, manualFileSpecs.metaData);
+        finalValue.fileId = fileRecord.id;
+        finalValue.imageUrl = fileRecord.fileUrl;
+      }
+
+      const data = await GarmentService.createGarment(finalValue);
       res.status(201).json({ status: "success", data });
     } catch (err) {
       next(err);
@@ -67,7 +89,25 @@ export default class GarmentController {
     if (error) return next(validationError(error.message));
 
     try {
-      const data = await GarmentService.updateGarment(req.params.id, value);
+      let finalValue = { ...value };
+
+      if (typeof req.body.file === 'string') {
+        try { finalValue.file = JSON.parse(req.body.file); } catch (e) {}
+      }
+      
+      if (typeof req.body.tags === 'string') {
+        try { finalValue.tags = JSON.parse(req.body.tags); } catch (e) {}
+      }
+
+      // If a new physical file was uploaded, process it
+      if (req.file) {
+        const manualFileSpecs = finalValue.file || {};
+        const fileRecord = await FileService.uploadFile(req.file, manualFileSpecs.metaData);
+        finalValue.fileId = fileRecord.id;
+        finalValue.imageUrl = fileRecord.fileUrl;
+      }
+
+      const data = await GarmentService.updateGarment(req.params.id, finalValue);
       res.json({ status: "success", data });
     } catch (err) {
       next(err);

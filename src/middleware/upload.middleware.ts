@@ -19,9 +19,9 @@ const s3 = new S3Client({
   },
 });
 
-const storage = multerS3({
+const storageS3 = multerS3({
   s3: s3,
-  bucket: S3_BUCKET_NAME,
+  bucket: S3_BUCKET_NAME || "default-bucket",
   acl: "public-read",
   metadata: function (req, file, cb) {
     cb(null, { fieldName: file.fieldname });
@@ -32,6 +32,21 @@ const storage = multerS3({
     cb(null, `uploads/${Date.now()}-${uniqueSuffix}${ext}`);
   },
 });
+
+// Local Storage Fallback
+const localStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = crypto.randomBytes(16).toString("hex");
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${uniqueSuffix}${ext}`);
+  },
+});
+
+// Choose storage based on environment
+const storage = (S3_BUCKET_NAME && AWS_ACCESS_KEY_ID) ? storageS3 : localStorage;
 
 // File filter
 const fileFilter = (
