@@ -8,7 +8,9 @@ export default class GarmentService {
     const filters: any = {};
     if (garmentType) filters.garmentType = garmentType;
     if (fittingSlot) filters.fittingSlot = fittingSlot;
-    if (category) filters.category = category;
+    if (category) {
+      filters.category = { hasSome: Array.isArray(category) ? category : [category] };
+    }
     if (gender) filters.gender = gender;
     if (tag) {
       filters.tags = { some: { name: tag } };
@@ -34,7 +36,7 @@ export default class GarmentService {
       imageUrl: data.imageUrl,
       garmentType: data.garmentType as GarmentTypes,
       fittingSlot: data.fittingSlot as FittingSlots,
-      category: data.category as Category,
+      category: data.category as Category[],
       gender: data.gender as Gender,
       layerLevel: data.layerLevel as LayerLevel,
       metaData: data.metaData,
@@ -71,7 +73,7 @@ export default class GarmentService {
       imageUrl: data.imageUrl,
       garmentType: data.garmentType as GarmentTypes,
       fittingSlot: data.fittingSlot as FittingSlots,
-      category: data.category as Category,
+      category: data.category as Category[],
       gender: data.gender as Gender,
       layerLevel: data.layerLevel as LayerLevel,
       metaData: data.metaData,

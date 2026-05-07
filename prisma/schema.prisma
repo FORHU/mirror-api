@@ -72,7 +72,7 @@ model Garment {
 
   garmentType GarmentTypes      @default(None)
   fittingSlot FittingSlots      @default(None)
-  category    Category?
+  category    Category[]
   gender      Gender            @default(UNISEX)
   layerLevel  LayerLevel        @default(BASE)
   metaData    Json?
@@ -224,31 +224,27 @@ enum GarmentTypes {
   Earrings
   Scarf
   Gloves
+  Traditional
+  Cultural
+  Uniform
 }
 
 enum Category {
-  Streetwear // Urban-inspired fashion (hoodies, sneakers, oversized fits, hype culture)
-  Casual // Everyday relaxed clothing (jeans, tees, simple outfits)
-  Formal // Strict dress code outfits (suits, tuxedos, formal dresses)
-  Business // Office/professional attire (blazers, slacks, business dresses)
-  SmartCasual // Hybrid of casual + formal (polished but relaxed looks)
-
-  Sportswear // Clothing designed for sports activities (jerseys, training gear)
-  Activewear // Gym/workout-focused clothing (performance fabrics, leggings)
-  Athleisure // Sport + lifestyle wear (leggings, joggers worn casually)
-
-  Winterwear // Cold-weather clothing (coats, jackets, heavy layers)
-  Summerwear // Hot-weather clothing (light fabrics, shorts, breathable outfits)
-  Rainwear // Waterproof clothing (raincoats, waterproof jackets)
-  Springwear // Spring-appropriate clothing (light layers, transitional pieces)
-  Autumnwear // Autumn-appropriate clothing (warm layers, cozy textures)
-
-  Vintage // Retro-inspired styles from past decades
-  Minimalist // Clean, simple, neutral, low-design outfits
-  Luxury // High-end fashion, premium brands, expensive styling
-  AvantGarde // Experimental, artistic, runway-style fashion
-
-  Traditional // Heritage or culturally rooted clothing (e.g. barong, kimono)
-  Cultural // Broader cultural-inspired outfits (non-ceremonial ethnic wear)
-  Uniform // Standardized outfits (school, military, work uniforms)
+  Streetwear
+  Casual
+  Formal
+  Business
+  SmartCasual
+  Sportswear
+  Activewear
+  Athleisure
+  Winterwear
+  Summerwear
+  Rainwear
+  Springwear
+  Autumnwear
+  Vintage
+  Minimalist
+  Luxury
+  AvantGarde
 }
