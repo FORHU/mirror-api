@@ -12,7 +12,9 @@ export default class OutfitRepo {
         include: {
           items: {
             include: {
-              garment: true,
+              garment: {
+                include: { file: true }
+              },
             },
             orderBy: { order: "asc" },
           },
@@ -31,7 +33,9 @@ export default class OutfitRepo {
       include: {
         items: {
           include: {
-            garment: true,
+            garment: {
+              include: { file: true }
+            },
           },
           orderBy: { order: "asc" },
         },
@@ -59,7 +63,11 @@ export default class OutfitRepo {
       },
       include: {
         items: {
-          include: { garment: true },
+        include: { 
+          garment: {
+            include: { file: true }
+          }
+        },
         },
       },
     });

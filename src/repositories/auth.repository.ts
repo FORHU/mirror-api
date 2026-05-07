@@ -83,6 +83,9 @@ export default class AuthRepo {
     refreshToken: string;
     expiresAt: Date;
     platform: string;
+    provider?: string;
+    providerUserId?: string;
+    providerAvatarUrl?: string;
   }) {
     return prisma.session.create({
       data,
@@ -130,6 +133,60 @@ export default class AuthRepo {
         avatar: {
           select: { fileUrl: true },
         },
+      },
+    });
+  }
+
+  static async findOrCreateGoogleUser(data: {
+    email: string;
+    username: string;
+    avatarUrl?: string;
+  }) {
+    // Try to find existing user by email
+    const existingUser = await this.findUserByEmail(data.email);
+
+    if (existingUser) {
+      // If they have an avatar URL from Google and don't have one set, or we want to sync it
+      if (data.avatarUrl && !existingUser.avatarId) {
+        // Create a File record for the avatar
+        const avatarFile = await prisma.file.create({
+          data: {
+            filename: `google_avatar_${Date.now()}.jpg`,
+            fileUrl: data.avatarUrl,
+          },
+        });
+
+        return prisma.user.update({
+          where: { id: existingUser.id },
+          data: { avatarId: avatarFile.id },
+          include: {
+            avatar: { select: { fileUrl: true } },
+          },
+        });
+      }
+      return existingUser;
+    }
+
+    // Create new user
+    let avatarId: string | undefined;
+    if (data.avatarUrl) {
+      const avatarFile = await prisma.file.create({
+        data: {
+          filename: `google_avatar_${Date.now()}.jpg`,
+          fileUrl: data.avatarUrl,
+        },
+      });
+      avatarId = avatarFile.id;
+    }
+
+    return prisma.user.create({
+      data: {
+        email: data.email,
+        username: data.username,
+        avatarId,
+      },
+      include: {
+        avatar: { select: { fileUrl: true } },
       },
     });
   }

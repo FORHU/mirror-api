@@ -23,12 +23,15 @@ model User {
 }
 
 model Session {
-  id           String   @id @default(uuid())
-  userId       String
-  platform     String
-  expiresAt    DateTime
-  accessToken  String
-  refreshToken String   @unique
+  id                String   @id @default(uuid())
+  userId            String
+  platform          String
+  expiresAt         DateTime
+  accessToken       String
+  refreshToken      String   @unique
+  provider          String?
+  providerUserId    String?
+  providerAvatarUrl String?
 
   createdAt DateTime @default(now())
 
@@ -38,16 +41,25 @@ model Session {
 }
 
 model File {
-  id       String  @id @default(uuid())
-  filename String?
-  fileUrl  String?
-  metaData Json?
+  id           String  @id @default(uuid())
+  filename     String?
+  originalName String?
+  fileUrl      String?
+  thumbnailUrl String?
+  mimeType     String?
+  extension    String?
+  size         Int?
+  provider     String?
+  bucket       String?
+  path         String?
+  metaData     Json?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  users User[] @relation("UserAvatar")
+  users    User[]    @relation("UserAvatar")
+  garments Garment[] @relation("GarmentFile")
 }
 
 model Garment {
@@ -55,22 +67,21 @@ model Garment {
   name        String
   description String?
   imageUrl    String
+  fileId      String?
+  file        File?               @relation("GarmentFile", fields: [fileId], references: [id])
 
-  bodyPart BodyPart  @default(None)
-  category Category?
-
-  colorName   String?
-  colorHex    String?
-  scaleFactor Float   @default(1.0)
-  zIndex      Int     @default(1)
+  garmentType GarmentTypes      @default(None)
+  fittingSlot FittingSlots      @default(None)
+  category    Category?
+  gender      Gender            @default(UNISEX)
+  layerLevel  LayerLevel        @default(BASE)
+  metaData    Json?
+  outfits     GarmentInOutfit[]
+  tags        Tag[]
 
   deletedAt DateTime?
-
-  outfits GarmentInOutfit[]
-  tags    Tag[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Tag {
@@ -118,7 +129,42 @@ model Interaction {
   createdAt DateTime @default(now())
 }
 
-enum BodyPart {
+
+enum LayerLevel {
+  INNER
+  BASE
+  MID
+  OUTER
+  OVER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  UNISEX
+}
+
+enum FittingSlots {
+  None
+
+  HeadGarment
+  Glasses
+  Earrings
+
+  UpperGarment
+  LowerGarment
+  FullGarment
+
+  FootGarment
+
+  LeftHandAccessory
+  RightHandAccessory
+
+  NeckAccessory
+  WaistAccessory
+}
+
+enum GarmentTypes {
   None
 
   // Headwear

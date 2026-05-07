@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import GarmentService from "../../services/shared/garment.service";
-import { BodyPart, Category } from "@prisma/client";
+import { GarmentTypes, FittingSlots, Category, Gender, LayerLevel } from "@prisma/client";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -9,13 +9,26 @@ const garmentSchema = Joi.object({
   name: Joi.string().required(),
   description: Joi.string().optional().allow(null, ""),
   imageUrl: Joi.string().uri().required(),
-  bodyPart: Joi.string().valid(...Object.values(BodyPart)).optional(),
+  garmentType: Joi.string().valid(...Object.values(GarmentTypes)).optional(),
+  fittingSlot: Joi.string().valid(...Object.values(FittingSlots)).optional(),
   category: Joi.string().valid(...Object.values(Category)).optional().allow(null),
-  colorName: Joi.string().optional().allow(null, ""),
-  colorHex: Joi.string().optional().allow(null, ""),
-  scaleFactor: Joi.number().optional(),
-  zIndex: Joi.number().integer().optional(),
+  gender: Joi.string().valid(...Object.values(Gender)).optional(),
+  layerLevel: Joi.string().valid(...Object.values(LayerLevel)).optional(),
   tags: Joi.array().items(Joi.string()).optional(),
+  metaData: Joi.object().optional().allow(null),
+  file: Joi.object({
+    filename: Joi.string().optional(),
+    originalName: Joi.string().optional(),
+    fileUrl: Joi.string().uri().optional(),
+    thumbnailUrl: Joi.string().uri().optional(),
+    mimeType: Joi.string().optional(),
+    extension: Joi.string().optional(),
+    size: Joi.number().optional(),
+    provider: Joi.string().optional(),
+    bucket: Joi.string().optional(),
+    path: Joi.string().optional(),
+    metaData: Joi.object().optional(),
+  }).optional(),
 });
 
 export default class GarmentController {

@@ -27,4 +27,6 @@ export const FASHN_BASE_URL = process.env.FASHN_BASE_URL || "https://api.fashn.a
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 export const CHAT_WONDER_API_URL = process.env.CHAT_WONDER_API_URL || "";
 
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+
 export const isDev = NODE_ENV === "development";

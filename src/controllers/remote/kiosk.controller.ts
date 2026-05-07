@@ -13,6 +13,7 @@ export default class KioskController {
   static async connect(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
       kioskId: Joi.string().required(),
+      kioskName: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -36,10 +37,14 @@ export default class KioskController {
         ...state,
         status: "in_use",
         userId,
+        kioskName: value.kioskName || state.kioskName, // Persist the name if provided
       });
 
       // Notify the Kiosk that it has been paired
-      emitToKiosk(value.kioskId, "kiosk_paired", { userId });
+      emitToKiosk(value.kioskId, "kiosk_paired", { 
+        userId, 
+        kioskName: value.kioskName || state.kioskName 
+      });
 
       logger.info(`User ${userId} paired with Kiosk ${value.kioskId}`);
 
@@ -132,6 +137,7 @@ export default class KioskController {
   static async notifyScanning(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
       kioskId: Joi.string().required(),
+      kioskName: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -144,8 +150,18 @@ export default class KioskController {
         return res.status(404).json({ status: "error", message: "Kiosk not found or offline" });
       }
 
+      // Save the name to state for the rest of the session
+      await CacheUtil.set(`kiosk_state:${value.kioskId}`, {
+        ...state,
+        kioskName: value.kioskName || state.kioskName || value.kioskId,
+        lastScannedAt: new Date(),
+      });
+
       // Notify the Kiosk that it has been scanned
-      emitToKiosk(value.kioskId, "kiosk_scanning", { status: "pending_login" });
+      emitToKiosk(value.kioskId, "kiosk_scanning", { 
+        status: "pending_login",
+        kioskName: value.kioskName || state.kioskName || value.kioskId 
+      });
 
       logger.info(`Kiosk ${value.kioskId} notified of scan`);
 

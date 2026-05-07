@@ -1,13 +1,15 @@
 import GarmentRepo from "../../repositories/garment.repository";
-import { BodyPart, Category, Prisma } from "@prisma/client";
+import { GarmentTypes, FittingSlots, Category, Gender, LayerLevel, Prisma } from "@prisma/client";
 
 export default class GarmentService {
   static async getGarments(query: any) {
-    const { page, limit, bodyPart, category, tag } = query;
+    const { page, limit, garmentType, fittingSlot, category, gender, tag } = query;
     
     const filters: any = {};
-    if (bodyPart) filters.bodyPart = bodyPart;
+    if (garmentType) filters.garmentType = garmentType;
+    if (fittingSlot) filters.fittingSlot = fittingSlot;
     if (category) filters.category = category;
+    if (gender) filters.gender = gender;
     if (tag) {
       filters.tags = { some: { name: tag } };
     }
@@ -30,13 +32,19 @@ export default class GarmentService {
       name: data.name,
       description: data.description,
       imageUrl: data.imageUrl,
-      bodyPart: data.bodyPart as BodyPart,
+      garmentType: data.garmentType as GarmentTypes,
+      fittingSlot: data.fittingSlot as FittingSlots,
       category: data.category as Category,
-      colorName: data.colorName,
-      colorHex: data.colorHex,
-      scaleFactor: data.scaleFactor,
-      zIndex: data.zIndex,
+      gender: data.gender as Gender,
+      layerLevel: data.layerLevel as LayerLevel,
+      metaData: data.metaData,
     };
+
+    if (data.file) {
+      garmentData.file = {
+        create: data.file,
+      };
+    }
 
     if (data.tags && Array.isArray(data.tags)) {
       garmentData.tags = {
@@ -57,13 +65,22 @@ export default class GarmentService {
       name: data.name,
       description: data.description,
       imageUrl: data.imageUrl,
-      bodyPart: data.bodyPart as BodyPart,
+      garmentType: data.garmentType as GarmentTypes,
+      fittingSlot: data.fittingSlot as FittingSlots,
       category: data.category as Category,
-      colorName: data.colorName,
-      colorHex: data.colorHex,
-      scaleFactor: data.scaleFactor,
-      zIndex: data.zIndex,
+      gender: data.gender as Gender,
+      layerLevel: data.layerLevel as LayerLevel,
+      metaData: data.metaData,
     };
+
+    if (data.file) {
+      garmentData.file = {
+        upsert: {
+          create: data.file,
+          update: data.file,
+        },
+      };
+    }
 
     if (data.tags && Array.isArray(data.tags)) {
       garmentData.tags = {

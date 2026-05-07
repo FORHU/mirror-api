@@ -17,6 +17,7 @@ export default class GarmentRepo {
         take: limit,
         include: {
           tags: true,
+          file: true,
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -31,6 +32,7 @@ export default class GarmentRepo {
       where: { id, deletedAt: null },
       include: {
         tags: true,
+        file: true,
       },
     });
   }
@@ -40,6 +42,7 @@ export default class GarmentRepo {
       data,
       include: {
         tags: true,
+        file: true,
       },
     });
   }
@@ -50,6 +53,7 @@ export default class GarmentRepo {
       data,
       include: {
         tags: true,
+        file: true,
       },
     });
   }
