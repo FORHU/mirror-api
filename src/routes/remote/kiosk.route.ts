@@ -4,6 +4,9 @@ import { authenticate } from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
+router.post("/notify-scanning", KioskController.notifyScanning);
+router.post("/clear-all", KioskController.clearAll);
+
 router.use(authenticate); // Only logged-in users can control kiosks
 
 router.post("/connect", KioskController.connect);

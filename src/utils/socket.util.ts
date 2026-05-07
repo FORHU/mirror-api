@@ -40,3 +40,13 @@ export const emitToKiosk = (kioskId: string, event: string, data: any) => {
     io.to(kioskId).emit(event, data);
   }
 };
+
+/**
+ * Disconnect all active sockets
+ */
+export const disconnectAll = () => {
+  if (io) {
+    io.disconnectSockets(true);
+    logger.info("All active sockets have been forcefully disconnected");
+  }
+};

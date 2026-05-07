@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import CacheUtil from "../../utils/cache.util";
-import { emitToKiosk } from "../../utils/socket.util";
+import { emitToKiosk, disconnectAll } from "../../utils/socket.util";
 import logger from "../../utils/logger";
 
 const validationError = (message: string) => ({ status: 400, message });
@@ -120,6 +120,56 @@ export default class KioskController {
       return res.json({
         status: "success",
         message: "Command sent to kiosk",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Phone notifies Kiosk that it has been scanned
+   */
+  static async notifyScanning(req: Request, res: Response, next: NextFunction) {
+    const schema = Joi.object({
+      kioskId: Joi.string().required(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return next(validationError(error.message));
+
+    try {
+      const state = await CacheUtil.get<any>(`kiosk_state:${value.kioskId}`);
+
+      if (!state) {
+        return res.status(404).json({ status: "error", message: "Kiosk not found or offline" });
+      }
+
+      // Notify the Kiosk that it has been scanned
+      emitToKiosk(value.kioskId, "kiosk_scanning", { status: "pending_login" });
+
+      logger.info(`Kiosk ${value.kioskId} notified of scan`);
+
+      return res.json({
+        status: "success",
+        message: "Kiosk notified of scan",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Reset everything: Clear Redis states and disconnect all sockets
+   */
+  static async clearAll(req: Request, res: Response, next: NextFunction) {
+    try {
+      await CacheUtil.delByPattern("kiosk_state:*");
+      await CacheUtil.delByPattern("socket_to_kiosk:*");
+      disconnectAll();
+
+      return res.json({
+        status: "success",
+        message: "All kiosk states cleared and sockets disconnected",
       });
     } catch (err) {
       next(err);

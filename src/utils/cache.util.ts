@@ -40,9 +40,18 @@ export default class CacheUtil {
     }
   }
 
+  static async getKeys(pattern: string): Promise<string[]> {
+    try {
+      return await RedisUtil.client.keys(pattern);
+    } catch (error) {
+      logger.error(`[CacheUtil:getKeys] Failed to get keys for pattern ${pattern}:`, error);
+      return [];
+    }
+  }
+
   static async delByPattern(pattern: string): Promise<void> {
     try {
-      const keys = await RedisUtil.client.keys(pattern);
+      const keys = await this.getKeys(pattern);
       if (keys.length) await RedisUtil.client.del(keys);
     } catch (error) {
       logger.error(`[CacheUtil:delByPattern] Failed to delete pattern ${pattern}:`, error);
