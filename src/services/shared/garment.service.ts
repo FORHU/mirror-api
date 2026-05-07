@@ -1,5 +1,5 @@
 import GarmentRepo from "../../repositories/garment.repository";
-import { GarmentTypes, FittingSlots, Category, Gender, LayerLevel, Prisma } from "@prisma/client";
+import { GARMENTTYPES, FITINGSLOTS, CATEGORY, GENDER, LAYERLEVEL, Prisma } from "@prisma/client";
 
 export default class GarmentService {
   static async getGarments(query: any) {
@@ -34,11 +34,11 @@ export default class GarmentService {
       name: data.name,
       description: data.description,
       imageUrl: data.imageUrl,
-      garmentType: data.garmentType as GarmentTypes,
-      fittingSlot: data.fittingSlot as FittingSlots,
-      category: data.category as Category[],
-      gender: data.gender as Gender,
-      layerLevel: data.layerLevel as LayerLevel,
+      garmentType: data.garmentType as GARMENTTYPES,
+      fittingSlot: data.fittingSlot as FITINGSLOTS,
+      category: data.category as CATEGORY[],
+      gender: data.gender as GENDER,
+      layerLevel: data.layerLevel as LAYERLEVEL,
       metaData: data.metaData,
     };
 
@@ -71,11 +71,11 @@ export default class GarmentService {
       name: data.name,
       description: data.description,
       imageUrl: data.imageUrl,
-      garmentType: data.garmentType as GarmentTypes,
-      fittingSlot: data.fittingSlot as FittingSlots,
-      category: data.category as Category[],
-      gender: data.gender as Gender,
-      layerLevel: data.layerLevel as LayerLevel,
+      garmentType: data.garmentType as GARMENTTYPES,
+      fittingSlot: data.fittingSlot as FITINGSLOTS,
+      category: data.category as CATEGORY[],
+      gender: data.gender as GENDER,
+      layerLevel: data.layerLevel as LAYERLEVEL,
       metaData: data.metaData,
     };
 
