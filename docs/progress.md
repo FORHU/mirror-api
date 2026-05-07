@@ -30,7 +30,7 @@ The API follows a **Client-Specific Layered Architecture** to cleanly separate t
 ### 3. Real-Time Sync & Control
 - **Socket.IO + Redis**: Bidirectional communication with horizontal scaling support.
 - **Kiosk Pairing**: Secure device locking using Redis. Ensures only the paired phone can control a specific Mirror.
-- **Command Forwarding**: REST API triggers (`POST /v1/mirror/kiosks/command`) are instantly forwarded to the Mirror via Sockets.
+- **Command Forwarding**: REST API triggers (`POST /api/remote/kiosks/command`) are instantly forwarded to the Mirror via Sockets.
 
 ### 4. AI Virtual Try-On
 - **FASHN.AI Integration**: Specialized service for `tryon-v1.6` model.
@@ -45,23 +45,27 @@ The API follows a **Client-Specific Layered Architecture** to cleanly separate t
 
 ## 📡 API Endpoint Map
 
+All endpoints are prefixed with `/api`.
+
 ### Remote (Mobile)
-- `POST /remote/auth/login`: Login/Register.
-- `GET /remote/users/me`: Get profile.
-- `POST /remote/kiosks/connect`: Pair phone to mirror.
-- `POST /remote/kiosks/disconnect`: Unpair.
-- `POST /remote/kiosks/command`: Send remote action (Capture, Toggle UI, etc).
+- `POST /api/remote/auth/login`: Login/Register.
+- `GET /api/remote/users/me`: Get profile.
+- `POST /api/remote/kiosks/notify-scanning`: [Anonymous] Notify Kiosk of a successful scan.
+- `POST /api/remote/kiosks/clear-all`: [Anonymous] Reset all kiosk states and disconnect everyone.
+- `POST /api/remote/kiosks/connect`: Pair phone to mirror.
+- `POST /api/remote/kiosks/disconnect`: Unpair.
+- `POST /api/remote/kiosks/command`: Send remote action (Capture, Toggle UI, etc).
 
 ### Mirror (Kiosk)
-- `POST /mirror/try-on/run`: Initiate AI Virtual Try-On.
-- `GET /mirror/file-uploads/presign`: Get S3 upload ticket.
+- `POST /api/mirror/try-on/run`: Initiate AI Virtual Try-On.
+- `GET /api/mirror/file-uploads/presign`: Get S3 upload ticket.
 
 ---
 
 ## 🔄 The Flow
 
 1.  **Connection**: Mirror connects to Socket.IO and joins a room named after its `kioskId`.
-2.  **Pairing**: User scans QR on the Mirror -> Phone sends `connect` request -> Backend locks `kioskId` to `userId` in Redis.
+2.  **Pairing**: User scans QR on the Mirror -> Phone sends `notify-scanning` request (Kiosk shows "Please sign in") -> Phone sends `connect` request -> Backend locks `kioskId` to `userId` in Redis.
 3.  **Control**: Phone sends `command` -> Backend checks Redis lock -> Backend emits event to Mirror's Socket room.
 4.  **Try-On**: Phone selects outfit -> Mirror triggers `try-on/run` -> Backend calls FASHN.AI -> Backend polls status -> Backend pushes final Image URL to Mirror via Sockets.
 
