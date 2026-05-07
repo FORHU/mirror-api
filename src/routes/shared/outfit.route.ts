@@ -4,11 +4,10 @@ import { authenticate } from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
-router.use(authenticate); // Protect all outfit routes
-
 router.get("/", OutfitController.index);
 router.get("/:id", OutfitController.show);
-router.post("/", OutfitController.create);
-router.delete("/:id", OutfitController.destroy);
+
+router.post("/", authenticate, OutfitController.create);
+router.delete("/:id", authenticate, OutfitController.destroy);
 
 export default router;

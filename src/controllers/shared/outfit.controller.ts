@@ -18,7 +18,7 @@ const outfitSchema = Joi.object({
 export default class OutfitController {
   static async index(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as any).user?.id;
       const data = await OutfitService.getUserOutfits(userId, req.query);
       res.json({ status: "success", data });
     } catch (err) {
@@ -28,7 +28,7 @@ export default class OutfitController {
 
   static async show(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as any).user?.id;
       const data = await OutfitService.getOutfitById(req.params.id, userId);
       res.json({ status: "success", data });
     } catch (err) {
