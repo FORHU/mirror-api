@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import AuthSvc from "../../services/remote/auth.service";
+import { emitToKiosk } from "utils/socket.util";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -12,6 +13,7 @@ export default class AuthController {
     const schema = Joi.object({
       email: Joi.string().email().required(),
       username: Joi.string().optional(),
+      kioskId: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -20,6 +22,16 @@ export default class AuthController {
     try {
       const platform = req.headers["x-platform"] as string;
       const data = await AuthSvc.login(value.email, platform, value.username);
+ 
+      // If a kioskId was provided during login, notify that Kiosk
+      if (!value.kioskId) return res.json({
+        status: "failed",
+        data,
+        message: "Kiosk not found",
+      });
+      
+      emitToKiosk(value.kioskId, "kiosk_login", data);
+
       return res.json({
         status: "success",
         data,
