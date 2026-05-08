@@ -12,18 +12,17 @@ model User {
   email     String       @unique
   username  String       @unique
   gender    USER_GENDER? @default(MALE)
-  avatarId  String?
   isDeleted Boolean      @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   userMeasurement Json? // For detailed { height: 90, wight: 70, usualSize: "M" }
-
-  avatar   File?         @relation("UserAvatar", fields: [avatarId], references: [id])
-  sessions Session[]
-  outfits  Outfit[]
-  outlines UserOutline[]
+  avatarId        String?       @unique
+  avatar          File?         @relation("UserAvatar", fields: [avatarId], references: [id])
+  sessions        Session[]
+  outlines        UserOutline[]
+  outfits         Outfit[]
 }
 
 model UserOutline {
@@ -38,7 +37,6 @@ model UserOutline {
   weather    Json? // Cached weather data for that time
 
   // Relationships
-  outfits   Outfit[]    @relation("UserOutlineOutfits")
   cosmetics Cosmetics[]
 
   // 1-to-1 with Calendar
@@ -48,6 +46,7 @@ model UserOutline {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+  outfits   Outfit[]
 }
 
 model Cosmetics {
@@ -102,16 +101,18 @@ model File {
   mimeType     String?
   extension    String?
   size         Int?
-  provider     String  @default("S3") // S3 or LOCAL
+  provider     String  @default("S3")
   bucket       String?
-  path         String? // Key or local path
-  metaData     Json? // For dimensions, dominant color, etc.
+  path         String?
+  metaData     Json?
 
   createdAt DateTime @default(now())
 
-  // Relations
-  garment    Garment? @relation("GarmentFile")
-  userAvatar User[]   @relation("UserAvatar")
+  garment       Garment? @relation("GarmentFile")
+  userAvatar    User?    @relation("UserAvatar")
+  outfitDisplay Outfit?  @relation("OutfitDisplayFile")
+
+  outfits Outfit[] @relation("OutfitCollection")
 }
 
 model Garment {
@@ -130,9 +131,8 @@ model Garment {
   silhouette  SILHOUETTE      @default(Regular)
   metaData    Json?
 
-  outfits      GarmentInOutfit[]
-  interactions Interaction[]
-  tags         Tag[]
+  outfits GarmentInOutfit[]
+  tags    Tag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -144,11 +144,34 @@ model Tag {
   garments Garment[]
 }
 
-model Interaction {
+model Outfit {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  metaData    Json?
+  isPublic    Boolean     @default(false)
+  designType  DESIGN_TYPE @default(systemDesign)
+
+  fileId String @unique
+  file   File   @relation("OutfitDisplayFile", fields: [fileId], references: [id])
+
+  userOutlineId String?
+  userOutline   UserOutline? @relation(fields: [userOutlineId], references: [id])
+
+  items GarmentInOutfit[]
+  files File[]            @relation("OutfitCollection")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+}
+
+model GarmentInOutfit {
   id        String  @id @default(cuid())
-  type      String // LIKE, DISLIKE, TRY_ON
   garmentId String
   outfitId  String?
+  order     Int     @default(0)
 
   garment Garment @relation(fields: [garmentId], references: [id])
   outfit  Outfit? @relation(fields: [outfitId], references: [id])
@@ -156,31 +179,9 @@ model Interaction {
   createdAt DateTime @default(now())
 }
 
-model Outfit {
-  id           String            @id @default(cuid())
-  userId       String
-  name         String
-  description  String?
-  isPublic     Boolean           @default(false)
-  user         User              @relation(fields: [userId], references: [id])
-  items        GarmentInOutfit[]
-  interactions Interaction[]
-  userOutlines UserOutline[]     @relation("UserOutlineOutfits")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model GarmentInOutfit {
-  id        String @id @default(cuid())
-  garmentId String
-  outfitId  String
-  order     Int    @default(0)
-
-  garment Garment @relation(fields: [garmentId], references: [id])
-  outfit  Outfit  @relation(fields: [outfitId], references: [id])
-
-  createdAt DateTime @default(now())
+enum DESIGN_TYPE {
+  systemDesign
+  UserDesign
 }
 
 /// Represents the Z-index stacking order for garments on the mirror.

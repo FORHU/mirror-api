@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import GarmentService from "../../services/shared/garment.service";
 import FileService from "../../services/shared/file.service";
-import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL } from "@prisma/client";
+import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, SILHOUETTE } from "@prisma/client";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -15,6 +15,7 @@ const garmentSchema = Joi.object({
   category: Joi.array().items(Joi.string().valid(...Object.values(CATEGORY))).optional(),
   gender: Joi.string().valid(...Object.values(GARMENT_GENDER)).optional(),
   layerLevel: Joi.string().valid(...Object.values(LAYER_LEVEL)).optional(),
+  silhouette: Joi.string().valid(...Object.values(SILHOUETTE)).optional(),
   tags: Joi.array().items(Joi.string()).optional(),
   metaData: Joi.object().optional().allow(null),
   fileId: Joi.string().optional(),

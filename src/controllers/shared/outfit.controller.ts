@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import OutfitService from "../../services/shared/outfit.service";
+import FileService from "../../services/shared/file.service";
+import { DESIGN_TYPE } from "@prisma/client";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -13,6 +15,10 @@ const outfitSchema = Joi.object({
       order: Joi.number().integer().default(0),
     })
   ).default([]),
+  isPublic: Joi.boolean().optional().default(false),
+  designType: Joi.string().valid(...Object.values(DESIGN_TYPE)).optional(),
+  fileId: Joi.string().optional(),
+  file: Joi.object().optional(), // Manual file metadata
 });
 
 export default class OutfitController {
@@ -36,14 +42,72 @@ export default class OutfitController {
     }
   }
 
+  /**
+   * Cleans and parses form-data into correct types
+   */
+  private static prepareBody(body: any) {
+    const cleaned = { ...body };
+    
+    // Parse JSON strings from multipart form-data
+    const jsonFields = ['items', 'isPublic', 'designType', 'file'];
+    jsonFields.forEach(field => {
+      if (typeof cleaned[field] === 'string') {
+        try {
+          cleaned[field] = JSON.parse(cleaned[field]);
+        } catch (e) {
+          // If not valid JSON, leave as is
+        }
+      }
+    });
+
+    return cleaned;
+  }
+
   static async create(req: Request, res: Response, next: NextFunction) {
-    const { error, value } = outfitSchema.validate(req.body);
+    const cleanedBody = OutfitController.prepareBody(req.body);
+    const { error, value } = outfitSchema.validate(cleanedBody);
     if (error) return next(validationError(error.message));
 
     try {
-      const userId = (req as any).user.id;
-      const data = await OutfitService.createOutfit(userId, value);
+      let finalValue = { ...value };
+      const userId = (req as any).user?.id;
+
+      // If a physical file was uploaded, process it
+      if (req.file) {
+        const manualFileSpecs = finalValue.file || {};
+        const fileRecord = await FileService.uploadFile(req.file, manualFileSpecs.metaData);
+        finalValue.fileId = fileRecord.id;
+      }
+
+      if (!finalValue.fileId) {
+        return next(validationError("Outfit display file is required"));
+      }
+
+      const data = await OutfitService.createOutfit(userId, finalValue);
       res.status(201).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async update(req: Request, res: Response, next: NextFunction) {
+    const cleanedBody = OutfitController.prepareBody(req.body);
+    const { error, value } = outfitSchema.validate(cleanedBody);
+    if (error) return next(validationError(error.message));
+
+    try {
+      let finalValue = { ...value };
+      const userId = (req as any).user?.id;
+
+      // If a new physical file was uploaded, process it
+      if (req.file) {
+        const manualFileSpecs = finalValue.file || {};
+        const fileRecord = await FileService.uploadFile(req.file, manualFileSpecs.metaData);
+        finalValue.fileId = fileRecord.id;
+      }
+
+      const data = await OutfitService.updateOutfit(req.params.id, userId, finalValue);
+      res.json({ status: "success", data });
     } catch (err) {
       next(err);
     }
@@ -51,7 +115,7 @@ export default class OutfitController {
 
   static async destroy(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as any).user?.id;
       const data = await OutfitService.deleteOutfit(req.params.id, userId);
       res.json({ status: "success", data });
     } catch (err) {

@@ -9,7 +9,6 @@ import remoteKioskRoute from './remote/kiosk.route';
 import mirrorTryOnRoute from './mirror/tryOn.route';
 import mirrorGarmentRoute from './shared/garment.route';
 import mirrorOutfitRoute from './shared/outfit.route';
-import mirrorInteractionRoute from './shared/interaction.route';
 import mirrorFileUploadRoute from './shared/fileUpload.route';
 
 const router = express.Router();
@@ -29,7 +28,6 @@ router.use('/remote/kiosks', remoteKioskRoute);
 router.use('/mirror/try-on', mirrorTryOnRoute);
 router.use('/mirror/garments', mirrorGarmentRoute);
 router.use('/mirror/outfits', mirrorOutfitRoute);
-router.use('/mirror/interactions', mirrorInteractionRoute);
 router.use('/mirror/file-uploads', mirrorFileUploadRoute);
 
 export default router;

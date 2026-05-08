@@ -1,9 +1,9 @@
 import GarmentRepo from "../../repositories/garment.repository";
-import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, Prisma } from "@prisma/client";
+import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, SILHOUETTE, Prisma } from "@prisma/client";
 
 export default class GarmentService {
   static async getGarments(query: any) {
-    const { page, limit, garmentType, fittingSlot, category, gender, tag } = query;
+    const { page, limit, garmentType, fittingSlot, category, gender, silhouette, tag } = query;
     
     const filters: any = {};
     if (garmentType) {
@@ -16,6 +16,7 @@ export default class GarmentService {
       filters.category = { hasSome: Array.isArray(category) ? category : [category] };
     }
     if (gender) filters.gender = gender;
+    if (silhouette) filters.silhouette = silhouette;
     if (tag) {
       filters.tags = { some: { name: tag } };
     }
@@ -43,6 +44,7 @@ export default class GarmentService {
       category: data.category as CATEGORY[],
       gender: data.gender as GARMENT_GENDER,
       layerLevel: data.layerLevel as LAYER_LEVEL,
+      silhouette: data.silhouette as SILHOUETTE,
       metaData: data.metaData,
     };
 
@@ -80,6 +82,7 @@ export default class GarmentService {
       category: data.category as CATEGORY[],
       gender: data.gender as GARMENT_GENDER,
       layerLevel: data.layerLevel as LAYER_LEVEL,
+      silhouette: data.silhouette as SILHOUETTE,
       metaData: data.metaData,
     };
 
