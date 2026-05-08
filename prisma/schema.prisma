@@ -8,22 +8,76 @@ datasource db {
 }
 
 model User {
-  id        String  @id @default(uuid())
-  email     String  @unique
-  username  String  @unique
+  id        String       @id @default(cuid())
+  email     String       @unique
+  username  String       @unique
+  gender    USER_GENDER? @default(MALE)
   avatarId  String?
-  isDeleted Boolean @default(false)
+  isDeleted Boolean      @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  avatar   File?     @relation("UserAvatar", fields: [avatarId], references: [id])
+  avatar   File?         @relation("UserAvatar", fields: [avatarId], references: [id])
   sessions Session[]
   outfits  Outfit[]
+  outlines UserOutline[]
+}
+
+model UserOutline {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // The AI context
+  userPrompt String[] // "I have a date on Sunday @ 6pm"
+  location   String? // Extracted: "Mall"
+  startTime  DateTime? // Parsed: Sunday @ 6pm
+  weather    Json? // Cached weather data for that time
+
+  // Relationships
+  outfits   Outfit[]    @relation("UserOutlineOutfits")
+  cosmetics Cosmetics[]
+
+  // 1-to-1 with Calendar
+  calendarId String?   @unique
+  calendar   Calendar? @relation(fields: [calendarId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+model Cosmetics {
+  id       String  @id @default(cuid())
+  name     String
+  brand    String?
+  type     String? // Lipstick, Eye Shadow, etc.
+  imageUrl String?
+  hexColor String? // For UI color swatches
+
+  userOutlineId String?
+  userOutline   UserOutline? @relation(fields: [userOutlineId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Calendar {
+  id          String    @id @default(cuid())
+  externalId  String? // ID from Google/iCal
+  title       String
+  description String?
+  location    String?
+  startTime   DateTime
+  endTime     DateTime?
+
+  userOutline UserOutline?
+
+  createdAt DateTime @default(now())
 }
 
 model Session {
-  id                String   @id @default(uuid())
+  id                String   @id @default(cuid())
   userId            String
   platform          String
   expiresAt         DateTime
@@ -34,32 +88,28 @@ model Session {
   providerAvatarUrl String?
 
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([userId])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model File {
-  id           String  @id @default(uuid())
-  filename     String?
+  id           String  @id @default(cuid())
+  filename     String
   originalName String?
-  fileUrl      String?
+  fileUrl      String
   thumbnailUrl String?
   mimeType     String?
   extension    String?
   size         Int?
-  provider     String?
+  provider     String  @default("S3") // S3 or LOCAL
   bucket       String?
-  path         String?
-  metaData     Json?
+  path         String? // Key or local path
+  metaData     Json? // For dimensions, dominant color, etc.
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  createdAt DateTime @default(now())
 
-  users    User[]    @relation("UserAvatar")
-  garments Garment[] @relation("GarmentFile")
+  // Relations
+  garment    Garment? @relation("GarmentFile")
+  userAvatar User[]   @relation("UserAvatar")
 }
 
 model Garment {
@@ -67,46 +117,59 @@ model Garment {
   name        String
   description String?
   imageUrl    String
-  fileId      String?
-  file        File?   @relation("GarmentFile", fields: [fileId], references: [id])
+  fileId      String  @unique
+  file        File    @relation("GarmentFile", fields: [fileId], references: [id])
 
-  garmentType GARMENTTYPES      @default(None)
-  fittingSlot FITINGSLOTS       @default(None)
+  garmentType GARMENT_TYPES  @default(None)
+  fittingSlot FITING_SLOTS   @default(None)
   category    CATEGORY[]
-  gender      GENDER            @default(UNISEX)
-  layerLevel  LAYERLEVEL        @default(BASE)
+  gender      GARMENT_GENDER @default(UNISEX)
+  layerLevel  LAYER_LEVEL    @default(BASE)
   metaData    Json?
-  outfits     GarmentInOutfit[]
-  tags        Tag[]
 
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  outfits      GarmentInOutfit[]
+  interactions Interaction[]
+  tags         Tag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Tag {
-  id   String @id @default(cuid())
-  name String @unique
-
+  id       String    @id @default(cuid())
+  name     String    @unique
   garments Garment[]
 }
 
+model Interaction {
+  id        String  @id @default(cuid())
+  type      String // LIKE, DISLIKE, TRY_ON
+  garmentId String
+  outfitId  String?
+
+  garment Garment @relation(fields: [garmentId], references: [id])
+  outfit  Outfit? @relation(fields: [outfitId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
 model Outfit {
-  id          String  @id @default(cuid())
-  name        String
-  description String?
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
+  id           String            @id @default(cuid())
+  userId       String
+  name         String
+  description  String?
+  isPublic     Boolean           @default(false)
+  user         User              @relation(fields: [userId], references: [id])
   items        GarmentInOutfit[]
   interactions Interaction[]
+  userOutlines UserOutline[]     @relation("UserOutlineOutfits")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model GarmentInOutfit {
+  id        String @id @default(cuid())
   garmentId String
   outfitId  String
   order     Int    @default(0)
@@ -114,24 +177,12 @@ model GarmentInOutfit {
   garment Garment @relation(fields: [garmentId], references: [id])
   outfit  Outfit  @relation(fields: [outfitId], references: [id])
 
-  @@id([garmentId, outfitId])
-}
-
-model Interaction {
-  id       String  @id @default(cuid())
-  message  String
-  response String
-  intent   String?
-
-  outfitId String?
-  outfit   Outfit? @relation(fields: [outfitId], references: [id])
-
   createdAt DateTime @default(now())
 }
 
 /// Represents the Z-index stacking order for garments on the mirror.
 /// Lower levels (INNER) are rendered first, higher levels (OVER) are rendered last.
-enum LAYERLEVEL {
+enum LAYER_LEVEL {
   INNER // 0: Undergarments, socks
   BASE // 1: T-shirts, light shirts, leggings
   MID // 2: Sweaters, hoodies, cardigans
@@ -140,15 +191,20 @@ enum LAYERLEVEL {
 }
 
 /// Target gender for the garment classification.
-enum GENDER {
+enum GARMENT_GENDER {
   MALE
   FEMALE
   UNISEX
 }
 
+enum USER_GENDER {
+  MALE
+  FEMALE
+}
+
 /// Defines where on the body the garment or accessory is anchored.
 /// Critical for the 2.5D rendering engine to position assets correctly.
-enum FITINGSLOTS {
+enum FITING_SLOTS {
   None
 
   // Head & Face
@@ -171,7 +227,7 @@ enum FITINGSLOTS {
   WaistAccessory // Belts, chains
 }
 
-enum GARMENTTYPES {
+enum GARMENT_TYPES {
   None
 
   // Headwear
@@ -229,21 +285,28 @@ enum GARMENTTYPES {
 }
 
 enum CATEGORY {
-  Streetwear
-  Casual
-  Formal
-  Business
-  SmartCasual
-  Sportswear
-  Activewear
-  Athleisure
-  Winterwear
-  Summerwear
-  Rainwear
-  Springwear
-  Autumnwear
-  Vintage
-  Minimalist
-  Luxury
-  AvantGarde
+  Streetwear // Urban-inspired fashion (hoodies, sneakers, oversized fits, hype culture)
+  Casual // Everyday relaxed clothing (jeans, tees, simple outfits)
+  Formal // Strict dress code outfits (suits, tuxedos, formal dresses)
+  Business // Office/professional attire (blazers, slacks, business dresses)
+  SmartCasual // Hybrid of casual + formal (polished but relaxed looks)
+
+  Sportswear // Clothing designed for sports activities (jerseys, training gear)
+  Activewear // Gym/workout-focused clothing (performance fabrics, leggings)
+  Athleisure // Sport + lifestyle wear (leggings, joggers worn casually)
+
+  Winterwear // Cold-weather clothing (coats, jackets, heavy layers)
+  Summerwear // Hot-weather clothing (light fabrics, shorts, breathable outfits)
+  Rainwear // Waterproof clothing (raincoats, waterproof jackets)
+  Springwear // Spring-appropriate clothing (light layers, transitional pieces)
+  Autumnwear // Autumn-appropriate clothing (warm layers, cozy textures)
+
+  Vintage // Retro-inspired styles from past decades
+  Minimalist // Clean, simple, neutral, low-design outfits
+  Luxury // High-end fashion, premium brands, expensive styling
+  AvantGarde // Experimental, artistic, runway-style fashion
+
+  Traditional // Heritage or culturally rooted clothing (e.g. barong, kimono)
+  Cultural // Broader cultural-inspired outfits (non-ceremonial ethnic wear)
+  Uniform // Standardized outfits (school, military, work uniforms)
 }
