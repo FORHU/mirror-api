@@ -6,8 +6,12 @@ export default class GarmentService {
     const { page, limit, garmentType, fittingSlot, category, gender, tag } = query;
     
     const filters: any = {};
-    if (garmentType) filters.garmentType = garmentType;
-    if (fittingSlot) filters.fittingSlot = fittingSlot;
+    if (garmentType) {
+      filters.garmentType = { hasSome: Array.isArray(garmentType) ? garmentType : [garmentType] };
+    }
+    if (fittingSlot) {
+      filters.fittingSlot = { hasSome: Array.isArray(fittingSlot) ? fittingSlot : [fittingSlot] };
+    }
     if (category) {
       filters.category = { hasSome: Array.isArray(category) ? category : [category] };
     }
@@ -34,8 +38,8 @@ export default class GarmentService {
       name: data.name,
       description: data.description,
       imageUrl: data.imageUrl,
-      garmentType: data.garmentType as GARMENT_TYPES,
-      fittingSlot: data.fittingSlot as FITING_SLOTS,
+      garmentType: data.garmentType as GARMENT_TYPES[],
+      fittingSlot: data.fittingSlot as FITING_SLOTS[],
       category: data.category as CATEGORY[],
       gender: data.gender as GARMENT_GENDER,
       layerLevel: data.layerLevel as LAYER_LEVEL,
@@ -71,8 +75,8 @@ export default class GarmentService {
       name: data.name,
       description: data.description,
       imageUrl: data.imageUrl,
-      garmentType: data.garmentType as GARMENT_TYPES,
-      fittingSlot: data.fittingSlot as FITING_SLOTS,
+      garmentType: data.garmentType as GARMENT_TYPES[],
+      fittingSlot: data.fittingSlot as FITING_SLOTS[],
       category: data.category as CATEGORY[],
       gender: data.gender as GARMENT_GENDER,
       layerLevel: data.layerLevel as LAYER_LEVEL,

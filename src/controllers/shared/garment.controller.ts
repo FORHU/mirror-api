@@ -10,8 +10,8 @@ const garmentSchema = Joi.object({
   name: Joi.string().required(),
   description: Joi.string().optional().allow(null, ""),
   imageUrl: Joi.string().uri().optional(), // Now optional because it can be auto-set by the file upload
-  garmentType: Joi.string().valid(...Object.values(GARMENT_TYPES)).optional(),
-  fittingSlot: Joi.string().valid(...Object.values(FITING_SLOTS)).optional(),
+  garmentType: Joi.array().items(Joi.string().valid(...Object.values(GARMENT_TYPES))).optional(),
+  fittingSlot: Joi.array().items(Joi.string().valid(...Object.values(FITING_SLOTS))).optional(),
   category: Joi.array().items(Joi.string().valid(...Object.values(CATEGORY))).optional(),
   gender: Joi.string().valid(...Object.values(GARMENT_GENDER)).optional(),
   layerLevel: Joi.string().valid(...Object.values(LAYER_LEVEL)).optional(),
@@ -47,7 +47,7 @@ export default class GarmentController {
     const cleaned = { ...body };
     
     // Parse JSON strings from multipart form-data
-    const jsonFields = ['category', 'tags', 'metaData', 'file'];
+    const jsonFields = ['garmentType', 'fittingSlot', 'category', 'tags', 'metaData', 'file'];
     jsonFields.forEach(field => {
       if (typeof cleaned[field] === 'string') {
         try {
