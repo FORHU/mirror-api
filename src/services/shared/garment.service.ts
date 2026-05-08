@@ -1,5 +1,5 @@
 import GarmentRepo from "../../repositories/garment.repository";
-import { GARMENT_TYPES, FITING_SLOTS, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, Prisma } from "@prisma/client";
+import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, Prisma } from "@prisma/client";
 
 export default class GarmentService {
   static async getGarments(query: any) {
@@ -39,7 +39,7 @@ export default class GarmentService {
       description: data.description,
       imageUrl: data.imageUrl,
       garmentType: data.garmentType as GARMENT_TYPES[],
-      fittingSlot: data.fittingSlot as FITING_SLOTS[],
+      fittingSlot: data.fittingSlot as FITTING_SLOT[],
       category: data.category as CATEGORY[],
       gender: data.gender as GARMENT_GENDER,
       layerLevel: data.layerLevel as LAYER_LEVEL,
@@ -76,7 +76,7 @@ export default class GarmentService {
       description: data.description,
       imageUrl: data.imageUrl,
       garmentType: data.garmentType as GARMENT_TYPES[],
-      fittingSlot: data.fittingSlot as FITING_SLOTS[],
+      fittingSlot: data.fittingSlot as FITTING_SLOT[],
       category: data.category as CATEGORY[],
       gender: data.gender as GARMENT_GENDER,
       layerLevel: data.layerLevel as LAYER_LEVEL,

@@ -18,6 +18,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  userMeasurement Json? // For detailed { height: 90, wight: 70, usualSize: "M" }
+
   avatar   File?         @relation("UserAvatar", fields: [avatarId], references: [id])
   sessions Session[]
   outfits  Outfit[]
@@ -121,7 +123,7 @@ model Garment {
   file        File    @relation("GarmentFile", fields: [fileId], references: [id])
 
   garmentType GARMENT_TYPES[]
-  fittingSlot FITING_SLOTS[]
+  fittingSlot FITTING_SLOT[]
   category    CATEGORY[]
   gender      GARMENT_GENDER  @default(UNISEX)
   layerLevel  LAYER_LEVEL     @default(BASE)
@@ -204,7 +206,7 @@ enum USER_GENDER {
 
 /// Defines where on the body the garment or accessory is anchored.
 /// Critical for the 2.5D rendering engine to position assets correctly.
-enum FITING_SLOTS {
+enum FITTING_SLOT {
   None
 
   // Head & Face
