@@ -127,6 +127,7 @@ model Garment {
   category    CATEGORY[]
   gender      GARMENT_GENDER  @default(UNISEX)
   layerLevel  LAYER_LEVEL     @default(BASE)
+  silhouette  SILHOUETTE      @default(Regular)
   metaData    Json?
 
   outfits      GarmentInOutfit[]
@@ -311,4 +312,58 @@ enum CATEGORY {
   Traditional // Heritage or culturally rooted clothing (e.g. barong, kimono)
   Cultural // Broader cultural-inspired outfits (non-ceremonial ethnic wear)
   Uniform // Standardized outfits (school, military, work uniforms)
+}
+
+/// Describes the overall visual shape and fit appearance of a garment.
+/// Used for outfit styling, silhouette matching, layering logic,
+/// and AI recommendation scoring in the virtual styling system.
+enum SILHOUETTE {
+  /// Close-to-body fit.
+  /// Example: Slim-fit t-shirt, fitted polo, skinny jeans.
+  Slim
+
+  /// Standard balanced fit.
+  /// Example: Basic t-shirt, regular jeans, standard hoodie.
+  Regular
+
+  /// Slightly loose and comfortable fit.
+  /// Example: Relaxed hoodie, loose trousers, casual sweatshirt.
+  Relaxed
+
+  /// Intentionally larger and loose silhouette.
+  /// Example: Oversized streetwear tee, baggy hoodie, oversized jacket.
+  Oversized
+
+  /// Square and wide body structure.
+  /// Usually shorter width-heavy proportions.
+  /// Example: Boxy cropped tee, modern streetwear shirt.
+  Boxy
+
+  /// Shortened garment length.
+  /// Example: Cropped hoodie, cropped jacket, cropped top.
+  Cropped
+
+  /// Extended vertical length.
+  /// Example: Longline t-shirt, elongated coat, long cardigan.
+  Longline
+
+  /// Wide lower-body silhouette.
+  /// Example: Wide-leg pants, loose trousers, baggy jeans.
+  WideLeg
+
+  /// Straight cut from top to bottom.
+  /// Example: Straight jeans, straight trousers.
+  Straight
+
+  /// Narrows toward the bottom.
+  /// Example: Tapered joggers, tapered pants.
+  Tapered
+
+  /// Soft, loose, and naturally draping shape.
+  /// Example: Flowing dress, loose cardigan, chiffon skirt.
+  Flowy
+
+  /// Strong and defined shape with rigid form.
+  /// Example: Blazer, tailored coat, structured jacket.
+  Structured
 }
