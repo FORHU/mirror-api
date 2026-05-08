@@ -19,4 +19,12 @@ export default class UserService {
   static async listUsers(page?: number, limit?: number) {
     return UserRepository.findAll(page, limit);
   }
+
+  /**
+   * Update user
+   */
+  static async updateUser(id: string, data: any) {
+    const user = await this.getUser(id);
+    return UserRepository.update(user.id, data);
+  }
 }
