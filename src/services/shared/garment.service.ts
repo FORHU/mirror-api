@@ -1,5 +1,5 @@
 import GarmentRepo from "../../repositories/garment.repository";
-import { GARMENTTYPES, FITINGSLOTS, CATEGORY, GENDER, LAYERLEVEL, Prisma } from "@prisma/client";
+import { GARMENT_TYPES, FITING_SLOTS, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, Prisma } from "@prisma/client";
 
 export default class GarmentService {
   static async getGarments(query: any) {
@@ -30,15 +30,15 @@ export default class GarmentService {
   }
 
   static async createGarment(data: any) {
-    const garmentData: Prisma.GarmentCreateInput = {
+    const garmentData: any = {
       name: data.name,
       description: data.description,
       imageUrl: data.imageUrl,
-      garmentType: data.garmentType as GARMENTTYPES,
-      fittingSlot: data.fittingSlot as FITINGSLOTS,
+      garmentType: data.garmentType as GARMENT_TYPES,
+      fittingSlot: data.fittingSlot as FITING_SLOTS,
       category: data.category as CATEGORY[],
-      gender: data.gender as GENDER,
-      layerLevel: data.layerLevel as LAYERLEVEL,
+      gender: data.gender as GARMENT_GENDER,
+      layerLevel: data.layerLevel as LAYER_LEVEL,
       metaData: data.metaData,
     };
 
@@ -67,15 +67,15 @@ export default class GarmentService {
   static async updateGarment(id: string, data: any) {
     await this.getGarmentById(id); // Ensure it exists
 
-    const garmentData: Prisma.GarmentUpdateInput = {
+    const garmentData: any = {
       name: data.name,
       description: data.description,
       imageUrl: data.imageUrl,
-      garmentType: data.garmentType as GARMENTTYPES,
-      fittingSlot: data.fittingSlot as FITINGSLOTS,
+      garmentType: data.garmentType as GARMENT_TYPES,
+      fittingSlot: data.fittingSlot as FITING_SLOTS,
       category: data.category as CATEGORY[],
-      gender: data.gender as GENDER,
-      layerLevel: data.layerLevel as LAYERLEVEL,
+      gender: data.gender as GARMENT_GENDER,
+      layerLevel: data.layerLevel as LAYER_LEVEL,
       metaData: data.metaData,
     };
 

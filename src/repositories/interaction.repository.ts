@@ -18,9 +18,8 @@ export default class InteractionRepo {
   }
 
   static async create(data: {
-    message: string;
-    response: string;
-    intent?: string;
+    type: string;
+    garmentId: string;
     outfitId?: string;
   }) {
     return prisma.interaction.create({

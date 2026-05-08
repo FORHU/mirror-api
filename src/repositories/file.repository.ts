@@ -2,9 +2,9 @@ import { prisma } from "../utils/prisma";
 
 export default class FileRepo {
   static async create(data: {
-    filename?: string;
+    filename: string;
     originalName?: string;
-    fileUrl?: string;
+    fileUrl: string;
     thumbnailUrl?: string;
     mimeType?: string;
     extension?: string;
@@ -23,15 +23,13 @@ export default class FileRepo {
     return prisma.file.findFirst({
       where: {
         id,
-        deletedAt: null,
       },
     });
   }
 
   static async softDelete(id: string) {
-    return prisma.file.update({
+    return prisma.file.delete({
       where: { id },
-      data: { deletedAt: new Date() },
     });
   }
 }

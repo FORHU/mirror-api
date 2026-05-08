@@ -120,11 +120,11 @@ model Garment {
   fileId      String  @unique
   file        File    @relation("GarmentFile", fields: [fileId], references: [id])
 
-  garmentType GARMENT_TYPES  @default(None)
-  fittingSlot FITING_SLOTS   @default(None)
+  garmentType GARMENT_TYPES[]
+  fittingSlot FITING_SLOTS[]
   category    CATEGORY[]
-  gender      GARMENT_GENDER @default(UNISEX)
-  layerLevel  LAYER_LEVEL    @default(BASE)
+  gender      GARMENT_GENDER  @default(UNISEX)
+  layerLevel  LAYER_LEVEL     @default(BASE)
   metaData    Json?
 
   outfits      GarmentInOutfit[]

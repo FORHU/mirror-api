@@ -5,9 +5,8 @@ import InteractionService from "../../services/shared/interaction.service";
 const validationError = (message: string) => ({ status: 400, message });
 
 const interactionSchema = Joi.object({
-  message: Joi.string().required(),
-  response: Joi.string().required(),
-  intent: Joi.string().optional().allow(null, ""),
+  type: Joi.string().required(),
+  garmentId: Joi.string().required(),
   outfitId: Joi.string().optional().allow(null, ""),
 });
 

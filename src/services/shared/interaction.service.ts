@@ -12,9 +12,8 @@ export default class InteractionService {
 
   static async logInteraction(data: any) {
     return InteractionRepo.create({
-      message: data.message,
-      response: data.response,
-      intent: data.intent,
+      type: data.type,
+      garmentId: data.garmentId,
       outfitId: data.outfitId,
     });
   }

@@ -6,7 +6,6 @@ export default class GarmentRepo {
     const skip = (page - 1) * limit;
     
     const where: Prisma.GarmentWhereInput = {
-      deletedAt: null,
       ...filters,
     };
 
@@ -29,7 +28,7 @@ export default class GarmentRepo {
 
   static async findById(id: string) {
     return prisma.garment.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
       include: {
         tags: true,
         file: true,
@@ -59,9 +58,8 @@ export default class GarmentRepo {
   }
 
   static async delete(id: string) {
-    return prisma.garment.update({
+    return prisma.garment.delete({
       where: { id },
-      data: { deletedAt: new Date() },
     });
   }
 }
