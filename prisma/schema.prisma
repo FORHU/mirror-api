@@ -131,8 +131,9 @@ model Garment {
   silhouette  SILHOUETTE      @default(Regular)
   metaData    Json?
 
-  outfits GarmentInOutfit[]
-  tags    Tag[]
+  outfits      GarmentInOutfit[]
+  tags         Tag[]
+  interactions Interaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -158,8 +159,9 @@ model Outfit {
   userOutlineId String?
   userOutline   UserOutline? @relation(fields: [userOutlineId], references: [id])
 
-  items GarmentInOutfit[]
-  files File[]            @relation("OutfitCollection")
+  items        GarmentInOutfit[]
+  files        File[]            @relation("OutfitCollection")
+  interactions Interaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -172,6 +174,18 @@ model GarmentInOutfit {
   garmentId String
   outfitId  String?
   order     Int     @default(0)
+
+  garment Garment @relation(fields: [garmentId], references: [id])
+  outfit  Outfit? @relation(fields: [outfitId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Interaction {
+  id        String  @id @default(cuid())
+  type      String
+  garmentId String
+  outfitId  String?
 
   garment Garment @relation(fields: [garmentId], references: [id])
   outfit  Outfit? @relation(fields: [outfitId], references: [id])

@@ -9,6 +9,7 @@ import {
   AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY,
   S3_BUCKET_NAME,
+  S3_CDN_URL,
   REDIS_TTL_SECONDS,
 } from "../../config";
 
@@ -33,7 +34,6 @@ export default class FileUploadService {
       Bucket: S3_BUCKET_NAME,
       Key: key,
       ContentType: mimetype,
-      ACL: "public-read",
     });
 
     const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 }); // 5 minutes
