@@ -1,5 +1,5 @@
 import { prisma } from "../utils/prisma";
-import { DESIGN_TYPE, FITTING_SLOT } from "@prisma/client";
+import { DESIGN_TYPE, FITTING_SLOT, LAYER_LEVEL } from "@prisma/client";
 
 export default class OutfitRepo {
   static async findByUserId(userId?: string, page: number = 1, limit: number = 20) {
@@ -11,6 +11,7 @@ export default class OutfitRepo {
         skip,
         take: limit,
         include: {
+          file: true,
           items: {
             include: {
               garment: {
@@ -31,6 +32,7 @@ export default class OutfitRepo {
     return prisma.outfit.findUnique({
       where: { id },
       include: {
+        file: true,
         items: {
           include: {
             garment: {
@@ -50,7 +52,7 @@ export default class OutfitRepo {
     designType?: DESIGN_TYPE;
     fileId: string;
     userOutlineId?: string;
-    items: { garmentId: string; slot?: FITTING_SLOT }[];
+    items: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[];
   }) {
     return prisma.outfit.create({
       data: {
@@ -65,10 +67,12 @@ export default class OutfitRepo {
           create: data.items.map((item) => ({
             garment: { connect: { id: item.garmentId } },
             slot: item.slot,
+            layerLevel: item.layerLevel,
           })),
         },
       },
       include: {
+        file: true,
         items: {
           include: { 
             garment: {
@@ -86,7 +90,7 @@ export default class OutfitRepo {
     isPublic?: boolean;
     designType?: DESIGN_TYPE;
     fileId?: string;
-    items?: { garmentId: string; slot?: FITTING_SLOT }[];
+    items?: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[];
   }) {
     // If items are provided, replace them
     if (data.items) {
@@ -108,11 +112,13 @@ export default class OutfitRepo {
             create: data.items.map((item) => ({
               garment: { connect: { id: item.garmentId } },
               slot: item.slot,
+              layerLevel: item.layerLevel,
             })),
           },
         }),
       },
       include: {
+        file: true,
         items: {
           include: {
             garment: {

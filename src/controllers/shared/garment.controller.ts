@@ -26,7 +26,11 @@ export default class GarmentController {
   static async index(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await GarmentService.getGarments(req.query);
-      res.json({ status: "success", data });
+      const hydratedData = {
+        ...data,
+        data: await FileService.attachPresignedUrls(data.data)
+      };
+      res.json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
     }
@@ -35,7 +39,8 @@ export default class GarmentController {
   static async show(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await GarmentService.getGarmentById(req.params.id);
-      res.json({ status: "success", data });
+      const hydratedData = await FileService.attachPresignedUrls(data);
+      res.json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
     }
@@ -81,7 +86,8 @@ export default class GarmentController {
       }
 
       const data = await GarmentService.createGarment(finalValue);
-      res.status(201).json({ status: "success", data });
+      const hydratedData = await FileService.attachPresignedUrls(data);
+      res.status(201).json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
     }
@@ -104,7 +110,8 @@ export default class GarmentController {
       }
 
       const data = await GarmentService.updateGarment(req.params.id, finalValue);
-      res.json({ status: "success", data });
+      const hydratedData = await FileService.attachPresignedUrls(data);
+      res.json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
     }

@@ -174,6 +174,7 @@ model GarmentInOutfit {
   garmentId String
   outfitId  String?
   slot      FITTING_SLOT?
+  layerLevel LAYER_LEVEL?
 
   garment Garment @relation(fields: [garmentId], references: [id])
   outfit  Outfit? @relation(fields: [outfitId], references: [id])
@@ -381,4 +382,13 @@ enum SILHOUETTE {
   /// Strong and defined shape with rigid form.
   /// Example: Blazer, tailored coat, structured jacket.
   Structured
+}
+
+enum WEATHER_CONDITION {
+  summer
+  winter
+  rainy
+  breathable
+  waterproof
+  layeringPiece
 }

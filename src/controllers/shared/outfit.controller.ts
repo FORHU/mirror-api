@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import OutfitService from "../../services/shared/outfit.service";
 import FileService from "../../services/shared/file.service";
-import { DESIGN_TYPE, FITTING_SLOT } from "@prisma/client";
+import { DESIGN_TYPE, FITTING_SLOT, LAYER_LEVEL } from "@prisma/client";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -13,6 +13,7 @@ const outfitSchema = Joi.object({
     Joi.object({
       garmentId: Joi.string().required(),
       slot: Joi.string().valid(...Object.values(FITTING_SLOT)).optional(),
+      layerLevel: Joi.string().valid(...Object.values(LAYER_LEVEL)).optional(),
     })
   ).default([]),
   isPublic: Joi.boolean().optional().default(false),
@@ -26,7 +27,11 @@ export default class OutfitController {
     try {
       const userId = (req as any).user?.id;
       const data = await OutfitService.getUserOutfits(userId, req.query);
-      res.json({ status: "success", data });
+      const hydratedData = {
+        ...data,
+        data: await FileService.attachPresignedUrls(data.data)
+      };
+      res.json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
     }
@@ -36,7 +41,8 @@ export default class OutfitController {
     try {
       const userId = (req as any).user?.id;
       const data = await OutfitService.getOutfitById(req.params.id, userId);
-      res.json({ status: "success", data });
+      const hydratedData = await FileService.attachPresignedUrls(data);
+      res.json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
     }
@@ -80,7 +86,8 @@ export default class OutfitController {
       }
 
       const data = await OutfitService.createOutfit(userId, finalValue);
-      res.status(201).json({ status: "success", data });
+      const hydratedData = await FileService.attachPresignedUrls(data);
+      res.status(201).json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
     }
@@ -103,7 +110,8 @@ export default class OutfitController {
       }
 
       const data = await OutfitService.updateOutfit(req.params.id, userId, finalValue);
-      res.json({ status: "success", data });
+      const hydratedData = await FileService.attachPresignedUrls(data);
+      res.json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
     }
