@@ -10,6 +10,7 @@ import mirrorTryOnRoute from './mirror/tryOn.route';
 import mirrorGarmentRoute from './shared/garment.route';
 import mirrorOutfitRoute from './shared/outfit.route';
 import mirrorFileUploadRoute from './shared/fileUpload.route';
+import mirrorMapRoute from './mirror/map.route';
 
 const router = express.Router();
 
@@ -29,5 +30,6 @@ router.use('/mirror/try-on', mirrorTryOnRoute);
 router.use('/mirror/garments', mirrorGarmentRoute);
 router.use('/mirror/outfits', mirrorOutfitRoute);
 router.use('/mirror/file-uploads', mirrorFileUploadRoute);
+router.use('/mirror/map', mirrorMapRoute);
 
 export default router;

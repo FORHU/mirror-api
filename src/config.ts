@@ -30,4 +30,6 @@ export const CHAT_WONDER_API_URL = process.env.CHAT_WONDER_API_URL || "";
 
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 
+export const MAPBOX_SECRET_TOKEN = process.env.MAPBOX_SECRET_TOKEN || "";
+
 export const isDev = NODE_ENV === "development";
