@@ -1,4 +1,5 @@
 import OutfitRepo from "../../repositories/outfit.repository";
+import GarmentRepo from "../../repositories/garment.repository";
 
 export default class OutfitService {
   static async getUserOutfits(userId?: string, query: any = {}) {
@@ -18,25 +19,48 @@ export default class OutfitService {
   }
 
   static async createOutfit(userId?: string, data: any = {}) {
+    let fileId = data.fileId;
+
+    // Fallback: If no fileId is provided, pick the image from the first garment
+    if (!fileId && data.items && data.items.length > 0) {
+      const firstGarment = await GarmentRepo.findById(data.items[0].garmentId);
+      if (firstGarment) {
+        fileId = firstGarment.fileId;
+      }
+    }
+
+    if (!fileId) throw { status: 400, message: "Outfit display file or at least one garment is required" };
+
     return OutfitRepo.create({
       userId,
       name: data.name,
       description: data.description,
       isPublic: data.isPublic,
       designType: data.designType,
-      fileId: data.fileId,
+      fileId: fileId,
       items: data.items || [],
     });
   }
 
   static async updateOutfit(id: string, userId?: string, data: any = {}) {
     await this.getOutfitById(id, userId); // Ensure it exists and belongs to user
+
+    let fileId = data.fileId;
+
+    // Fallback: If no fileId is provided and items are updated, pick from first garment
+    if (!fileId && data.items && data.items.length > 0) {
+      const firstGarment = await GarmentRepo.findById(data.items[0].garmentId);
+      if (firstGarment) {
+        fileId = firstGarment.fileId;
+      }
+    }
+
     return OutfitRepo.update(id, {
       name: data.name,
       description: data.description,
       isPublic: data.isPublic,
       designType: data.designType,
-      fileId: data.fileId,
+      fileId: fileId,
       items: data.items,
     });
   }

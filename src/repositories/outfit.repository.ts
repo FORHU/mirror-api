@@ -1,4 +1,5 @@
 import { prisma } from "../utils/prisma";
+import { DESIGN_TYPE, FITTING_SLOT } from "@prisma/client";
 
 export default class OutfitRepo {
   static async findByUserId(userId?: string, page: number = 1, limit: number = 20) {
@@ -16,7 +17,6 @@ export default class OutfitRepo {
                 include: { file: true }
               },
             },
-            orderBy: { order: "asc" },
           },
         },
         orderBy: { createdAt: "desc" },
@@ -37,7 +37,6 @@ export default class OutfitRepo {
               include: { file: true }
             },
           },
-          orderBy: { order: "asc" },
         },
       },
     });
@@ -48,9 +47,10 @@ export default class OutfitRepo {
     name: string;
     description?: string;
     isPublic?: boolean;
-    designType?: any; // Using any or specific enum if imported
+    designType?: DESIGN_TYPE;
     fileId: string;
-    items: { garmentId: string; order: number }[];
+    userOutlineId?: string;
+    items: { garmentId: string; slot?: FITTING_SLOT }[];
   }) {
     return prisma.outfit.create({
       data: {
@@ -59,11 +59,12 @@ export default class OutfitRepo {
         isPublic: data.isPublic,
         designType: data.designType,
         ...(data.userId && { user: { connect: { id: data.userId } } }),
+        ...(data.userOutlineId && { userOutline: { connect: { id: data.userOutlineId } } }),
         file: { connect: { id: data.fileId } },
         items: {
           create: data.items.map((item) => ({
             garment: { connect: { id: item.garmentId } },
-            order: item.order,
+            slot: item.slot,
           })),
         },
       },
@@ -74,7 +75,6 @@ export default class OutfitRepo {
               include: { file: true }
             }
           },
-          orderBy: { order: "asc" },
         },
       },
     });
@@ -84,9 +84,9 @@ export default class OutfitRepo {
     name?: string;
     description?: string;
     isPublic?: boolean;
-    designType?: any;
+    designType?: DESIGN_TYPE;
     fileId?: string;
-    items?: { garmentId: string; order: number }[];
+    items?: { garmentId: string; slot?: FITTING_SLOT }[];
   }) {
     // If items are provided, replace them
     if (data.items) {
@@ -107,7 +107,7 @@ export default class OutfitRepo {
           items: {
             create: data.items.map((item) => ({
               garment: { connect: { id: item.garmentId } },
-              order: item.order,
+              slot: item.slot,
             })),
           },
         }),
@@ -119,7 +119,6 @@ export default class OutfitRepo {
               include: { file: true }
             }
           },
-          orderBy: { order: "asc" },
         },
       },
     });

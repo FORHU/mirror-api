@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import OutfitService from "../../services/shared/outfit.service";
 import FileService from "../../services/shared/file.service";
-import { DESIGN_TYPE } from "@prisma/client";
+import { DESIGN_TYPE, FITTING_SLOT } from "@prisma/client";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -12,7 +12,7 @@ const outfitSchema = Joi.object({
   items: Joi.array().items(
     Joi.object({
       garmentId: Joi.string().required(),
-      order: Joi.number().integer().default(0),
+      slot: Joi.string().valid(...Object.values(FITTING_SLOT)).optional(),
     })
   ).default([]),
   isPublic: Joi.boolean().optional().default(false),
@@ -77,10 +77,6 @@ export default class OutfitController {
         const manualFileSpecs = finalValue.file || {};
         const fileRecord = await FileService.uploadFile(req.file, manualFileSpecs.metaData);
         finalValue.fileId = fileRecord.id;
-      }
-
-      if (!finalValue.fileId) {
-        return next(validationError("Outfit display file is required"));
       }
 
       const data = await OutfitService.createOutfit(userId, finalValue);

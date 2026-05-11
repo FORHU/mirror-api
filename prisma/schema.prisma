@@ -26,9 +26,9 @@ model User {
 }
 
 model UserOutline {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  id     String  @id @default(cuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
   // The AI context
   userPrompt String[] // "I have a date on Sunday @ 6pm"
@@ -170,10 +170,10 @@ model Outfit {
 }
 
 model GarmentInOutfit {
-  id        String  @id @default(cuid())
+  id        String        @id @default(cuid())
   garmentId String
   outfitId  String?
-  order     Int     @default(0)
+  slot      FITTING_SLOT?
 
   garment Garment @relation(fields: [garmentId], references: [id])
   outfit  Outfit? @relation(fields: [outfitId], references: [id])

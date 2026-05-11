@@ -10,6 +10,7 @@ import mirrorTryOnRoute from './mirror/tryOn.route';
 import mirrorGarmentRoute from './shared/garment.route';
 import mirrorOutfitRoute from './shared/outfit.route';
 import mirrorFileUploadRoute from './shared/fileUpload.route';
+import mirrorGenerationRoute from './shared/generation.route';
 
 const router = express.Router();
 
@@ -23,11 +24,12 @@ router.get('/', (_, res) => {
 router.use('/remote/auth', remoteAuthRoute);
 router.use('/remote/users', remoteUserRoute);
 router.use('/remote/kiosks', remoteKioskRoute);
+router.use('/remote/generation', mirrorGenerationRoute);
+router.use('/remote/file-uploads', mirrorFileUploadRoute);
 
 // Mirror endpoints
 router.use('/mirror/try-on', mirrorTryOnRoute);
 router.use('/mirror/garments', mirrorGarmentRoute);
 router.use('/mirror/outfits', mirrorOutfitRoute);
-router.use('/mirror/file-uploads', mirrorFileUploadRoute);
 
 export default router;
