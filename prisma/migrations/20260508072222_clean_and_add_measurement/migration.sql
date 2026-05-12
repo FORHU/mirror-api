@@ -10,9 +10,7 @@ CREATE TYPE "FITTING_SLOT" AS ENUM ('None', 'HeadGarment', 'Glasses', 'Earrings'
 
 -- AlterTable
 ALTER TABLE "Garment" DROP COLUMN "fittingSlot",
-ADD COLUMN     "fittingSlot" "FITTING_SLOT"[],
-ALTER COLUMN "garmentType" DROP DEFAULT,
-ALTER COLUMN "garmentType" SET DATA TYPE "GARMENT_TYPES"[] USING ARRAY["garmentType"]::"GARMENT_TYPES"[];
+ADD COLUMN     "fittingSlot" "FITTING_SLOT"[];
 
 -- AlterTable
 ALTER TABLE "User" ADD COLUMN     "userMeasurement" JSONB;

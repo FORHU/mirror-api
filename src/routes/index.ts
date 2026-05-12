@@ -11,6 +11,7 @@ import mirrorGarmentRoute from './shared/garment.route';
 import mirrorOutfitRoute from './shared/outfit.route';
 import mirrorFileUploadRoute from './shared/fileUpload.route';
 import mirrorGenerationRoute from './shared/generation.route';
+import chatWonderRoute from './shared/chat-wonder.route';
 
 const router = express.Router();
 
@@ -29,6 +30,7 @@ router.use('/remote/file-uploads', mirrorFileUploadRoute);
 router.use('/remote/try-on', mirrorTryOnRoute);
 router.use('/remote/garments', mirrorGarmentRoute);
 router.use('/remote/outfits', mirrorOutfitRoute);
+router.use('/remote/chat-wonder', chatWonderRoute);
 
 // Mirror endpoints
 router.use('/mirror/try-on', mirrorTryOnRoute);

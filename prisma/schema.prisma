@@ -12,8 +12,8 @@ model User {
   email     String       @unique
   username  String       @unique
   gender    USER_GENDER? @default(MALE)
-  isDeleted Boolean      @default(false)
 
+  isDeleted Boolean      @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -23,6 +23,24 @@ model User {
   sessions        Session[]
   outlines        UserOutline[]
   outfits         Outfit[]
+
+  conversations   Conversation[]
+  chatMessages    ChatMessage[]
+  emotionMemories EmotionMemory[]
+
+  userGarments    Garment[] @relation("UserGarments")
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  platform  String
+  expiresAt DateTime
+  accessToken String
+  refreshToken String   @unique
+
+  createdAt DateTime @default(now())
+  user      UserOutline     @relation(fields: [userId], references: [id])
 }
 
 model UserOutline {
@@ -31,7 +49,10 @@ model UserOutline {
   user   User?   @relation(fields: [userId], references: [id])
 
   // The AI context
-  userPrompt String[] // "I have a date on Sunday @ 6pm"
+  conversationId String?      @unique
+  conversation   Conversation? @relation(fields: [conversationId], references: [id])
+
+  userPrompt String[] // Raw prompt(s) that produced this outline
   location   String? // Extracted: "Mall"
   startTime  DateTime? // Parsed: Sunday @ 6pm
   weather    Json? // Cached weather data for that time
@@ -43,10 +64,83 @@ model UserOutline {
   calendarId String?   @unique
   calendar   Calendar? @relation(fields: [calendarId], references: [id])
 
+  userMap   UserMap?
+
+  chatSessions ChatSession[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
   outfits   Outfit[]
+}
+
+model Conversation {
+  id            String        @id @default(cuid())
+  userId        String
+  title         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  lastMessageAt DateTime?
+  isDeleted     Boolean       @default(false)
+  chatMessages  ChatMessage[]
+  user          User          @relation(fields: [userId], references: [id])
+  userOutline   UserOutline?
+
+  @@index([userId, lastMessageAt(sort: Desc)])
+  @@index([userId, isDeleted])
+}
+
+model ChatMessage {
+  id             String          @id @default(cuid())
+  userId         String
+  createdAt      DateTime        @default(now())
+  message        String
+  mediaUrl       String?
+  conversationId String?
+  role           ChatMessageRole @default(USER)
+  conversation   Conversation?   @relation(fields: [conversationId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+  embedding      Embedding?
+  emotionMemory  EmotionMemory?
+
+  @@index([conversationId, createdAt])
+  @@index([userId, conversationId])
+}
+
+model Embedding {
+  id            String      @id @default(cuid())
+  model         String
+  vector        Json?
+  createdAt     DateTime    @default(now())
+  chatMessageId String      @unique
+  chatMessage   ChatMessage @relation(fields: [chatMessageId], references: [id])
+}
+
+model EmotionMemory {
+  id            String      @id @default(cuid())
+  chatMessageId String      @unique
+  userId        String
+  emotion       String
+  confidence    Float
+  createdAt     DateTime    @default(now())
+  chatMessage   ChatMessage @relation(fields: [chatMessageId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+}
+
+enum ChatMessageRole {
+  USER
+  AI
+  ADMIN
+}
+
+
+model UserMap {
+  id            String  @id @default(cuid())
+  userOutlineId String @unique
+  userOutline   UserOutline @relation(fields: [userOutlineId], references: [id])
+  mapData       Json // GeoJSON or custom format for user-specific location data
+
+  createdAt DateTime @default(now())
 }
 
 model Cosmetics {
@@ -130,6 +224,9 @@ model Garment {
   layerLevel  LAYER_LEVEL     @default(BASE)
   silhouette  SILHOUETTE      @default(Regular)
   metaData    Json?
+
+  userId String?
+  user   User?   @relation("UserGarments", fields: [userId], references: [id])
 
   outfits      GarmentInOutfit[]
   tags         Tag[]
