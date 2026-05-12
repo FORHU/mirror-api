@@ -34,19 +34,23 @@ export interface DirectionsResponse {
 }
 
 export const mapService = {
-  search: async (query: string): Promise<GeocodingFeature[]> => {
+  search: async (query: string, proximity?: string): Promise<GeocodingFeature[]> => {
     if (!query) return [];
     
     try {
+      const params: any = {
+        access_token: MAPBOX_SECRET_TOKEN,
+        autocomplete: true,
+        limit: 5,
+      };
+
+      if (proximity) {
+        params.proximity = proximity;
+      }
+
       const response = await axios.get<GeocodingResponse>(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`,
-        {
-          params: {
-            access_token: MAPBOX_SECRET_TOKEN,
-            autocomplete: true,
-            limit: 5,
-          }
-        }
+        { params }
       );
       
       return response.data.features;
@@ -56,10 +60,10 @@ export const mapService = {
     }
   },
 
-  getDirections: async (origin: string, destination: string): Promise<DirectionsResponse> => {
+  getDirections: async (origin: string, destination: string, profile: string = "driving"): Promise<DirectionsResponse> => {
     try {
       const response = await axios.get<DirectionsResponse>(
-        `https://api.mapbox.com/directions/v5/mapbox/driving/${origin};${destination}`,
+        `https://api.mapbox.com/directions/v5/mapbox/${profile}/${origin};${destination}`,
         {
           params: {
             access_token: MAPBOX_SECRET_TOKEN,
