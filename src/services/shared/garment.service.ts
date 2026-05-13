@@ -125,16 +125,17 @@ export default class GarmentService {
   }
 
   /**
-   * Step 1: upload the image and run GPT-4o vision against our enum vocabulary.
-   * Returns the raw evaluation + file record so the controller can validate
-   * the AI output before we persist anything.
+   * Just the upload step: takes the multipart file (or a pre-existing URL),
+   * saves the File row, returns a presigned URL the controller can hand to AI.
+   * Fast — no AI call here. Use this when you want to respond to the client
+   * early and finish AI work in the background.
    */
-  static async runGarmentEvaluation(
+  static async uploadGarmentFile(
     file: any,
-    options: { imageUrl?: string } = {},
-  ): Promise<{ evaluation: GarmentEvaluation; file: any | null; imageUrl: string }> {
+    fallbackImageUrl?: string,
+  ): Promise<{ file: any | null; imageUrl: string }> {
     let fileRecord: any = null;
-    let urlForAI = options.imageUrl;
+    let urlForAI = fallbackImageUrl;
 
     if (file) {
       fileRecord = await FileService.uploadFile(file);
@@ -146,8 +147,21 @@ export default class GarmentService {
       throw { status: 400, message: "Either an uploaded file or an imageUrl is required" };
     }
 
-    const evaluation = await evaluateGarmentImage(urlForAI);
-    return { evaluation, file: fileRecord, imageUrl: fileRecord?.fileUrl || urlForAI };
+    return { file: fileRecord, imageUrl: urlForAI };
+  }
+
+  /**
+   * Step 1: upload the image and run GPT-4o vision against our enum vocabulary.
+   * Returns the raw evaluation + file record so the controller can validate
+   * the AI output before we persist anything.
+   */
+  static async runGarmentEvaluation(
+    file: any,
+    options: { imageUrl?: string } = {},
+  ): Promise<{ evaluation: GarmentEvaluation; file: any | null; imageUrl: string }> {
+    const { file: fileRecord, imageUrl } = await this.uploadGarmentFile(file, options.imageUrl);
+    const evaluation = await evaluateGarmentImage(imageUrl);
+    return { evaluation, file: fileRecord, imageUrl };
   }
 
   /**

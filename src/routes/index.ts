@@ -27,12 +27,13 @@ router.use('/remote/users', remoteUserRoute);
 router.use('/remote/kiosks', remoteKioskRoute);
 router.use('/remote/generation', mirrorGenerationRoute);
 router.use('/remote/file-uploads', mirrorFileUploadRoute);
-router.use('/remote/try-on', mirrorTryOnRoute);
 router.use('/remote/garments', mirrorGarmentRoute);
 router.use('/remote/outfits', mirrorOutfitRoute);
-router.use('/remote/chat-wonder', chatWonderRoute);
 
 // Mirror endpoints
+// router.use('/mirror/garments', mirrorGarmentRoute);
+// router.use('/mirror/outfits', mirrorOutfitRoute);
 router.use('/mirror/try-on', mirrorTryOnRoute);
+router.use('/mirror/chat-wonder', chatWonderRoute); 
 
 export default router;

@@ -1,11 +1,26 @@
 import { Socket } from "socket.io";
 import logger from "../utils/logger";
 import CacheUtil from "../utils/cache.util";
+import { KIOSK_DEVICE_SECRET, ACCESS_TOKEN_SECRET } from "../config";
+import jwt from "jsonwebtoken";
 
 export const registerKioskEvents = (socket: Socket) => {
   // Kiosk connects and registers its ID
-  socket.on("register_kiosk", async (data: { kioskId: string, name?: string }) => {
+  socket.on("register_kiosk", async (data: { kioskId: string; name?: string; secret?: string }) => {
     if (!data.kioskId) return;
+
+    // Reject unverified devices — prevents arbitrary sockets from claiming kiosk rooms.
+    if (!KIOSK_DEVICE_SECRET) {
+      logger.error(`[register_kiosk] KIOSK_DEVICE_SECRET not configured — rejecting ${data.kioskId}`);
+      socket.emit("kiosk_registered", { status: "error", message: "Server misconfigured" });
+      return;
+    }
+    if (data.secret !== KIOSK_DEVICE_SECRET) {
+      logger.warn(`[register_kiosk] Rejected unauthorized registration for ${data.kioskId} (socket ${socket.id})`);
+      socket.emit("kiosk_registered", { status: "error", message: "Invalid kiosk secret" });
+      socket.disconnect(true);
+      return;
+    }
 
     socket.join(data.kioskId);
     logger.info(`Kiosk ${data.kioskId} registered with socket ${socket.id}`);
@@ -30,6 +45,33 @@ export const registerKioskEvents = (socket: Socket) => {
       kioskId: data.kioskId,
       kioskName: data.name || existingState?.kioskName || data.kioskId
     });
+  });
+
+  /**
+   * Remote app joins a kiosk room to receive real-time updates.
+   * Call this after pairing via REST.
+   */
+  socket.on("join_kiosk_room", async (data: { kioskId: string; token: string }) => {
+    try {
+      const { kioskId, token } = data;
+      if (!kioskId || !token) return;
+
+      // Verify token
+      const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as { userId: string };
+      const userId = decoded.userId;
+
+      // Verify pairing state in Redis
+      const state = await CacheUtil.get<any>(`kiosk_state:${kioskId}`);
+      if (state && state.userId === userId) {
+        socket.join(kioskId);
+        logger.info(`Socket ${socket.id} (User ${userId}) joined room ${kioskId}`);
+        socket.emit("room_joined", { kioskId, status: "success" });
+      } else {
+        socket.emit("room_joined", { status: "error", message: "Not paired with this kiosk" });
+      }
+    } catch (err) {
+      socket.emit("room_joined", { status: "error", message: "Authentication failed" });
+    }
   });
 
   // Handle Kiosk disconnect

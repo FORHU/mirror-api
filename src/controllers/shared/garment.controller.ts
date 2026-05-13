@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import GarmentService from "../../services/shared/garment.service";
 import FileService from "../../services/shared/file.service";
+import { evaluateGarmentImage } from "../../utils/openai/evaluate-garment.util";
+import { emitToKiosk } from "../../utils/socket.util";
+import logger from "../../utils/logger";
 import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, SILHOUETTE } from "@prisma/client";
 
 const validationError = (message: string) => ({ status: 400, message });
@@ -142,9 +145,19 @@ export default class GarmentController {
 
   /**
    * POST /garments/evaluate
-   * Authenticated. Accepts ONE image (`file`) or an `imageUrl`.
-   * Runs the image through GPT-4o vision, validates the result against our
-   * Prisma enums, and persists it as a Garment owned by the caller.
+   * Authenticated. Accepts ONE image (`file`) or an `imageUrl`, optionally
+   * a `kioskId` for websocket notifications.
+   *
+   * Flow:
+   *  1. Uploads the file to S3 (fast).
+   *  2. Responds immediately with 202 + the File record so the client can
+   *     show a "processing" state.
+   *  3. In the background: GPT-4o vision → Joi validation → persist Garment.
+   *  4. Emits websocket events to the kiosk room when done or on failure.
+   *
+   * Websocket events (when `kioskId` is provided):
+   *  - "garment_evaluated"  { fileId, garment }
+   *  - "garment_failed"     { fileId, error }
    */
   static async evaluate(req: Request, res: Response, next: NextFunction) {
     try {
@@ -152,30 +165,61 @@ export default class GarmentController {
       if (!userId) return next({ status: 401, message: "Authentication required" });
 
       const imageUrl = req.body?.imageUrl;
+      const kioskId = req.body?.kioskId;
       if (!req.file && !imageUrl) {
         return next(validationError("Provide either an uploaded `file` or an `imageUrl`"));
       }
 
-      // Step 1: upload + AI evaluation
-      const { evaluation, file: fileRecord, imageUrl: finalImageUrl } =
-        await GarmentService.runGarmentEvaluation(req.file, { imageUrl });
+      // Step 1: upload only — fast, blocks the response just long enough
+      // for the client to know the upload itself succeeded.
+      const { file: fileRecord, imageUrl: finalImageUrl } =
+        await GarmentService.uploadGarmentFile(req.file, imageUrl);
 
-      // Step 2: validate AI output against our enums
-      const { error, value } = evaluationSchema.validate(evaluation);
-      if (error) {
-        return next({ status: 502, message: `AI returned invalid evaluation: ${error.message}` });
-      }
+      // Step 2: respond immediately. AI work continues below.
+      res.status(202).json({
+        status: "queued",
+        data: {
+          fileId: fileRecord?.id || null,
+          imageUrl: finalImageUrl,
+          kioskId: kioskId || null,
+        },
+        message: "Upload received. Evaluation in progress.",
+      });
 
-      // Step 3: persist as Garment
-      const garment = await GarmentService.persistEvaluatedGarment(
-        value,
-        fileRecord,
-        finalImageUrl,
-        userId,
-      );
+      // Step 3: background AI work — no await on the response path.
+      (async () => {
+        try {
+          const evaluation = await evaluateGarmentImage(finalImageUrl);
 
-      const hydrated = await FileService.attachPresignedUrls(garment);
-      res.status(201).json({ status: "success", data: hydrated });
+          const { error, value } = evaluationSchema.validate(evaluation);
+          if (error) throw new Error(`AI returned invalid evaluation: ${error.message}`);
+
+          const garment = await GarmentService.persistEvaluatedGarment(
+            value,
+            fileRecord,
+            finalImageUrl,
+            userId,
+          );
+
+          const hydrated = await FileService.attachPresignedUrls(garment);
+          logger.info(`[GarmentEvaluate] Completed garment ${garment.id} for user ${userId}`);
+
+          if (kioskId) {
+            emitToKiosk(kioskId, "garment_evaluated", {
+              fileId: fileRecord?.id,
+              garment: hydrated,
+            });
+          }
+        } catch (err: any) {
+          logger.error(`[GarmentEvaluate] Background failure: ${err.message}`);
+          if (kioskId) {
+            emitToKiosk(kioskId, "garment_failed", {
+              fileId: fileRecord?.id,
+              error: err.message,
+            });
+          }
+        }
+      })();
     } catch (err) {
       next(err);
     }

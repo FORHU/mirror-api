@@ -87,6 +87,7 @@ export default class OutfitController {
 
       const data = await OutfitService.createOutfit(userId, finalValue);
       const hydratedData = await FileService.attachPresignedUrls(data);
+      console.log("------ Outfit has been created ------");
       res.status(201).json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
