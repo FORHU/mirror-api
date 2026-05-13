@@ -36,10 +36,15 @@ The API follows a **Client-Specific Layered Architecture** to cleanly separate t
 - **FASHN.AI Integration**: Specialized service for `tryon-v1.6` model.
 - **Background Polling**: The backend manages AI generation state.
 - **Live Progress**: Socket events (`tryon_progress`, `tryon_completed`) keep the Kiosk UI reactive during AI processing.
+- **REST Status Polling**: `GET /try-on/:predictionId/status` is available as a non-websocket alternative for mobile/web clients.
+- **Garment Alignment**: Outfit composition is the **frontend's** job — the phone positions garments on a canvas, screenshots, uploads the composed image to S3, and the backend forwards the URL to FASHN.AI. Because the input is always a pre-composed full-body image, the new `runByGarment` endpoint hardcodes FASHN's `category` to `one-pieces`.
+- **Try-On by Garment ID**: `POST /try-on/garment` lets the client trigger a run using a stored `Garment.id` instead of raw URLs.
+- **Model Image Management (S3 Presigned)**: Dedicated endpoints for the user's body photo (`/try-on/model/*`) — presigned PUT for direct-to-S3 upload, confirm-then-attach-as-`User.avatar`, and presigned GET for retrieval.
 
-### 5. Conversational AI (LLMs)
+### 5. Conversational & Vision AI (LLMs)
+- **OpenAI GPT-4o (Vision)**: Used to classify garment images against our Prisma enums (`GARMENT_TYPES`, `FITTING_SLOT`, `CATEGORY`, `GARMENT_GENDER`, `LAYER_LEVEL`, `SILHOUETTE`). The endpoint `POST /garments/evaluate` accepts a single image, sends it to GPT-4o with the enum vocabulary baked into the prompt, validates the response with Joi against those same enums, then persists a `Garment` tied to the authenticated user.
 - **OpenAI (ChatGPT)**: Integrated for fashion advice and personal stylist responses.
-- **Chat Wonder**: Custom AI integration for localized or specialized knowledge.
+- **Chat Wonder**: Custom AI integration for localized or specialized knowledge. Text-only — does not currently accept image inputs.
 
 ---
 
@@ -56,9 +61,27 @@ All endpoints are prefixed with `/api`.
 - `POST /api/remote/kiosks/disconnect`: Unpair.
 - `POST /api/remote/kiosks/command`: Send remote action (Capture, Toggle UI, etc).
 
-### Mirror (Kiosk)
-- `POST /api/mirror/try-on/run`: Initiate AI Virtual Try-On.
-- `GET /api/mirror/file-uploads/presign`: Get S3 upload ticket.
+### Garments (Shared)
+- `GET /api/remote/garments`: List garments (paginated, filterable by enum fields).
+- `GET /api/remote/garments/:id`: Fetch a single garment.
+- `POST /api/remote/garments`: Manually create a garment.
+- `POST /api/remote/garments/evaluate`: **[Auth + image]** Single-image AI evaluation. GPT-4o classifies the garment against our Prisma enums, Joi validates the AI output, and the result is persisted as a `Garment` owned by the caller.
+- `PATCH /api/remote/garments/:id`: Update.
+- `DELETE /api/remote/garments/:id`: Delete.
+
+### Try-On (Mirror + Remote — same routes mounted at both prefixes)
+- `POST /api/mirror/try-on/run`: Legacy raw-URL try-on (`modelImage`, `garmentImage`, `category`, `kioskId`). Kiosk websocket polling.
+- `POST /api/mirror/try-on/garment`: **[Auth]** Try-on using a stored `Garment.id` + user-supplied `modelImage`. Category is always `one-pieces` (composite-outfit strategy). Optional `kioskId` enables websocket updates.
+- `GET /api/mirror/try-on/:predictionId/status`: REST polling alternative to the kiosk websocket flow.
+- `POST /api/mirror/try-on/model/presign`: **[Auth]** Get an S3 presigned PUT URL for uploading the user's model image directly (key namespaced under `tryon-models/<userId>/`).
+- `POST /api/mirror/try-on/model/confirm`: **[Auth]** Persist the uploaded File and attach it as `User.avatar`.
+- `GET /api/mirror/try-on/model`: **[Auth]** Return the user's current model image with a fresh presigned GET URL.
+
+### Files
+- `POST /api/remote/file-uploads/upload`: Single-file direct upload (with Sharp processing).
+- `POST /api/remote/file-uploads/upload-many`: Multi-file direct upload.
+- `GET /api/remote/file-uploads/presign`: Generic S3 presigned PUT.
+- `POST /api/remote/file-uploads/confirm`: Generic file-record save after upload.
 
 ---
 
@@ -67,7 +90,9 @@ All endpoints are prefixed with `/api`.
 1.  **Connection**: Mirror connects to Socket.IO and joins a room named after its `kioskId`.
 2.  **Pairing**: User scans QR on the Mirror -> Phone sends `notify-scanning` request (Kiosk shows "Please sign in") -> Phone sends `connect` request -> Backend locks `kioskId` to `userId` in Redis.
 3.  **Control**: Phone sends `command` -> Backend checks Redis lock -> Backend emits event to Mirror's Socket room.
-4.  **Try-On**: Phone selects outfit -> Mirror triggers `try-on/run` -> Backend calls FASHN.AI -> Backend polls status -> Backend pushes final Image URL to Mirror via Sockets.
+4.  **Garment Capture (AI)**: User uploads a garment image -> Backend pushes it to GPT-4o vision with our enum vocabulary -> Joi enforces the AI's response against the enums -> Garment row persisted, tied to the user.
+5.  **Model Image Setup**: Phone requests presigned PUT URL -> uploads model photo directly to S3 -> confirms upload -> Backend creates File row and sets it as `User.avatar`.
+6.  **Try-On**: Phone composes the outfit on its canvas -> uploads composed image to S3 -> Phone calls either `tryon/run` (raw URLs) or `tryon/garment` (by Garment.id) -> Backend forwards to FASHN.AI with `category: "one-pieces"` -> Backend polls status -> Backend pushes final Image URL to Mirror via Sockets, while mobile clients can also poll `GET /try-on/:id/status` directly.
 
 ---
 
@@ -86,6 +111,8 @@ Ensure the following are set in your `.env`:
 - `REDIS_HOST`/`REDIS_PORT`: Redis connection details.
 - `AWS_REGION`/`S3_BUCKET_NAME`: For image storage.
 - `FASHN_API_KEY`/`FASHN_BASE_URL`: For the AI Try-On engine.
+- `OPENAI_API_KEY`: For GPT-4o garment evaluation.
+- `CHAT_WONDER_API_URL`: For the conversational AI service (text-only).
 - `JWT_SECRET`: For secure authentication.
 
 ---
@@ -96,4 +123,4 @@ Ensure the following are set in your `.env`:
 - **Real-time**: Socket.io + Redis Adapter
 - **Cache/State**: Redis
 - **Cloud**: AWS S3
-- **AI**: FASHN.AI
+- **AI**: FASHN.AI (virtual try-on), OpenAI GPT-4o (vision classification), Chat Wonder (conversational)

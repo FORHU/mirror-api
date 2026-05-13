@@ -46,10 +46,10 @@ export default class GenerationService {
     }
 
     // 3. Create the Outfit
-    // NOTE: Outfit requires a fileId. For now, we'll use the fileId of the first garment 
+    // NOTE: Outfit requires a fileId. For now, we'll use the fileId of the first garment
     // or a placeholder if we had one. In production, this might be an AI-generated preview image.
     const firstGarment = await GarmentRepo.findById(items[0].garmentId);
-    
+
     const outfit = await OutfitRepo.create({
       userId: data.userId,
       name: `Generated Outfit for: ${data.userPrompt[0]?.substring(0, 20) || "Today"}`,

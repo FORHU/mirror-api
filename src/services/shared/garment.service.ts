@@ -1,5 +1,7 @@
 import GarmentRepo from "../../repositories/garment.repository";
 import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, SILHOUETTE, Prisma } from "@prisma/client";
+import FileService from "./file.service";
+import { evaluateGarmentImage, GarmentEvaluation } from "../../utils/openai/evaluate-garment.util";
 
 export default class GarmentService {
   static async getGarments(query: any) {
@@ -47,6 +49,10 @@ export default class GarmentService {
       silhouette: data.silhouette as SILHOUETTE,
       metaData: data.metaData,
     };
+
+    if (data.userId) {
+      garmentData.user = { connect: { id: data.userId } };
+    }
 
     if (data.file) {
       garmentData.file = {
@@ -116,5 +122,60 @@ export default class GarmentService {
     await this.getGarmentById(id);
     await GarmentRepo.delete(id);
     return { message: "Garment deleted successfully" };
+  }
+
+  /**
+   * Step 1: upload the image and run GPT-4o vision against our enum vocabulary.
+   * Returns the raw evaluation + file record so the controller can validate
+   * the AI output before we persist anything.
+   */
+  static async runGarmentEvaluation(
+    file: any,
+    options: { imageUrl?: string } = {},
+  ): Promise<{ evaluation: GarmentEvaluation; file: any | null; imageUrl: string }> {
+    let fileRecord: any = null;
+    let urlForAI = options.imageUrl;
+
+    if (file) {
+      fileRecord = await FileService.uploadFile(file);
+      const signed = await FileService.attachPresignedUrls(fileRecord);
+      urlForAI = signed.fileUrl;
+    }
+
+    if (!urlForAI) {
+      throw { status: 400, message: "Either an uploaded file or an imageUrl is required" };
+    }
+
+    const evaluation = await evaluateGarmentImage(urlForAI);
+    return { evaluation, file: fileRecord, imageUrl: fileRecord?.fileUrl || urlForAI };
+  }
+
+  /**
+   * Step 2: persist an already-validated evaluation as a Garment for the user.
+   */
+  static async persistEvaluatedGarment(
+    evaluation: GarmentEvaluation,
+    fileRecord: any,
+    imageUrl: string,
+    userId: string,
+  ) {
+    return this.createGarment({
+      name: evaluation.name,
+      description: evaluation.description,
+      imageUrl,
+      garmentType: evaluation.garmentType,
+      fittingSlot: evaluation.fittingSlot,
+      category: evaluation.category,
+      gender: evaluation.gender,
+      layerLevel: evaluation.layerLevel,
+      silhouette: evaluation.silhouette,
+      metaData: {
+        dominantColor: evaluation.dominantColor,
+        generatedBy: "openai:gpt-4o",
+      },
+      tags: evaluation.tags,
+      fileId: fileRecord?.id,
+      userId,
+    });
   }
 }

@@ -22,6 +22,20 @@ const garmentSchema = Joi.object({
   file: Joi.object().optional(), // Manual file metadata
 });
 
+// Validates the AI's classification against our Prisma enums before persisting.
+const evaluationSchema = Joi.object({
+  name: Joi.string().required(),
+  description: Joi.string().required().allow(""),
+  garmentType: Joi.array().items(Joi.string().valid(...Object.values(GARMENT_TYPES))).min(1).required(),
+  fittingSlot: Joi.array().items(Joi.string().valid(...Object.values(FITTING_SLOT))).min(1).required(),
+  category: Joi.array().items(Joi.string().valid(...Object.values(CATEGORY))).min(1).required(),
+  gender: Joi.string().valid(...Object.values(GARMENT_GENDER)).required(),
+  layerLevel: Joi.string().valid(...Object.values(LAYER_LEVEL)).required(),
+  silhouette: Joi.string().valid(...Object.values(SILHOUETTE)).required(),
+  tags: Joi.array().items(Joi.string()).required(), // strings only
+  dominantColor: Joi.string().optional().allow(null, ""),
+});
+
 export default class GarmentController {
   static async index(req: Request, res: Response, next: NextFunction) {
     try {
@@ -121,6 +135,47 @@ export default class GarmentController {
     try {
       const data = await GarmentService.deleteGarment(req.params.id);
       res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /garments/evaluate
+   * Authenticated. Accepts ONE image (`file`) or an `imageUrl`.
+   * Runs the image through GPT-4o vision, validates the result against our
+   * Prisma enums, and persists it as a Garment owned by the caller.
+   */
+  static async evaluate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return next({ status: 401, message: "Authentication required" });
+
+      const imageUrl = req.body?.imageUrl;
+      if (!req.file && !imageUrl) {
+        return next(validationError("Provide either an uploaded `file` or an `imageUrl`"));
+      }
+
+      // Step 1: upload + AI evaluation
+      const { evaluation, file: fileRecord, imageUrl: finalImageUrl } =
+        await GarmentService.runGarmentEvaluation(req.file, { imageUrl });
+
+      // Step 2: validate AI output against our enums
+      const { error, value } = evaluationSchema.validate(evaluation);
+      if (error) {
+        return next({ status: 502, message: `AI returned invalid evaluation: ${error.message}` });
+      }
+
+      // Step 3: persist as Garment
+      const garment = await GarmentService.persistEvaluatedGarment(
+        value,
+        fileRecord,
+        finalImageUrl,
+        userId,
+      );
+
+      const hydrated = await FileService.attachPresignedUrls(garment);
+      res.status(201).json({ status: "success", data: hydrated });
     } catch (err) {
       next(err);
     }
