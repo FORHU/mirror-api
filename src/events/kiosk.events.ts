@@ -4,6 +4,10 @@ import CacheUtil from "../utils/cache.util";
 import { KIOSK_DEVICE_SECRET, ACCESS_TOKEN_SECRET } from "../config";
 import jwt from "jsonwebtoken";
 
+// Long enough to outlast any realistic session, short enough that crashed
+// processes can't leak locks forever. Refreshed every time the kiosk re-registers.
+const KIOSK_STATE_TTL_SECONDS = 60 * 60 * 24; // 24h
+
 export const registerKioskEvents = (socket: Socket) => {
   // Kiosk connects and registers its ID
   socket.on("register_kiosk", async (data: { kioskId: string; name?: string; secret?: string }) => {
@@ -28,17 +32,18 @@ export const registerKioskEvents = (socket: Socket) => {
     // Check if there is an existing state (to preserve names/data)
     const existingState = await CacheUtil.get<any>(`kiosk_state:${data.kioskId}`);
 
-    // Set state in Redis
+    // Set state in Redis with a bounded TTL — if disconnect ever fails to fire
+    // (process crash, network partition), the lock auto-releases instead of leaking.
     await CacheUtil.set(`kiosk_state:${data.kioskId}`, {
       status: existingState?.status === "in_use" ? "in_use" : "available",
       userId: existingState?.userId || null,
       kioskName: data.name || existingState?.kioskName || data.kioskId,
       socketId: socket.id,
       lastRegisteredAt: new Date(),
-    });
-    
+    }, KIOSK_STATE_TTL_SECONDS);
+
     // Map socket.id to kioskId so we can clean up on disconnect
-    await CacheUtil.set(`socket_to_kiosk:${socket.id}`, data.kioskId);
+    await CacheUtil.set(`socket_to_kiosk:${socket.id}`, data.kioskId, KIOSK_STATE_TTL_SECONDS);
 
     socket.emit("kiosk_registered", { 
       status: "success", 

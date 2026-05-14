@@ -1,5 +1,6 @@
 import OutfitRepo from "../../repositories/outfit.repository";
 import GarmentRepo from "../../repositories/garment.repository";
+import { assertNoDuplicateComposition } from "../../validations/outfit.validation";
 
 export default class OutfitService {
   static async getUserOutfits(userId?: string, query: any = {}) {
@@ -19,6 +20,8 @@ export default class OutfitService {
   }
 
   static async createOutfit(userId?: string, data: any = {}) {
+    await assertNoDuplicateComposition(userId, data.items);
+
     let fileId = data.fileId;
 
     // Fallback: If no fileId is provided, pick the image from the first garment

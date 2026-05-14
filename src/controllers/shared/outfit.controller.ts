@@ -2,6 +2,11 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import OutfitService from "../../services/shared/outfit.service";
 import FileService from "../../services/shared/file.service";
+import {
+  assertNoDuplicateComposition,
+  validateGarmentIds,
+} from "../../validations/outfit.validation";
+import logger from "../../utils/logger";
 import { DESIGN_TYPE, FITTING_SLOT, LAYER_LEVEL } from "@prisma/client";
 
 const validationError = (message: string) => ({ status: 400, message });
@@ -75,10 +80,24 @@ export default class OutfitController {
     if (error) return next(validationError(error.message));
 
     try {
-      let finalValue = { ...value };
+      const finalValue = value;
       const userId = (req as any).user?.id;
 
-      // If a physical file was uploaded, process it
+      // Reject ambiguous input: caller sent both a multipart file and a fileId.
+      if (req.file && finalValue.fileId) {
+        return next(validationError("Provide either an uploaded file or a fileId, not both"));
+      }
+
+      // Reject non-image uploads up front so Sharp doesn't throw a 500 later.
+      if (req.file && !req.file.mimetype?.startsWith("image/")) {
+        return next(validationError("Uploaded file must be an image"));
+      }
+
+      // Validate garment ids + duplicate composition BEFORE uploading anything
+      // to S3, otherwise a rejection downstream orphans the S3 object + File row.
+      await validateGarmentIds(finalValue.items);
+      await assertNoDuplicateComposition(userId, finalValue.items);
+
       if (req.file) {
         const manualFileSpecs = finalValue.file || {};
         const fileRecord = await FileService.uploadFile(req.file, manualFileSpecs.metaData);
@@ -87,7 +106,7 @@ export default class OutfitController {
 
       const data = await OutfitService.createOutfit(userId, finalValue);
       const hydratedData = await FileService.attachPresignedUrls(data);
-      console.log("------ Outfit has been created ------");
+      logger.info(`Outfit created: ${data.id}`);
       res.status(201).json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
