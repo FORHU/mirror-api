@@ -3,6 +3,7 @@ import Joi from "joi";
 import CacheUtil from "../../utils/cache.util";
 import { emitToKiosk, disconnectAll } from "../../utils/socket.util";
 import logger from "../../utils/logger";
+import { isDev } from "../../config";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -22,10 +23,21 @@ export default class KioskController {
     try {
       const userId = (req as any).user.id;
       const kioskStateKey = `kiosk_state:${value.kioskId}`;
-      const state = await CacheUtil.get<any>(kioskStateKey);
+      let state = await CacheUtil.get<any>(kioskStateKey);
 
       if (!state) {
-        return res.status(404).json({ status: "error", message: "Kiosk not found or offline" });
+        if (isDev) {
+          // In development, if the kiosk isn't online, create a dummy state so pairing can proceed
+          logger.info(`[DevMode] Creating dummy state for kiosk ${value.kioskId}`);
+          state = {
+            status: "available",
+            userId: null,
+            kioskName: value.kioskName || value.kioskId,
+            socketId: null, // No active socket
+          };
+        } else {
+          return res.status(404).json({ status: "error", message: "Kiosk not found or offline" });
+        }
       }
 
       if (state.status === "in_use" && state.userId !== userId) {
@@ -144,10 +156,20 @@ export default class KioskController {
     if (error) return next(validationError(error.message));
 
     try {
-      const state = await CacheUtil.get<any>(`kiosk_state:${value.kioskId}`);
+      let state = await CacheUtil.get<any>(`kiosk_state:${value.kioskId}`);
 
       if (!state) {
-        return res.status(404).json({ status: "error", message: "Kiosk not found or offline" });
+        if (isDev) {
+          logger.info(`[DevMode] Creating dummy state for notifyScanning: ${value.kioskId}`);
+          state = {
+            status: "available",
+            userId: null,
+            kioskName: value.kioskName || value.kioskId,
+            socketId: null,
+          };
+        } else {
+          return res.status(404).json({ status: "error", message: "Kiosk not found or offline" });
+        }
       }
 
       // Save the name to state for the rest of the session

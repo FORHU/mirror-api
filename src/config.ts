@@ -31,5 +31,8 @@ export const CHAT_WONDER_API_URL = process.env.CHAT_WONDER_API_URL || "";
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 
 export const MAPBOX_SECRET_TOKEN = process.env.MAPBOX_SECRET_TOKEN || "";
+export const ORS_API_KEY = process.env.ORS_API_KEY || "";
 
 export const isDev = NODE_ENV === "development";
+
+// Server reload triggered to pick up new ORS_API_KEY

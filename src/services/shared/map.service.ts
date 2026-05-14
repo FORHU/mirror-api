@@ -16,6 +16,29 @@ export interface GeocodingResponse {
   features: GeocodingFeature[];
 }
 
+export interface GeocodeResult {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  placeId: string;
+}
+
+export interface DirectionsStep {
+  instruction: string;
+  maneuver: { type: string; modifier: string };
+  distance: number;
+  duration: number;
+  name: string;
+}
+
+export interface DirectionsFormatted {
+  geojson: any;
+  steps: DirectionsStep[];
+  distance: number;
+  duration: number;
+}
+
 export interface DirectionsResponse {
   routes: Array<{
     geometry: string | any;
@@ -79,5 +102,105 @@ export const mapService = {
       console.error("Mapbox Directions Error:", error);
       throw new Error("Failed to calculate route");
     }
-  }
+  },
+
+  geocodeAddress: async (
+    query: string,
+    proximityLng: number = 120.5960,
+    proximityLat: number = 16.3971
+  ): Promise<GeocodeResult[]> => {
+    try {
+      const encoded = encodeURIComponent(query);
+      const response = await axios.get<GeocodingResponse>(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json`,
+        {
+          params: {
+            access_token: MAPBOX_SECRET_TOKEN,
+            proximity: `${proximityLng},${proximityLat}`,
+            country: "PH",
+            limit: 5,
+            types: "address,place,poi",
+          },
+        }
+      );
+      return response.data.features.map((f) => ({
+        name: f.place_name.split(",")[0],
+        address: f.place_name,
+        lat: f.center[1],
+        lng: f.center[0],
+        placeId: f.id,
+      }));
+    } catch (error) {
+      console.error("Mapbox Geocode Error:", error);
+      throw new Error("Geocoding service unavailable");
+    }
+  },
+
+  getDirectionsFormatted: async (
+    origin: [number, number],
+    destination: [number, number],
+    profile: string = "driving"
+  ): Promise<DirectionsFormatted> => {
+    try {
+      const isBaguio = origin[1] > 16.39 && origin[1] < 16.43 && origin[0] > 120.58 && origin[0] < 120.62;
+      let effectiveProfile = profile;
+
+      // BAGUIO LOCAL OVERRIDE: Use walking profile for cycling in city center
+      // This ensures we avoid Session Road and use safe pedestrian-allowed paths
+      if (profile === "cycling" && isBaguio) {
+        effectiveProfile = "walking";
+      }
+
+      const waypointStr = `${origin[0]},${origin[1]};${destination[0]},${destination[1]}`;
+
+      const response = await axios.get<any>(
+        `https://api.mapbox.com/directions/v5/mapbox/${effectiveProfile}/${waypointStr}`,
+        {
+          params: {
+            access_token: MAPBOX_SECRET_TOKEN,
+            geometries: "geojson",
+            steps: true,
+            overview: "full",
+            annotations: "duration,distance",
+          },
+        }
+      );
+
+      const route = response.data.routes?.[0];
+      if (!route) throw new Error("No route found");
+
+      const steps: DirectionsStep[] = (route.legs?.[0]?.steps ?? []).map((s: any) => ({
+        instruction: s.maneuver?.instruction ?? "",
+        maneuver: {
+          type: s.maneuver?.type ?? "turn",
+          modifier: s.maneuver?.modifier ?? "",
+          bearing_after: s.maneuver?.bearing_after,
+          bearing_before: s.maneuver?.bearing_before,
+        },
+        distance: s.distance ?? 0,
+        duration: s.duration ?? 0,
+        name: s.name ?? "",
+      }));
+
+      const finalDuration = (profile === "cycling" && isBaguio) 
+        ? Math.round(route.duration / 3.2) 
+        : route.duration;
+
+      return {
+        geojson: {
+          type: "FeatureCollection",
+          features: [{ type: "Feature", geometry: route.geometry, properties: {} }],
+        },
+        steps,
+        distance: route.distance,
+        duration: finalDuration,
+      };
+    } catch (error: any) {
+      if (error.message === "No route found") throw error;
+      const status = error.response?.status;
+      const data = error.response?.data;
+      console.error(`Mapbox Directions Error [${status}]:`, data || error.message);
+      throw new Error(`Directions service unavailable: ${data?.message || error.message}`);
+    }
+  },
 };
