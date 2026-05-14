@@ -33,12 +33,13 @@ The API follows a **Client-Specific Layered Architecture** to cleanly separate t
 - **Command Forwarding**: REST API triggers (`POST /api/remote/kiosks/command`) are instantly forwarded to the Mirror via Sockets.
 
 ### 4. AI Virtual Try-On
-- **FASHN.AI Integration**: Specialized service for `tryon-v1.6` model.
-- **Background Polling**: The backend manages AI generation state.
-- **Live Progress**: Socket events (`tryon_progress`, `tryon_completed`) keep the Kiosk UI reactive during AI processing.
-- **REST Status Polling**: `GET /try-on/:predictionId/status` is available as a non-websocket alternative for mobile/web clients.
-- **Garment Alignment**: Outfit composition is the **frontend's** job — the phone positions garments on a canvas, screenshots, uploads the composed image to S3, and the backend forwards the URL to FASHN.AI. Because the input is always a pre-composed full-body image, the new `runByGarment` endpoint hardcodes FASHN's `category` to `one-pieces`.
-- **Try-On by Garment ID**: `POST /try-on/garment` lets the client trigger a run using a stored `Garment.id` instead of raw URLs.
+- **FASHN.AI Integration**: Image flow uses the `tryon-v1.6` model; image-to-video flow uses the model id from `FASHN_VIDEO_MODEL` env var (empty disables video endpoints).
+- **Background Polling**: The backend manages AI generation state. Poll timeout is 2 min for image, 5 min for video.
+- **Live Progress**: Socket events (`tryon_progress`, `tryon_completed`, `tryon_failed`) keep the Kiosk UI reactive during AI processing. Each payload now carries a `media: "image" | "video"` discriminator; completion payloads use `imageUrl` for image runs and `videoUrl` for video runs.
+- **REST Status Polling**: `GET /try-on/:predictionId/status` works for both image and video predictions.
+- **Garment Alignment**: Outfit composition is the **frontend's** job — the phone positions garments on a canvas, screenshots, uploads the composed image to S3, and the backend forwards the URL to FASHN.AI. Because the input is always a pre-composed full-body image, the `runByGarment`/`runVideoByGarment` endpoints hardcode FASHN's `category` to `one-pieces`.
+- **Try-On by Garment ID**: `POST /try-on/garment` (image) and `POST /try-on/video/garment` (image-to-video) let the client trigger a run using a stored `Garment.id` instead of raw URLs.
+- **Try-On by Outfit ID**: `POST /try-on/outfit` and `POST /try-on/video/outfit` accept a stored `Outfit.id`.
 - **Model Image Management (S3 Presigned)**: Dedicated endpoints for the user's body photo (`/try-on/model/*`) — presigned PUT for direct-to-S3 upload, confirm-then-attach-as-`User.avatar`, and presigned GET for retrieval.
 
 ### 5. Conversational & Vision AI (LLMs)
@@ -71,8 +72,11 @@ All endpoints are prefixed with `/api`.
 
 ### Try-On (Mirror + Remote — same routes mounted at both prefixes)
 - `POST /api/mirror/try-on/run`: Legacy raw-URL try-on (`modelImage`, `garmentImage`, `category`, `kioskId`). Kiosk websocket polling.
-- `POST /api/mirror/try-on/garment`: **[Auth]** Try-on using a stored `Garment.id` + user-supplied `modelImage`. Category is always `one-pieces` (composite-outfit strategy). Optional `kioskId` enables websocket updates.
-- `GET /api/mirror/try-on/:predictionId/status`: REST polling alternative to the kiosk websocket flow.
+- `POST /api/mirror/try-on/garment`: **[Auth]** Image try-on using a stored `Garment.id` + user-supplied `modelImage`. Category is always `one-pieces` (composite-outfit strategy). Optional `kioskId` enables websocket updates.
+- `POST /api/mirror/try-on/outfit`: **[Auth]** Image try-on using a stored `Outfit.id`.
+- `POST /api/mirror/try-on/video/garment`: **[Auth]** Image-to-video try-on using a stored `Garment.id`. Returns 503 if `FASHN_VIDEO_MODEL` is unset.
+- `POST /api/mirror/try-on/video/outfit`: **[Auth]** Image-to-video try-on using a stored `Outfit.id`.
+- `GET /api/mirror/try-on/:predictionId/status`: REST polling alternative to the kiosk websocket flow. Works for both image and video predictions.
 - `POST /api/mirror/try-on/model/presign`: **[Auth]** Get an S3 presigned PUT URL for uploading the user's model image directly (key namespaced under `tryon-models/<userId>/`).
 - `POST /api/mirror/try-on/model/confirm`: **[Auth]** Persist the uploaded File and attach it as `User.avatar`.
 - `GET /api/mirror/try-on/model`: **[Auth]** Return the user's current model image with a fresh presigned GET URL.
@@ -100,6 +104,9 @@ All endpoints are prefixed with `/api`.
 - **Redis Locking**: Kiosks are protected by a state-lock in Redis. This prevents multiple phones from controlling the same mirror simultaneously.
 - **JWT Authentication**: All sensitive endpoints require a valid token. The user's identity is verified before any command is forwarded to a kiosk.
 - **Auto-Cleanup**: When a Mirror's socket disconnects, the system automatically releases the Redis lock, preventing "zombie" states.
+- **Bounded TTL**: `kiosk_state:*` and `socket_to_kiosk:*` keys carry a 24-hour TTL refreshed on every `register_kiosk`, so a crashed process or network partition self-heals instead of leaking locks forever.
+- **Kiosk Device Secret**: `register_kiosk` requires `KIOSK_DEVICE_SECRET` — unverified sockets are rejected before they can join a kiosk room.
+- **Idle Auto-Logout (kiosk frontend)**: After 5 min of UI inactivity on the kiosk display, the kiosk calls `POST /api/remote/kiosks/disconnect` (releasing the Redis lock) and clears its local auth tokens. The manual logout button uses the same code path.
 
 ## 📈 Scalability
 - **Redis Socket Adapter**: The WebSocket server is stateless. You can run multiple instances of the API, and events will correctly propagate between nodes via Redis.
@@ -108,12 +115,15 @@ All endpoints are prefixed with `/api`.
 ## ⚙️ Environment Variables (Important)
 Ensure the following are set in your `.env`:
 - `DATABASE_URL`: PostgreSQL connection string.
-- `REDIS_HOST`/`REDIS_PORT`: Redis connection details.
-- `AWS_REGION`/`S3_BUCKET_NAME`: For image storage.
+- `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`: Redis connection details.
+- `AWS_REGION`/`AWS_S3_BUCKET_NAME`/`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`: For image/video storage.
 - `FASHN_API_KEY`/`FASHN_BASE_URL`: For the AI Try-On engine.
+- `FASHN_VIDEO_MODEL`: FASHN model id for image-to-video try-on. Leave empty to disable the `/try-on/video/*` endpoints.
 - `OPENAI_API_KEY`: For GPT-4o garment evaluation.
 - `CHAT_WONDER_API_URL`: For the conversational AI service (text-only).
-- `JWT_SECRET`: For secure authentication.
+- `ACCESS_TOKEN_SECRET`/`REFRESH_TOKEN_SECRET`: For JWT signing.
+- `KIOSK_DEVICE_SECRET`: Shared secret kiosk devices must present when calling `register_kiosk` over the socket.
+- `GOOGLE_CLIENT_ID`: For Google SSO auth.
 
 ---
 
