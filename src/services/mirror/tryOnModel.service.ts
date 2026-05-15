@@ -47,7 +47,7 @@ export default class TryOnModelService {
 
     logger.info(`[TryOnModel] Uploaded model for user ${userId}, fileId=${fileRecord.id}`);
 
-    return FileService.attachPresignedUrls(fileRecord);
+    return FileService.uploadFile(fileRecord);
   }
 
   /**
@@ -62,6 +62,6 @@ export default class TryOnModelService {
     if (!user) throw { status: 404, message: "User not found" };
     if (!user.avatar) throw { status: 404, message: "No model image set for this user" };
 
-    return FileService.attachPresignedUrls(user.avatar);
+    return FileService.uploadFile(user.avatar);
   }
 }

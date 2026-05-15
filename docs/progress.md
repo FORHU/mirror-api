@@ -40,7 +40,7 @@ The API follows a **Client-Specific Layered Architecture** to cleanly separate t
 - **Garment Alignment**: Outfit composition is the **frontend's** job — the phone positions garments on a canvas, screenshots, uploads the composed image to S3, and the backend forwards the URL to FASHN.AI. Because the input is always a pre-composed full-body image, the `runByGarment`/`runVideoByGarment` endpoints hardcode FASHN's `category` to `one-pieces`.
 - **Try-On by Garment ID**: `POST /try-on/garment` (image) and `POST /try-on/video/garment` (image-to-video) let the client trigger a run using a stored `Garment.id` instead of raw URLs.
 - **Try-On by Outfit ID**: `POST /try-on/outfit` and `POST /try-on/video/outfit` accept a stored `Outfit.id`.
-- **Model Image Management (S3 Presigned)**: Dedicated endpoints for the user's body photo (`/try-on/model/*`) — presigned PUT for direct-to-S3 upload, confirm-then-attach-as-`User.avatar`, and presigned GET for retrieval.
+- **Model Image Management**: Dedicated endpoints for the user's body photo (`/try-on/model/*`) — multipart upload through the API (multer-s3) that creates a `File` row and attaches it as `User.avatar`, plus a GET endpoint that returns a fresh presigned-read URL.
 
 ### 5. Conversational & Vision AI (LLMs)
 - **OpenAI GPT-4o (Vision)**: Used to classify garment images against our Prisma enums (`GARMENT_TYPES`, `FITTING_SLOT`, `CATEGORY`, `GARMENT_GENDER`, `LAYER_LEVEL`, `SILHOUETTE`). The endpoint `POST /garments/evaluate` accepts a single image, sends it to GPT-4o with the enum vocabulary baked into the prompt, validates the response with Joi against those same enums, then persists a `Garment` tied to the authenticated user.
@@ -77,8 +77,7 @@ All endpoints are prefixed with `/api`.
 - `POST /api/mirror/try-on/video/garment`: **[Auth]** Image-to-video try-on using a stored `Garment.id`. Returns 503 if `FASHN_VIDEO_MODEL` is unset.
 - `POST /api/mirror/try-on/video/outfit`: **[Auth]** Image-to-video try-on using a stored `Outfit.id`.
 - `GET /api/mirror/try-on/:predictionId/status`: REST polling alternative to the kiosk websocket flow. Works for both image and video predictions.
-- `POST /api/mirror/try-on/model/presign`: **[Auth]** Get an S3 presigned PUT URL for uploading the user's model image directly (key namespaced under `tryon-models/<userId>/`).
-- `POST /api/mirror/try-on/model/confirm`: **[Auth]** Persist the uploaded File and attach it as `User.avatar`.
+- `POST /api/mirror/try-on/model`: **[Auth]** Multipart upload of the user's model photo. Creates a `File` row and attaches it as `User.avatar`; the previous avatar's File row and S3 object are deleted.
 - `GET /api/mirror/try-on/model`: **[Auth]** Return the user's current model image with a fresh presigned GET URL.
 
 ### Files
@@ -95,7 +94,7 @@ All endpoints are prefixed with `/api`.
 2.  **Pairing**: User scans QR on the Mirror -> Phone sends `notify-scanning` request (Kiosk shows "Please sign in") -> Phone sends `connect` request -> Backend locks `kioskId` to `userId` in Redis.
 3.  **Control**: Phone sends `command` -> Backend checks Redis lock -> Backend emits event to Mirror's Socket room.
 4.  **Garment Capture (AI)**: User uploads a garment image -> Backend pushes it to GPT-4o vision with our enum vocabulary -> Joi enforces the AI's response against the enums -> Garment row persisted, tied to the user.
-5.  **Model Image Setup**: Phone requests presigned PUT URL -> uploads model photo directly to S3 -> confirms upload -> Backend creates File row and sets it as `User.avatar`.
+5.  **Model Image Setup**: Phone uploads model photo via multipart `POST /try-on/model` -> Backend (multer-s3) streams it to S3 -> File row created, attached as `User.avatar`, prior avatar deleted.
 6.  **Try-On**: Phone composes the outfit on its canvas -> uploads composed image to S3 -> Phone calls either `tryon/run` (raw URLs) or `tryon/garment` (by Garment.id) -> Backend forwards to FASHN.AI with `category: "one-pieces"` -> Backend polls status -> Backend pushes final Image URL to Mirror via Sockets, while mobile clients can also poll `GET /try-on/:id/status` directly.
 
 ---

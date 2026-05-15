@@ -45,7 +45,7 @@ export default class GarmentController {
       const data = await GarmentService.getGarments(req.query);
       const hydratedData = {
         ...data,
-        data: await FileService.attachPresignedUrls(data.data)
+        data: await FileService.uploadFile(data.data)
       };
       res.json({ status: "success", data: hydratedData });
     } catch (err) {
@@ -56,7 +56,7 @@ export default class GarmentController {
   static async show(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await GarmentService.getGarmentById(req.params.id);
-      const hydratedData = await FileService.attachPresignedUrls(data);
+      const hydratedData = await FileService.uploadFile(data);
       res.json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
@@ -103,7 +103,7 @@ export default class GarmentController {
       }
 
       const data = await GarmentService.createGarment(finalValue);
-      const hydratedData = await FileService.attachPresignedUrls(data);
+      const hydratedData = await FileService.uploadFile(data);
       res.status(201).json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
@@ -127,7 +127,7 @@ export default class GarmentController {
       }
 
       const data = await GarmentService.updateGarment(req.params.id, finalValue);
-      const hydratedData = await FileService.attachPresignedUrls(data);
+      const hydratedData = await FileService.uploadFile(data);
       res.json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
@@ -201,7 +201,7 @@ export default class GarmentController {
             userId,
           );
 
-          const hydrated = await FileService.attachPresignedUrls(garment);
+          const hydrated = await FileService.uploadFile(garment);
           logger.info(`[GarmentEvaluate] Completed garment ${garment.id} for user ${userId}`);
 
           if (kioskId) {

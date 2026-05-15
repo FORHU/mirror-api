@@ -1,6 +1,7 @@
 import OutfitRepo from "../../repositories/outfit.repository";
 import GarmentRepo from "../../repositories/garment.repository";
-import { assertNoDuplicateComposition } from "../../validations/outfit.validation";
+import FileRepo from "../../repositories/file.repository";
+import { findExistingComposition } from "../../validations/outfit.validation";
 
 export default class OutfitService {
   static async getUserOutfits(userId?: string, query: any = {}) {
@@ -20,19 +21,37 @@ export default class OutfitService {
   }
 
   static async createOutfit(userId?: string, data: any = {}) {
-    await assertNoDuplicateComposition(userId, data.items);
+    // Idempotent: if this user already has an outfit with the same garment set,
+    // return it instead of creating a duplicate (and avoid wasting a File row).
+    const existing = await findExistingComposition(userId, data.items);
+    if (existing) return existing;
 
     let fileId = data.fileId;
 
-    // Fallback: If no fileId is provided, pick the image from the first garment
+    // Fallback: when the client doesn't upload its own display image, mint a NEW
+    // File row pointing at the first usable garment's URL. We can't reuse the
+    // garment's existing File row directly — `Outfit.fileId` is @unique, so each
+    // Outfit must own a distinct File.id. This creates a separate DB row that
+    // references the same underlying URL, satisfying the unique constraint.
     if (!fileId && data.items && data.items.length > 0) {
-      const firstGarment = await GarmentRepo.findById(data.items[0].garmentId);
-      if (firstGarment) {
-        fileId = firstGarment.fileId;
+      for (const item of data.items) {
+        const garment = await GarmentRepo.findById(item.garmentId);
+        const sourceUrl = garment?.imageUrl || garment?.file?.fileUrl;
+        if (sourceUrl) {
+          const newFile = await FileRepo.create({
+            filename: `outfit-display-${Date.now()}`,
+            fileUrl: sourceUrl,
+            provider: "EXTERNAL",
+          });
+          fileId = newFile.id;
+          break;
+        }
       }
     }
 
-    if (!fileId) throw { status: 400, message: "Outfit display file or at least one garment is required" };
+    if (!fileId) {
+      throw { status: 400, message: "Outfit requires a display image (upload a file, pass fileId, or include at least one garment with an image)" };
+    }
 
     return OutfitRepo.create({
       userId,
@@ -48,22 +67,12 @@ export default class OutfitService {
   static async updateOutfit(id: string, userId?: string, data: any = {}) {
     await this.getOutfitById(id, userId); // Ensure it exists and belongs to user
 
-    let fileId = data.fileId;
-
-    // Fallback: If no fileId is provided and items are updated, pick from first garment
-    if (!fileId && data.items && data.items.length > 0) {
-      const firstGarment = await GarmentRepo.findById(data.items[0].garmentId);
-      if (firstGarment) {
-        fileId = firstGarment.fileId;
-      }
-    }
-
     return OutfitRepo.update(id, {
       name: data.name,
       description: data.description,
       isPublic: data.isPublic,
       designType: data.designType,
-      fileId: fileId,
+      fileId: data.fileId,
       items: data.items,
     });
   }

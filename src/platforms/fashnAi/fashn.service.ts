@@ -35,10 +35,6 @@ export default class FashnService {
             model_image: modelUrl,
             garment_image: garmentUrl,
             category: category, // e.g. "tops", "bottoms", "one-pieces"
-            nsfw_filter: true,
-            cover_feet: false,
-            adjust_hands: true,
-            restore_face: true,
           },
         },
         { headers: this.headers }
@@ -79,8 +75,6 @@ export default class FashnService {
             model_image: modelUrl,
             garment_image: garmentUrl,
             category,
-            nsfw_filter: true,
-            restore_face: true,
           },
         },
         { headers: this.headers }

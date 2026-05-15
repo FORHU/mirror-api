@@ -3,7 +3,7 @@ import Joi from "joi";
 import OutfitService from "../../services/shared/outfit.service";
 import FileService from "../../services/shared/file.service";
 import {
-  assertNoDuplicateComposition,
+  findExistingComposition,
   validateGarmentIds,
 } from "../../validations/outfit.validation";
 import logger from "../../utils/logger";
@@ -34,7 +34,7 @@ export default class OutfitController {
       const data = await OutfitService.getUserOutfits(userId, req.query);
       const hydratedData = {
         ...data,
-        data: await FileService.attachPresignedUrls(data.data)
+        data: await FileService.uploadFile(data.data)
       };
       res.json({ status: "success", data: hydratedData });
     } catch (err) {
@@ -46,7 +46,7 @@ export default class OutfitController {
     try {
       const userId = (req as any).user?.id;
       const data = await OutfitService.getOutfitById(req.params.id, userId);
-      const hydratedData = await FileService.attachPresignedUrls(data);
+      const hydratedData = await FileService.uploadFile(data);
       res.json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);
@@ -93,10 +93,19 @@ export default class OutfitController {
         return next(validationError("Uploaded file must be an image"));
       }
 
-      // Validate garment ids + duplicate composition BEFORE uploading anything
-      // to S3, otherwise a rejection downstream orphans the S3 object + File row.
+      // Validate garment ids BEFORE uploading anything to S3, otherwise a
+      // rejection downstream orphans the S3 object + File row.
       await validateGarmentIds(finalValue.items);
-      await assertNoDuplicateComposition(userId, finalValue.items);
+
+      // Idempotency: if the same user already has an outfit with these exact
+      // garments, return it instead of creating a duplicate. Skip the file
+      // upload entirely so we don't orphan an S3 object either.
+      const existing = await findExistingComposition(userId, finalValue.items);
+      if (existing) {
+        const hydratedExisting = await FileService.uploadFile(existing);
+        logger.info(`Outfit reused (same composition): ${existing.id}`);
+        return res.status(200).json({ status: "success", data: hydratedExisting });
+      }
 
       if (req.file) {
         const manualFileSpecs = finalValue.file || {};
@@ -105,7 +114,7 @@ export default class OutfitController {
       }
 
       const data = await OutfitService.createOutfit(userId, finalValue);
-      const hydratedData = await FileService.attachPresignedUrls(data);
+      const hydratedData = await FileService.uploadFile(data);
       logger.info(`Outfit created: ${data.id}`);
       res.status(201).json({ status: "success", data: hydratedData });
     } catch (err) {
@@ -130,7 +139,7 @@ export default class OutfitController {
       }
 
       const data = await OutfitService.updateOutfit(req.params.id, userId, finalValue);
-      const hydratedData = await FileService.attachPresignedUrls(data);
+      const hydratedData = await FileService.uploadFile(data);
       res.json({ status: "success", data: hydratedData });
     } catch (err) {
       next(err);

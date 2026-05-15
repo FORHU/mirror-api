@@ -139,7 +139,7 @@ export default class GarmentService {
 
     if (file) {
       fileRecord = await FileService.uploadFile(file);
-      const signed = await FileService.attachPresignedUrls(fileRecord);
+      const signed = await FileService.uploadFile(fileRecord);
       urlForAI = signed.fileUrl;
     }
 

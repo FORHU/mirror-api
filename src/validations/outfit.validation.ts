@@ -16,21 +16,17 @@ export async function validateGarmentIds(items: { garmentId: string }[] = []) {
 }
 
 /**
- * Rejects creating an outfit with the same garment composition the user
- * already has. System outfits (no userId) and empty compositions are skipped.
+ * Returns the user's existing outfit with the same garment composition, or
+ * null if none. System outfits (no userId) and empty compositions are skipped.
+ *
+ * Used to make outfit-create idempotent per user: if the same composition
+ * already exists, callers can return the existing row instead of duplicating.
  */
-export async function assertNoDuplicateComposition(
+export async function findExistingComposition(
   userId: string | undefined,
   items: { garmentId: string }[] = []
 ) {
-  if (!userId || !items.length) return;
+  if (!userId || !items.length) return null;
   const garmentIds = items.map((i) => i.garmentId).filter(Boolean);
-  const existing = await OutfitRepo.findByExactGarmentSet(userId, garmentIds);
-  if (existing) {
-    throwResponse(
-      409,
-      `An outfit with these garments already exists: "${existing.name}"`,
-      { existingId: existing.id },
-    );
-  }
+  return OutfitRepo.findByExactGarmentSet(userId, garmentIds);
 }

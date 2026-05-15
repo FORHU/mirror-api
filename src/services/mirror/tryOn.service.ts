@@ -1,7 +1,6 @@
 import FashnService from "../../platforms/fashnAi/fashn.service";
 import GarmentService from "../shared/garment.service";
 import OutfitService from "../shared/outfit.service";
-import FileService from "../shared/file.service";
 import TryOnModelService from "./tryOnModel.service";
 import { emitToKiosk } from "../../utils/socket.util";
 import logger from "../../utils/logger";
@@ -26,9 +25,8 @@ export default class TryOnService {
    */
   static async runByGarment(userId: string, garmentId: string, modelImage?: string, kioskId?: string) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
-    const garment = await GarmentService.getGarmentById(garmentId);
-    const hydrated = await FileService.attachPresignedUrls(garment);
-    const garmentImageUrl = hydrated.imageUrl || hydrated.file?.fileUrl;
+    const garment: any = await GarmentService.getGarmentById(garmentId);
+    const garmentImageUrl = garment.imageUrl || garment.file?.fileUrl;
 
     if (!garmentImageUrl) throw new Error("Garment has no usable image URL");
 
@@ -46,9 +44,8 @@ export default class TryOnService {
    */
   static async runByOutfit(userId: string, outfitId: string, modelImage?: string, kioskId?: string) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
-    const outfit = await OutfitService.getOutfitById(outfitId, userId);
-    const hydrated = await FileService.attachPresignedUrls(outfit);
-    const outfitImageUrl = hydrated.file?.fileUrl;
+    const outfit: any = await OutfitService.getOutfitById(outfitId, userId);
+    const outfitImageUrl = outfit.file?.fileUrl;
 
     if (!outfitImageUrl) throw new Error("Outfit has no display image");
 
@@ -66,9 +63,8 @@ export default class TryOnService {
    */
   static async runVideoByGarment(userId: string, garmentId: string, modelImage?: string, kioskId?: string) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
-    const garment = await GarmentService.getGarmentById(garmentId);
-    const hydrated = await FileService.attachPresignedUrls(garment);
-    const garmentImageUrl = hydrated.imageUrl || hydrated.file?.fileUrl;
+    const garment: any = await GarmentService.getGarmentById(garmentId);
+    const garmentImageUrl = garment.imageUrl || garment.file?.fileUrl;
 
     if (!garmentImageUrl) throw new Error("Garment has no usable image URL");
 
@@ -86,9 +82,8 @@ export default class TryOnService {
    */
   static async runVideoByOutfit(userId: string, outfitId: string, modelImage?: string, kioskId?: string) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
-    const outfit = await OutfitService.getOutfitById(outfitId, userId);
-    const hydrated = await FileService.attachPresignedUrls(outfit);
-    const outfitImageUrl = hydrated.file?.fileUrl;
+    const outfit: any = await OutfitService.getOutfitById(outfitId, userId);
+    const outfitImageUrl = outfit.file?.fileUrl;
 
     if (!outfitImageUrl) throw new Error("Outfit has no display image");
 
@@ -125,15 +120,19 @@ export default class TryOnService {
 
         if (statusData.status === "completed") {
           clearInterval(interval);
+          const fashnUrl = statusData.output?.[0];
+
+          // Emit FASHN's URL directly. Persistence to our S3 is intentionally
+          // deferred — see notes on the TODO follow-up to re-add a non-presigned
+          // persistence path (CDN-backed or public-read bucket).
           emitToKiosk(kioskId, "tryon_completed", {
             predictionId,
             media: isVideo ? "video" : "image",
-            ...(isVideo
-              ? { videoUrl: statusData.output?.[0] }
-              : { imageUrl: statusData.output?.[0] }),
+            ...(isVideo ? { videoUrl: fashnUrl } : { imageUrl: fashnUrl }),
           });
         } else if (statusData.status === "failed") {
           clearInterval(interval);
+          logger.error(`FASHN.AI failed [${predictionId}] full response: ${JSON.stringify(statusData)}`);
           emitToKiosk(kioskId, "tryon_failed", {
             predictionId,
             media: isVideo ? "video" : "image",
