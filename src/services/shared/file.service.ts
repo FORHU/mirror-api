@@ -75,11 +75,16 @@ export default class FileService {
   static async uploadFile(file: any, manualMetaData: any = {}) {
     try {
       const { filename, originalname, mimetype, size, path: localPath, location, key, bucket } = file;
-      
+
+      // multer-s3 v3 + newer AWS SDK sometimes return `location` as undefined
+      // even on successful S3 uploads (e.g. single-part PUTs). Detect S3 by
+      // `bucket && key` instead, which are always populated by multer-s3.
+      const isS3 = Boolean(bucket && key);
+
       let buffer: Buffer;
 
       // 1. Get buffer for analysis
-      if (location) {
+      if (isS3) {
         const command = new GetObjectCommand({
           Bucket: bucket,
           Key: key,
@@ -113,10 +118,12 @@ export default class FileService {
         ...manualMetaData // Include any other custom fields
       };
 
-      // 5. Construct URL (Use CDN if available, otherwise location)
-      // Note: If we use presigned URLs, this "static" URL might just be a fallback or internal ref
-      const finalUrl = location 
-        ? (S3_CDN_URL ? `${S3_CDN_URL}/${key}` : location)
+      // 5. Construct URL. Prefer CDN; fall back to multer-s3's location or a
+      // bucket+key derived URL when location isn't returned by the SDK.
+      const s3DirectUrl =
+        location || (isS3 ? `https://${bucket}.s3.amazonaws.com/${key}` : null);
+      const finalUrl = isS3
+        ? (S3_CDN_URL ? `${S3_CDN_URL}/${key}` : s3DirectUrl)
         : `/uploads/${filename}`;
 
       // 6. Create record in DB
@@ -127,7 +134,7 @@ export default class FileService {
         mimeType: mimetype,
         extension: path.extname(originalname || filename || key).replace(".", ""),
         size,
-        provider: location ? "S3" : "LOCAL",
+        provider: isS3 ? "S3" : "LOCAL",
         bucket: bucket,
         path: key || localPath,
         metaData: finalMetaData,

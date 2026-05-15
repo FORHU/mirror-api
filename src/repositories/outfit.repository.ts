@@ -84,6 +84,7 @@ export default class OutfitRepo {
     fileId: string;
     userOutlineId?: string;
     items: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[];
+    metaData?: any;
   }) {
     return prisma.outfit.create({
       data: {
@@ -91,6 +92,7 @@ export default class OutfitRepo {
         description: data.description,
         isPublic: data.isPublic,
         designType: data.designType,
+        ...(data.metaData !== undefined && { metaData: data.metaData }),
         ...(data.userId && { user: { connect: { id: data.userId } } }),
         ...(data.userOutlineId && { userOutline: { connect: { id: data.userOutlineId } } }),
         file: { connect: { id: data.fileId } },
