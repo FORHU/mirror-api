@@ -34,9 +34,12 @@ export interface VoiceContext {
   isNavigating?: boolean;
   profile?: string;
   history?: Array<{ user: string; assistant: string }>;
-  remainingDistance?: number; // metres
-  remainingDuration?: number; // seconds
+  remainingDistance?: number;    // metres, total trip remaining
+  remainingDuration?: number;    // seconds, total trip remaining
   destinationName?: string;
+  currentInstruction?: string;   // e.g. "Turn right onto Session Road"
+  nextManeuverDistance?: number; // metres to the very next turn
+  nextInstruction?: string;      // instruction after current one
 }
 
 function formatDistance(metres?: number): string {
@@ -61,9 +64,13 @@ function buildSystemPrompt(ctx: VoiceContext, weatherInfo: string): string {
     car: "driving (car)", motorcycle: "motorcycle", bicycle: "cycling", walking: "walking",
   };
   const profileState = profileMap[ctx.profile ?? "car"] ?? ctx.profile ?? "driving (car)";
-  const distState    = ctx.isNavigating ? formatDistance(ctx.remainingDistance) : "not navigating";
-  const etaState     = ctx.isNavigating ? formatDuration(ctx.remainingDuration) : "not navigating";
-  const destState    = ctx.destinationName || "none";
+  const distState    = ctx.isNavigating ? formatDistance(ctx.remainingDistance)      : "not navigating";
+  const etaState     = ctx.isNavigating ? formatDuration(ctx.remainingDuration)      : "not navigating";
+  const destState    = ctx.destinationName                                           || "none";
+  const curTurnState = ctx.isNavigating && ctx.currentInstruction
+    ? `${ctx.currentInstruction} (in ${formatDistance(ctx.nextManeuverDistance)})`
+    : "none";
+  const nextTurnState = ctx.isNavigating && ctx.nextInstruction ? ctx.nextInstruction : "none";
 
   return `You are a voice companion for a map navigation app.
 Always respond with a JSON object using this exact schema:
@@ -82,6 +89,8 @@ Current map state:
 - Destination: ${destState}
 - Remaining distance: ${distState}
 - Remaining ETA: ${etaState}
+- Next maneuver: ${curTurnState}
+- Maneuver after that: ${nextTurnState}
 
 CRITICAL — what "off" means:
 - "Traffic layer: OFF" means it is not shown visually on the map. It does NOT mean traffic data is unavailable.
@@ -109,6 +118,7 @@ Behaviour rules:
 - For weather questions: always read out the exact weather from context. Never say you can't check.
 - For any traffic question (conditions, congestion, "how's traffic"): ALWAYS turn on the traffic layer and describe what you know. Never refuse because the layer is off.
 - For distance/ETA questions ("how far", "how long", "when will I arrive"): read out the exact remaining distance and ETA from context above. Never say "let me check" — the data is already in context.
+- For turn questions ("where do I turn", "left or right", "what's my next turn", "should I turn"): read the next maneuver instruction and distance directly from context. E.g. "Turn right onto Session Road in 200 metres."
 - For "best route to avoid traffic": use intent "traffic_route".
 - For travel mode changes: use intent "set_profile".
 - Always perform the action yourself. Never tell the user to tap a button or enable something manually.
@@ -228,5 +238,9 @@ export const voiceService = {
     const audio = await synthesize(reply);
 
     return { transcript, reply, intent, destination, profile, audio };
+  },
+
+  tts: async (text: string): Promise<Buffer> => {
+    return synthesize(text);
   },
 };

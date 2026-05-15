@@ -23,9 +23,12 @@ export default class VoiceController {
       trafficEnabled:    req.query.traffic    === "true",
       isNavigating:      req.query.navigating === "true",
       profile:           (req.query.profile as string) || "car",
-      remainingDistance: req.query.remainingDistance ? parseFloat(req.query.remainingDistance as string) : undefined,
-      remainingDuration: req.query.remainingDuration ? parseFloat(req.query.remainingDuration as string) : undefined,
-      destinationName:   req.query.destinationName   ? decodeURIComponent(req.query.destinationName as string) : undefined,
+      remainingDistance:    req.query.remainingDistance    ? parseFloat(req.query.remainingDistance as string)                        : undefined,
+      remainingDuration:    req.query.remainingDuration    ? parseFloat(req.query.remainingDuration as string)                        : undefined,
+      destinationName:      req.query.destinationName      ? decodeURIComponent(req.query.destinationName as string)                  : undefined,
+      currentInstruction:   req.query.currentInstruction   ? decodeURIComponent(req.query.currentInstruction as string)              : undefined,
+      nextManeuverDistance: req.query.nextManeuverDistance  ? parseFloat(req.query.nextManeuverDistance as string)                    : undefined,
+      nextInstruction:      req.query.nextInstruction       ? decodeURIComponent(req.query.nextInstruction as string)                 : undefined,
       history,
     };
 
@@ -45,6 +48,19 @@ export default class VoiceController {
       if (err.message === "EMPTY_TRANSCRIPT") {
         return res.status(422).json({ error: "Could not transcribe audio. Please speak clearly and try again." });
       }
+      next(err);
+    }
+  }
+
+  static async tts(req: Request, res: Response, next: NextFunction) {
+    const { text } = req.body as { text?: string };
+    if (!text?.trim()) return res.status(400).json({ error: "text is required" });
+
+    try {
+      const audio = await voiceService.tts(text.trim());
+      res.set("Content-Type", "audio/mpeg");
+      res.send(audio);
+    } catch (err) {
       next(err);
     }
   }

@@ -9,4 +9,6 @@ router.post(
   VoiceController.process
 );
 
+router.post("/tts", express.json(), VoiceController.tts);
+
 export default router;
