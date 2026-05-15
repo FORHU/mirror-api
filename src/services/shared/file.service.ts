@@ -5,8 +5,9 @@ import FileRepo from "../../repositories/file.repository";
 import logger from "../../utils/logger";
 import { S3_CDN_URL, S3_BUCKET_NAME } from "../../config";
 import { s3Client } from "../../utils/s3";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import crypto from "crypto";
 
 export default class FileService {
   /**
@@ -137,6 +138,58 @@ export default class FileService {
       logger.error("Error processing file upload:", error);
       throw error;
     }
+  }
+
+  /**
+   * Downloads a remote image URL, persists it to S3, and creates a File row.
+   * Used to capture transient third-party output (e.g. FASHN.AI try-on results)
+   * before the source URL expires.
+   */
+  static async uploadFromUrl(sourceUrl: string, opts: { keyPrefix?: string; originalName?: string } = {}) {
+    const response = await axios.get<ArrayBuffer>(sourceUrl, { responseType: "arraybuffer" });
+    const buffer = Buffer.from(response.data);
+    const rawContentType = response.headers["content-type"];
+    const mimeType = typeof rawContentType === "string" ? rawContentType : "image/png";
+    const extension = mimeType.split("/")[1]?.split(";")[0] || "png";
+
+    const image = sharp(buffer);
+    const metadata = await image.metadata();
+    const stats = await image.stats();
+    const autoDominantColor = this.rgbToHex(
+      Math.round(stats.channels[0].mean),
+      Math.round(stats.channels[1].mean),
+      Math.round(stats.channels[2].mean)
+    );
+
+    const key = `${opts.keyPrefix || "uploads"}/${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${extension}`;
+    await s3Client.send(new PutObjectCommand({
+      Bucket: S3_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: mimeType,
+    }));
+
+    const finalUrl = S3_CDN_URL ? `${S3_CDN_URL}/${key}` : `s3://${S3_BUCKET_NAME}/${key}`;
+
+    return FileRepo.create({
+      filename: key.split("/").pop() || key,
+      originalName: opts.originalName,
+      fileUrl: finalUrl,
+      mimeType,
+      extension,
+      size: buffer.byteLength,
+      provider: "S3",
+      bucket: S3_BUCKET_NAME,
+      path: key,
+      metaData: {
+        width: metadata.width,
+        height: metadata.height,
+        dominantColor: autoDominantColor,
+        isAlpha: metadata.hasAlpha,
+        format: metadata.format,
+        sourceUrl,
+      },
+    });
   }
 
   private static rgbToHex(r: number, g: number, b: number) {
