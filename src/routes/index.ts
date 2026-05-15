@@ -12,6 +12,7 @@ import mirrorOutfitRoute from './shared/outfit.route';
 import mirrorFileUploadRoute from './shared/fileUpload.route';
 import mirrorMapRoute from './mirror/map.route';
 import mirrorWeatherRoute from './mirror/weather.route';
+import mirrorVoiceRoute from './mirror/voice.route';
 import devTokenHandler from "../controllers/mirror/dev.controller";
 
 const router = express.Router();
@@ -40,5 +41,6 @@ router.use('/mirror/outfits', mirrorOutfitRoute);
 router.use("/mirror/file-uploads", mirrorFileUploadRoute);
 router.use("/mirror/map", mirrorMapRoute);
 router.use("/mirror/weather", mirrorWeatherRoute);
+router.use("/mirror/voice", mirrorVoiceRoute);
 
 export default router;
