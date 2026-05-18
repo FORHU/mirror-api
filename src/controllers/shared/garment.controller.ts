@@ -25,6 +25,25 @@ const garmentSchema = Joi.object({
   file: Joi.object().optional(), // Manual file metadata
 });
 
+// PATCH variant: every field optional. Mirrors `outfitUpdateSchema` so a
+// caller can PATCH a single field (e.g. `description`) without re-sending
+// the whole record.
+const garmentUpdateSchema = Joi.object({
+  name: Joi.string().optional(),
+  description: Joi.string().optional().allow(null, ""),
+  imageUrl: Joi.string().uri().optional(),
+  garmentType: Joi.array().items(Joi.string().valid(...Object.values(GARMENT_TYPES))).optional(),
+  fittingSlot: Joi.array().items(Joi.string().valid(...Object.values(FITTING_SLOT))).optional(),
+  category: Joi.array().items(Joi.string().valid(...Object.values(CATEGORY))).optional(),
+  gender: Joi.string().valid(...Object.values(GARMENT_GENDER)).optional(),
+  layerLevel: Joi.string().valid(...Object.values(LAYER_LEVEL)).optional(),
+  silhouette: Joi.string().valid(...Object.values(SILHOUETTE)).optional(),
+  tags: Joi.array().items(Joi.string()).optional(),
+  metaData: Joi.object().optional().allow(null),
+  fileId: Joi.string().optional(),
+  file: Joi.object().optional(),
+});
+
 // Validates the AI's classification against our Prisma enums before persisting.
 const evaluationSchema = Joi.object({
   name: Joi.string().required(),
@@ -59,42 +78,46 @@ export default class GarmentController {
   }
 
   /**
-   * Cleans and parses form-data into correct types
+   * Cleans and parses form-data into correct types.
+   *
+   * Mirrors the outfit controller's split: strict-JSON fields throw a clean
+   * 400 on parse failure (so the caller sees "X is not valid JSON" instead
+   * of a downstream Joi type error); lenient fields fall back to raw string
+   * for Joi to validate/coerce.
    */
   private static prepareBody(body: any) {
     const cleaned = { ...body };
-    
-    // Parse JSON strings from multipart form-data
-    const jsonFields = ['garmentType', 'fittingSlot', 'category', 'tags', 'metaData', 'file'];
-    jsonFields.forEach(field => {
+
+    const strictJsonFields = ['garmentType', 'fittingSlot', 'category', 'tags', 'metaData', 'file'];
+    for (const field of strictJsonFields) {
       if (typeof cleaned[field] === 'string') {
         try {
           cleaned[field] = JSON.parse(cleaned[field]);
-        } catch (e) {
-          // If not valid JSON, leave as is (Joi will catch if it's wrong type)
+        } catch (e: any) {
+          throw { status: 400, message: `Field "${field}" is not valid JSON: ${e.message}` };
         }
       }
-    });
+    }
 
     return cleaned;
   }
 
   static async create(req: Request, res: Response, next: NextFunction) {
-    const cleanedBody = GarmentController.prepareBody(req.body);
-    const { error, value } = garmentSchema.validate(cleanedBody);
-    if (error) return next(validationError(error.message));
-
     try {
+      const cleanedBody = GarmentController.prepareBody(req.body);
+      const { error, value } = garmentSchema.validate(cleanedBody);
+      if (error) return next(validationError(error.message));
+
       let finalValue = { ...value };
 
-      // If a physical file was uploaded, process it
+      // If a physical file was uploaded, the new file's URL is the source
+      // of truth — overwrite any imageUrl the caller may have sent so the
+      // two never diverge. Matches `update`'s rule.
       if (req.file) {
         const manualFileSpecs = finalValue.file || {};
         const fileRecord = await FileService.uploadFile(req.file, manualFileSpecs.metaData);
         finalValue.fileId = fileRecord.id;
-        if (!finalValue.imageUrl) {
-          finalValue.imageUrl = fileRecord.fileUrl;
-        }
+        finalValue.imageUrl = fileRecord.fileUrl;
       }
 
       const data = await GarmentService.createGarment(finalValue);
@@ -105,11 +128,11 @@ export default class GarmentController {
   }
 
   static async update(req: Request, res: Response, next: NextFunction) {
-    const cleanedBody = GarmentController.prepareBody(req.body);
-    const { error, value } = garmentSchema.validate(cleanedBody);
-    if (error) return next(validationError(error.message));
-
     try {
+      const cleanedBody = GarmentController.prepareBody(req.body);
+      const { error, value } = garmentUpdateSchema.validate(cleanedBody);
+      if (error) return next(validationError(error.message));
+
       let finalValue = { ...value };
 
       // If a new physical file was uploaded, process it

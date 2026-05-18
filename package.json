@@ -10,7 +10,8 @@
     "start": "node ./dist/src/server.js",
     "lint": "eslint src/**/*.ts --fix",
     "db:setup": "npx prisma generate && npx prisma migrate dev",
-    "db:seed": "ts-node prisma/seed.ts"
+    "db:seed": "ts-node prisma/seed.ts",
+    "outfits:generate": "ts-node src/scripts/generate-outfits.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

@@ -77,7 +77,8 @@ export default class GarmentService {
   }
 
   static async updateGarment(id: string, data: any) {
-    await this.getGarmentById(id); // Ensure it exists
+    const existing = await this.getGarmentById(id); // Ensure it exists
+    const oldFileId = existing.fileId;
 
     const garmentData: any = {
       name: data.name,
@@ -115,12 +116,42 @@ export default class GarmentService {
       };
     }
 
-    return GarmentRepo.update(id, garmentData);
+    const updated = await GarmentRepo.update(id, garmentData);
+
+    // If the file pointer changed (caller swapped fileId or uploaded a new
+    // file), the previous File row is now unreferenced from this garment.
+    // Hand it to FileService — it deletes the row + S3 object only when no
+    // other entity still holds onto it. Wrapped so a cleanup failure can't
+    // mask the successful update.
+    if (data.fileId && oldFileId && data.fileId !== oldFileId) {
+      try {
+        await FileService.discardIfUnreferenced(oldFileId);
+      } catch (err: any) {
+        // Already best-effort inside discardIfUnreferenced; this is belt-and-suspenders.
+      }
+    }
+
+    return updated;
   }
 
   static async deleteGarment(id: string) {
-    await this.getGarmentById(id);
+    const existing = await this.getGarmentById(id);
+    const fileId = existing.fileId;
+
     await GarmentRepo.delete(id);
+
+    // The Garment is gone — nothing here points at the File anymore.
+    // Defer to FileService.discardIfUnreferenced so S3 and the File row
+    // are reaped only when no other model (Outfit, User avatar) still
+    // references the same file.
+    if (fileId) {
+      try {
+        await FileService.discardIfUnreferenced(fileId);
+      } catch (err: any) {
+        // Best-effort cleanup; the delete itself already succeeded.
+      }
+    }
+
     return { message: "Garment deleted successfully" };
   }
 

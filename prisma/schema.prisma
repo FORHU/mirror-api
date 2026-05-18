@@ -478,12 +478,3 @@ enum SILHOUETTE {
   /// Example: Blazer, tailored coat, structured jacket.
   Structured
 }
-
-enum WEATHER_CONDITION {
-  summer
-  winter
-  rainy
-  breathable
-  waterproof
-  layeringPiece
-}

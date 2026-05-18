@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Outfit" ALTER COLUMN "isPublic" SET DEFAULT true;
+
+-- DropEnum
+DROP TYPE "WEATHER_CONDITION";

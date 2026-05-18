@@ -2,12 +2,24 @@ import { prisma } from "../utils/prisma";
 import { DESIGN_TYPE, FITTING_SLOT, LAYER_LEVEL } from "@prisma/client";
 
 export default class OutfitRepo {
-  static async findByUserId(userId?: string, page: number = 1, limit: number = 20) {
+  static async findByUserId(
+    userId?: string,
+    page: number = 1,
+    limit: number = 20,
+    filters: { fileProvider?: string; fileProviderNot?: string } = {},
+  ) {
     const skip = (page - 1) * limit;
+
+    const where: any = { userId };
+    if (filters.fileProvider) {
+      where.file = { provider: filters.fileProvider };
+    } else if (filters.fileProviderNot) {
+      where.file = { provider: { not: filters.fileProviderNot } };
+    }
 
     const [data, total] = await Promise.all([
       prisma.outfit.findMany({
-        where: { userId },
+        where,
         skip,
         take: limit,
         include: {
@@ -22,7 +34,7 @@ export default class OutfitRepo {
         },
         orderBy: { createdAt: "desc" },
       }),
-      prisma.outfit.count({ where: { userId } }),
+      prisma.outfit.count({ where }),
     ]);
 
     return { data, total, page, limit };
@@ -32,7 +44,7 @@ export default class OutfitRepo {
    * Finds a user's outfit whose item garment-set exactly matches `garmentIds`
    * (order-insensitive, duplicates ignored). Returns null if none.
    */
-  static async findByExactGarmentSet(userId: string, garmentIds: string[]) {
+  static async findByExactGarmentSet(userId: string | null, garmentIds: string[]) {
     const uniqueIds = Array.from(new Set(garmentIds));
     if (!uniqueIds.length) return null;
 

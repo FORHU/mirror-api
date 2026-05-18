@@ -5,7 +5,7 @@ import FileRepo from "../../repositories/file.repository";
 import logger from "../../utils/logger";
 import { S3_CDN_URL, S3_BUCKET_NAME } from "../../config";
 import { s3Client } from "../../utils/s3";
-import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 
@@ -201,5 +201,34 @@ export default class FileService {
 
   private static rgbToHex(r: number, g: number, b: number) {
     return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  /**
+   * Hard-delete a File row IFF no Garment, Outfit, or User avatar still
+   * references it. S3-backed files also have their underlying object
+   * removed. Returns true on deletion, false when the file is still in
+   * use or doesn't exist.
+   *
+   * Use this when something stops pointing at a File (e.g. a `fileId`
+   * swap on PATCH, or an entity being deleted) and the row should be
+   * garbage-collected without risking a file shared with another consumer.
+   */
+  static async discardIfUnreferenced(fileId: string): Promise<boolean> {
+    const file = await FileRepo.findByIdWithRelations(fileId);
+    if (!file) return false;
+    if (file.garment || file.outfitDisplay || file.userAvatar) return false;
+
+    try {
+      if (file.provider === "S3" && file.path && file.bucket) {
+        await s3Client.send(
+          new DeleteObjectCommand({ Bucket: file.bucket, Key: file.path }),
+        );
+      }
+      await FileRepo.softDelete(file.id);
+      return true;
+    } catch (err: any) {
+      logger.warn(`[FileService.discardIfUnreferenced] cleanup failed (fileId=${file.id}): ${err.message}`);
+      return false;
+    }
   }
 }

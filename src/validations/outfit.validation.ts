@@ -23,10 +23,12 @@ export async function validateGarmentIds(items: { garmentId: string }[] = []) {
  * already exists, callers can return the existing row instead of duplicating.
  */
 export async function findExistingComposition(
-  userId: string | undefined,
+  userId: string | null | undefined,
   items: { garmentId: string }[] = []
 ) {
-  if (!userId || !items.length) return null;
+  if (!items.length) return null;
   const garmentIds = items.map((i) => i.garmentId).filter(Boolean);
-  return OutfitRepo.findByExactGarmentSet(userId, garmentIds);
+  // Pass `null` explicitly for system outfits so Prisma matches IS NULL
+  // instead of dropping the filter (which would leak across users).
+  return OutfitRepo.findByExactGarmentSet(userId ?? null, garmentIds);
 }

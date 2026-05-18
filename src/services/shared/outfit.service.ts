@@ -5,6 +5,7 @@ import FileService from "./file.service";
 import logger from "../../utils/logger";
 import { s3Client } from "../../utils/s3";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { CATEGORY, FITTING_SLOT, GARMENT_GENDER, SILHOUETTE } from "@prisma/client";
 import { findExistingComposition } from "../../validations/outfit.validation";
 import {
   OutfitEvaluation,
@@ -20,6 +21,35 @@ export default class OutfitService {
       userId,
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20
+    );
+  }
+
+  /**
+   * Outfits whose display file is still the EXTERNAL placeholder minted by
+   * `createOutfit`'s garment-URL fallback — i.e. rows that haven't had a real
+   * image uploaded yet. Powers the "needs-image" admin/dev list.
+   */
+  static async getOutfitsNeedingImage(userId?: string, query: any = {}) {
+    const { page, limit } = query;
+    return OutfitRepo.findByUserId(
+      userId,
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+      { fileProvider: "EXTERNAL" },
+    );
+  }
+
+  /**
+   * Outfits whose display file is a real upload (non-EXTERNAL provider).
+   * Powers the "complete" list — outfits considered ready to surface.
+   */
+  static async getOutfitsWithUploadedImage(userId?: string, query: any = {}) {
+    const { page, limit } = query;
+    return OutfitRepo.findByUserId(
+      userId,
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+      { fileProviderNot: "EXTERNAL" },
     );
   }
 
@@ -76,9 +106,11 @@ export default class OutfitService {
   }
 
   static async updateOutfit(id: string, userId?: string, data: any = {}) {
-    await this.getOutfitById(id, userId); // Ensure it exists and belongs to user
+    const existing = await this.getOutfitById(id, userId); // Ensure it exists and belongs to user
+    const oldFileId = existing.fileId;
+    const oldFileProvider = (existing as any).file?.provider;
 
-    return OutfitRepo.update(id, {
+    const updated = await OutfitRepo.update(id, {
       name: data.name,
       description: data.description,
       isPublic: data.isPublic,
@@ -86,11 +118,44 @@ export default class OutfitService {
       fileId: data.fileId,
       items: data.items,
     });
+
+    // Outfit.fileId is @unique, so once the caller swaps in a new fileId the
+    // previous File row is unreferenced. The EXTERNAL placeholder minted by
+    // createOutfit's garment-URL fallback is the canonical case — drop it
+    // here so the File table doesn't accumulate dead pointer rows. S3-backed
+    // files are left alone (they own an actual object and need a different
+    // cleanup path).
+    if (data.fileId && oldFileId && data.fileId !== oldFileId && oldFileProvider === "EXTERNAL") {
+      try {
+        await FileRepo.softDelete(oldFileId);
+      } catch (err: any) {
+        logger.warn(`[OutfitService.updateOutfit] placeholder File cleanup failed (fileId=${oldFileId}): ${err.message}`);
+      }
+    }
+
+    return updated;
   }
 
   static async deleteOutfit(id: string, userId?: string) {
-    await this.getOutfitById(id, userId); // Ensure it exists and belongs to user
+    const existing = await this.getOutfitById(id, userId); // Ensure it exists and belongs to user
+    const fileId = existing.fileId;
+    const fileProvider = (existing as any).file?.provider;
+
     await OutfitRepo.delete(id);
+
+    // Outfit.fileId is @unique — once the Outfit is gone, the File row is
+    // unreferenced. Mirror updateOutfit's cleanup: drop EXTERNAL placeholder
+    // rows so the File table doesn't accumulate dead pointers. S3-backed
+    // uploads are left alone (they own an S3 object and need a different
+    // cleanup path that deletes the object too).
+    if (fileId && fileProvider === "EXTERNAL") {
+      try {
+        await FileRepo.softDelete(fileId);
+      } catch (err: any) {
+        logger.warn(`[OutfitService.deleteOutfit] placeholder File cleanup failed (fileId=${fileId}): ${err.message}`);
+      }
+    }
+
     return { message: "Outfit deleted successfully" };
   }
 
@@ -195,8 +260,10 @@ export default class OutfitService {
     evaluation: OutfitEvaluation,
     fileRecord: any,
     userId: string,
-    items: { garmentId: string }[],
+    items: { garmentId: string; slot?: FITTING_SLOT | null }[],
   ) {
+    const garmentMap = await this.garmentMapFor(items.map((i) => i.garmentId));
+    const stats = this.computeOutfitStats(items, garmentMap);
     return this.createOutfit(userId, {
       name: evaluation.name,
       description: evaluation.description,
@@ -207,6 +274,7 @@ export default class OutfitService {
         tags: evaluation.tags,
         dominantColor: evaluation.dominantColor,
         generatedBy: "openai:gpt-4o:evaluate",
+        ...stats,
       },
     });
   }
@@ -220,6 +288,8 @@ export default class OutfitService {
     composition: OutfitComposition,
     userId: string,
   ) {
+    const garmentMap = await this.garmentMapFor(composition.items.map((i) => i.garmentId));
+    const stats = this.computeOutfitStats(composition.items, garmentMap);
     return this.createOutfit(userId, {
       name: composition.name,
       description: composition.description,
@@ -228,6 +298,7 @@ export default class OutfitService {
       metaData: {
         tags: composition.tags,
         generatedBy: "openai:gpt-4o:compose",
+        ...stats,
       },
     });
   }
@@ -240,6 +311,8 @@ export default class OutfitService {
     fileRecord: any,
     userId: string,
   ) {
+    const garmentMap = await this.garmentMapFor(match.items.map((i) => i.garmentId));
+    const stats = this.computeOutfitStats(match.items, garmentMap);
     return this.createOutfit(userId, {
       name: match.name,
       description: match.description,
@@ -251,6 +324,191 @@ export default class OutfitService {
         dominantColor: match.dominantColor,
         unmatchedDescriptions: match.unmatchedDescriptions,
         generatedBy: "openai:gpt-4o:match",
+        ...stats,
+      },
+    });
+  }
+
+  /**
+   * Computes per-outfit metadata from the picked garments:
+   *   - categoryMix: per-garment normalized weight (each garment contributes
+   *     weight 1, split evenly across its `category` array). Percentages
+   *     always sum to 100, rounded to 1 decimal.
+   *   - silhouette.perSlot: silhouette per slot (slot taken from the item
+   *     if set, otherwise the garment's first fittingSlot).
+   *   - silhouette.tally: occurrence count per silhouette value.
+   *   - silhouette.dominant: most frequent silhouette; ties broken by enum
+   *     order for deterministic output.
+   *
+   * Garments missing `category` or `silhouette` are simply ignored in their
+   * respective bucket — no fabrication, no defaults.
+   */
+  static computeOutfitStats(
+    items: { garmentId: string; slot?: FITTING_SLOT | null }[],
+    garmentMap: Map<string, any>,
+  ) {
+    const picked = items
+      .map((it) => ({ item: it, garment: garmentMap.get(it.garmentId) }))
+      .filter((p) => p.garment);
+
+    const catTotals: Record<string, number> = {};
+    for (const { garment } of picked) {
+      const cats: string[] = Array.isArray(garment.category) ? garment.category : [];
+      if (!cats.length) continue;
+      const w = 1 / cats.length;
+      for (const c of cats) catTotals[c] = (catTotals[c] ?? 0) + w;
+    }
+    const catSum = Object.values(catTotals).reduce((a, b) => a + b, 0);
+    const categoryMix: Record<string, number> = {};
+    if (catSum > 0) {
+      for (const [k, v] of Object.entries(catTotals)) {
+        categoryMix[k] = Math.round((v / catSum) * 1000) / 10;
+      }
+    }
+
+    const perSlot: Record<string, string> = {};
+    const tally: Record<string, number> = {};
+    for (const { item, garment } of picked) {
+      const s = garment.silhouette;
+      if (!s) continue;
+      const slot = item.slot ?? garment.fittingSlot?.[0];
+      if (slot) perSlot[slot] = s;
+      tally[s] = (tally[s] ?? 0) + 1;
+    }
+
+    let dominant: string | undefined;
+    let bestCount = 0;
+    for (const s of Object.values(SILHOUETTE) as string[]) {
+      const c = tally[s] ?? 0;
+      if (c > bestCount) {
+        dominant = s;
+        bestCount = c;
+      }
+    }
+
+    return {
+      categoryMix,
+      silhouette: { perSlot, tally, dominant },
+    };
+  }
+
+  /**
+   * Loads garments by id and returns a Map keyed by id, for stat computation.
+   * Returns an empty Map if `ids` is empty.
+   */
+  private static async garmentMapFor(ids: string[]): Promise<Map<string, any>> {
+    if (!ids.length) return new Map();
+    const rows = await GarmentRepo.findByIds(ids);
+    return new Map(rows.map((g: any) => [g.id, g]));
+  }
+
+  /**
+   * Rule-based outfit composer. No AI. Picks garments from the wardrobe
+   * matching the requested CATEGORY, one per body slot, at random. The
+   * required slots are torso + legs + feet; head and a single accessory
+   * are included only if a matching garment exists.
+   *
+   * Resolves torso+legs via either a FullGarment (dress/jumpsuit) or
+   * UpperGarment + LowerGarment separates, chosen at random from whichever
+   * paths are viable.
+   */
+  static async recommendOutfit(opts: {
+    category: CATEGORY;
+    userId?: string;
+    gender?: GARMENT_GENDER;
+    name?: string;
+    description?: string;
+  }) {
+    const genderFilter = opts.gender
+      ? { gender: { in: [opts.gender, GARMENT_GENDER.UNISEX] } }
+      : {};
+
+    const { data: garments } = await GarmentRepo.findAll(
+      {
+        OR: [{ userId: opts.userId }, { userId: null }],
+        category: { has: opts.category },
+        ...genderFilter,
+      },
+      1,
+      200,
+    );
+
+    const bySlot = new Map<FITTING_SLOT, any[]>();
+    for (const g of garments) {
+      for (const slot of g.fittingSlot ?? []) {
+        const bucket = bySlot.get(slot) ?? [];
+        bucket.push(g);
+        bySlot.set(slot, bucket);
+      }
+    }
+
+    const pickRandom = <T>(arr?: T[]): T | undefined =>
+      arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : undefined;
+
+    const foot = pickRandom(bySlot.get(FITTING_SLOT.FootGarment));
+    if (!foot) {
+      throw {
+        status: 404,
+        message: `No footwear found for category "${opts.category}"`,
+      };
+    }
+
+    const fulls = bySlot.get(FITTING_SLOT.FullGarment);
+    const uppers = bySlot.get(FITTING_SLOT.UpperGarment);
+    const lowers = bySlot.get(FITTING_SLOT.LowerGarment);
+    const paths: ("full" | "separates")[] = [];
+    if (fulls?.length) paths.push("full");
+    if (uppers?.length && lowers?.length) paths.push("separates");
+    if (!paths.length) {
+      throw {
+        status: 404,
+        message: `No torso/leg garments found for category "${opts.category}"`,
+      };
+    }
+
+    const items: { garmentId: string; slot: FITTING_SLOT }[] = [];
+    const path = paths[Math.floor(Math.random() * paths.length)];
+    if (path === "full") {
+      items.push({ garmentId: pickRandom(fulls)!.id, slot: FITTING_SLOT.FullGarment });
+    } else {
+      items.push({ garmentId: pickRandom(uppers)!.id, slot: FITTING_SLOT.UpperGarment });
+      items.push({ garmentId: pickRandom(lowers)!.id, slot: FITTING_SLOT.LowerGarment });
+    }
+    items.push({ garmentId: foot.id, slot: FITTING_SLOT.FootGarment });
+
+    const head = pickRandom(bySlot.get(FITTING_SLOT.HeadGarment));
+    if (head) items.push({ garmentId: head.id, slot: FITTING_SLOT.HeadGarment });
+
+    // At most one accessory — pool from every accessory slot, then pick one.
+    const accessoryPool: { garmentId: string; slot: FITTING_SLOT }[] = [];
+    const accessorySlots: FITTING_SLOT[] = [
+      FITTING_SLOT.NeckAccessory,
+      FITTING_SLOT.WaistAccessory,
+      FITTING_SLOT.LeftHandAccessory,
+      FITTING_SLOT.RightHandAccessory,
+      FITTING_SLOT.Glasses,
+      FITTING_SLOT.Earrings,
+    ];
+    for (const slot of accessorySlots) {
+      const g = pickRandom(bySlot.get(slot));
+      if (g) accessoryPool.push({ garmentId: g.id, slot });
+    }
+    const accessory = pickRandom(accessoryPool);
+    if (accessory) items.push(accessory);
+
+    const garmentMap = new Map<string, any>(garments.map((g: any) => [g.id, g]));
+    const stats = this.computeOutfitStats(items, garmentMap);
+
+    return this.createOutfit(opts.userId, {
+      name: opts.name || `${opts.category} look`,
+      description: opts.description,
+      designType: opts.userId ? "UserDesign" : "systemDesign",
+      items,
+      metaData: {
+        generatedBy: "rule:recommend",
+        category: opts.category,
+        composition: path,
+        ...stats,
       },
     });
   }
