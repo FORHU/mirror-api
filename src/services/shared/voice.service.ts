@@ -34,12 +34,16 @@ export interface VoiceContext {
   isNavigating?: boolean;
   profile?: string;
   history?: Array<{ user: string; assistant: string }>;
-  remainingDistance?: number;    // metres, total trip remaining
-  remainingDuration?: number;    // seconds, total trip remaining
+  remainingDistance?: number;
+  remainingDuration?: number;
   destinationName?: string;
-  currentInstruction?: string;   // e.g. "Turn right onto Session Road"
-  nextManeuverDistance?: number; // metres to the very next turn
-  nextInstruction?: string;      // instruction after current one
+  currentInstruction?: string;
+  nextManeuverDistance?: number;
+  nextInstruction?: string;
+  currentTime?: string;   // e.g. "01:46 PM"
+  currentDate?: string;   // e.g. "Sunday, May 18, 2026"
+  schedules?: string;     // serialised upcoming calendar events, or "none"
+  currentPage?: string;   // which app section the user is on
 }
 
 function formatDistance(metres?: number): string {
@@ -72,7 +76,12 @@ function buildSystemPrompt(ctx: VoiceContext, weatherInfo: string): string {
     : "none";
   const nextTurnState = ctx.isNavigating && ctx.nextInstruction ? ctx.nextInstruction : "none";
 
-  return `You are a voice companion for a map navigation app.
+  const timeState     = ctx.currentTime ? ctx.currentTime : new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  const dateState     = ctx.currentDate ? ctx.currentDate : new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const scheduleState = ctx.schedules   ? ctx.schedules   : "No schedule data connected yet";
+  const pageState     = ctx.currentPage ? ctx.currentPage : "map";
+
+  return `You are a smart mirror voice companion. You assist the user with navigation, weather, time, and their schedule.
 Always respond with a JSON object using this exact schema:
 {
   "reply": "spoken response (1-2 sentences, conversational, will be read aloud)",
@@ -81,8 +90,12 @@ Always respond with a JSON object using this exact schema:
   "profile": "car" | "motorcycle" | "bicycle" | "walking" (only when intent is set_profile)
 }
 
-Current map state:
+Current context:
+- Current time: ${timeState}
+- Current date: ${dateState}
 - Weather: ${weatherInfo}
+- Schedule / upcoming events: ${scheduleState}
+- Current screen: ${pageState}
 - Traffic layer visibility: ${trafficState}
 - Navigation: ${navState}
 - Travel mode: ${profileState}
@@ -91,6 +104,12 @@ Current map state:
 - Remaining ETA: ${etaState}
 - Next maneuver: ${curTurnState}
 - Maneuver after that: ${nextTurnState}
+
+Behaviour for time, date, and schedule questions:
+- For "what time is it" / "what's the time": reply with the exact currentTime above. No hedging.
+- For "what day is it" / "what's today's date": reply with currentDate above.
+- For "what's my schedule" / "do I have any events": read out scheduleState. If it says "No schedule data connected", say so politely.
+- Always answer time and date questions directly — the data is already in context.
 
 CRITICAL — what "off" means:
 - "Traffic layer: OFF" means it is not shown visually on the map. It does NOT mean traffic data is unavailable.

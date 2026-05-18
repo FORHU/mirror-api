@@ -29,6 +29,10 @@ export default class VoiceController {
       currentInstruction:   req.query.currentInstruction   ? decodeURIComponent(req.query.currentInstruction as string)              : undefined,
       nextManeuverDistance: req.query.nextManeuverDistance  ? parseFloat(req.query.nextManeuverDistance as string)                    : undefined,
       nextInstruction:      req.query.nextInstruction       ? decodeURIComponent(req.query.nextInstruction as string)                 : undefined,
+      currentTime:          req.query.currentTime           ? decodeURIComponent(req.query.currentTime as string)                      : undefined,
+      currentDate:          req.query.currentDate           ? decodeURIComponent(req.query.currentDate as string)                      : undefined,
+      schedules:            req.query.schedules             ? decodeURIComponent(req.query.schedules as string)                        : undefined,
+      currentPage:          req.query.currentPage           ? decodeURIComponent(req.query.currentPage as string)                      : undefined,
       history,
     };
 
