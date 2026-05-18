@@ -1,4 +1,5 @@
 import { prisma } from "../utils/prisma";
+import { DESIGN_TYPE, FITTING_SLOT, LAYER_LEVEL } from "@prisma/client";
 
 export default class OutfitRepo {
   static async findByUserId(userId?: string, page: number = 1, limit: number = 20) {
@@ -10,13 +11,13 @@ export default class OutfitRepo {
         skip,
         take: limit,
         include: {
+          file: true,
           items: {
             include: {
               garment: {
                 include: { file: true }
               },
             },
-            orderBy: { order: "asc" },
           },
         },
         orderBy: { createdAt: "desc" },
@@ -27,17 +28,48 @@ export default class OutfitRepo {
     return { data, total, page, limit };
   }
 
+  /**
+   * Finds a user's outfit whose item garment-set exactly matches `garmentIds`
+   * (order-insensitive, duplicates ignored). Returns null if none.
+   */
+  static async findByExactGarmentSet(userId: string, garmentIds: string[]) {
+    const uniqueIds = Array.from(new Set(garmentIds));
+    if (!uniqueIds.length) return null;
+
+    // Narrow with Prisma: candidate outfits whose items are all within our set.
+    // `every` matches vacuously on zero-item outfits, so we filter on size in JS.
+    const candidates = await prisma.outfit.findMany({
+      where: {
+        userId,
+        isDeleted: false,
+        items: { every: { garmentId: { in: uniqueIds } } },
+      },
+      select: {
+        id: true,
+        name: true,
+        items: { select: { garmentId: true } },
+      },
+    });
+
+    return (
+      candidates.find((o) => {
+        const ids = new Set(o.items.map((i) => i.garmentId));
+        return ids.size === uniqueIds.length && uniqueIds.every((id) => ids.has(id));
+      }) ?? null
+    );
+  }
+
   static async findById(id: string) {
     return prisma.outfit.findUnique({
       where: { id },
       include: {
+        file: true,
         items: {
           include: {
             garment: {
               include: { file: true }
             },
           },
-          orderBy: { order: "asc" },
         },
       },
     });
@@ -48,9 +80,11 @@ export default class OutfitRepo {
     name: string;
     description?: string;
     isPublic?: boolean;
-    designType?: any; // Using any or specific enum if imported
+    designType?: DESIGN_TYPE;
     fileId: string;
-    items: { garmentId: string; order: number }[];
+    userOutlineId?: string;
+    items: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[];
+    metaData?: any;
   }) {
     return prisma.outfit.create({
       data: {
@@ -58,23 +92,26 @@ export default class OutfitRepo {
         description: data.description,
         isPublic: data.isPublic,
         designType: data.designType,
+        ...(data.metaData !== undefined && { metaData: data.metaData }),
         ...(data.userId && { user: { connect: { id: data.userId } } }),
+        ...(data.userOutlineId && { userOutline: { connect: { id: data.userOutlineId } } }),
         file: { connect: { id: data.fileId } },
         items: {
           create: data.items.map((item) => ({
             garment: { connect: { id: item.garmentId } },
-            order: item.order,
+            slot: item.slot,
+            layerLevel: item.layerLevel,
           })),
         },
       },
       include: {
+        file: true,
         items: {
           include: { 
             garment: {
               include: { file: true }
             }
           },
-          orderBy: { order: "asc" },
         },
       },
     });
@@ -84,9 +121,9 @@ export default class OutfitRepo {
     name?: string;
     description?: string;
     isPublic?: boolean;
-    designType?: any;
+    designType?: DESIGN_TYPE;
     fileId?: string;
-    items?: { garmentId: string; order: number }[];
+    items?: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[];
   }) {
     // If items are provided, replace them
     if (data.items) {
@@ -107,19 +144,20 @@ export default class OutfitRepo {
           items: {
             create: data.items.map((item) => ({
               garment: { connect: { id: item.garmentId } },
-              order: item.order,
+              slot: item.slot,
+              layerLevel: item.layerLevel,
             })),
           },
         }),
       },
       include: {
+        file: true,
         items: {
           include: {
             garment: {
               include: { file: true }
             }
           },
-          orderBy: { order: "asc" },
         },
       },
     });

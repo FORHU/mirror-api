@@ -36,6 +36,19 @@ export default class GarmentRepo {
     });
   }
 
+  static async countByIds(ids: string[]) {
+    if (!ids.length) return 0;
+    return prisma.garment.count({ where: { id: { in: ids } } });
+  }
+
+  static async findByIds(ids: string[]) {
+    if (!ids.length) return [];
+    return prisma.garment.findMany({
+      where: { id: { in: ids } },
+      include: { tags: true, file: true },
+    });
+  }
+
   static async create(data: Prisma.GarmentCreateInput) {
     return prisma.garment.create({
       data,

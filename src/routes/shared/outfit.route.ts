@@ -10,6 +10,9 @@ router.get("/:id", authenticate, OutfitController.show);
 
 router.post("/", authenticate, upload.single("file"), OutfitController.create);
 router.post("/system", OutfitController.create); // JSON only, no auth
+router.post("/evaluate", authenticate, upload.single("file"), OutfitController.evaluate);
+router.post("/compose", authenticate, OutfitController.compose);
+router.post("/evaluate-hybrid", authenticate, upload.single("file"), OutfitController.evaluateHybrid);
 router.patch("/:id", authenticate, upload.single("file"), OutfitController.update);
 router.delete("/:id", authenticate, OutfitController.destroy);
 

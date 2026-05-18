@@ -22,7 +22,16 @@ const s3 = new S3Client({
 const storageS3 = multerS3({
   s3: s3,
   bucket: S3_BUCKET_NAME || "default-bucket",
-  acl: "public-read",
+  // Bucket has Object Ownership = "Bucket owner enforced" (ACLs disabled,
+  // AWS recommended default). multer-s3 v3 defaults to `acl: 'private'` when
+  // omitted, which the bucket rejects with `AccessControlListNotSupported`.
+  // Returning undefined from the acl callback makes multer-s3 pass
+  // `ACL: undefined`, which the AWS SDK then drops from the request entirely.
+  // Public read access is granted via bucket policy instead.
+  acl: function (_req: any, _file: any, cb: any) {
+    cb(null, undefined);
+  } as any,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
   metadata: function (req, file, cb) {
     cb(null, { fieldName: file.fieldname });
   },

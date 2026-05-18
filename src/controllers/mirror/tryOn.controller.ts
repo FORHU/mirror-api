@@ -1,14 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
+import TryOnService from "../../services/mirror/tryOn.service";
 import FashnService from "../../platforms/fashnAi/fashn.service";
-import { emitToKiosk } from "../../utils/socket.util";
-import logger from "../../utils/logger";
 
 const validationError = (message: string) => ({ status: 400, message });
 
 export default class TryOnController {
   /**
-   * Starts a virtual try-on session
+   * Starts a virtual try-on session.
+   * Legacy raw-URL endpoint.
    */
   static async run(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
@@ -22,22 +22,19 @@ export default class TryOnController {
     if (error) return next(validationError(error.message));
 
     try {
-      // 1. Trigger the FASHN.AI run
       const result = await FashnService.runTryOn(
         value.modelImage,
         value.garmentImage,
         value.category
       );
 
-      // 2. Respond to the client immediately with the prediction ID
       res.status(202).json({
         status: "success",
         data: { predictionId: result.id },
         message: "Try-on process started",
       });
 
-      // 3. Start background polling for status updates
-      this.pollStatus(result.id, value.kioskId);
+      TryOnService.pollStatus(result.id, value.kioskId);
       
     } catch (err) {
       next(err);
@@ -45,49 +42,154 @@ export default class TryOnController {
   }
 
   /**
-   * Background polling logic to update the Kiosk via WebSockets
+   * Starts a try-on using a stored Garment by ID.
    */
-  private static async pollStatus(predictionId: string, kioskId: string) {
-    let attempts = 0;
-    const maxAttempts = 60; // 2 minutes max (2s * 60)
-    
-    const interval = setInterval(async () => {
-      attempts++;
-      
-      try {
-        const statusData = await FashnService.getStatus(predictionId);
-        logger.info(`FASHN.AI Status [${predictionId}]: ${statusData.status}`);
+  static async runByGarment(req: Request, res: Response, next: NextFunction) {
+    const schema = Joi.object({
+      garmentId: Joi.string().required(),
+      modelImage: Joi.string().uri().optional(),
+      kioskId: Joi.string().optional(),
+    });
 
-        if (statusData.status === "completed") {
-          clearInterval(interval);
-          emitToKiosk(kioskId, "tryon_completed", {
-            predictionId,
-            imageUrl: statusData.output?.[0],
-          });
-        } else if (statusData.status === "failed") {
-          clearInterval(interval);
-          emitToKiosk(kioskId, "tryon_failed", {
-            predictionId,
-            error: statusData.error || "Generation failed",
-          });
-        } else {
-          // Notify kiosk of progress (starting, processing)
-          emitToKiosk(kioskId, "tryon_progress", {
-            predictionId,
-            status: statusData.status,
-          });
-        }
+    const { error, value } = schema.validate(req.body);
+    if (error) return next(validationError(error.message));
 
-        if (attempts >= maxAttempts) {
-          clearInterval(interval);
-          logger.warn(`Polling timed out for ${predictionId}`);
-          emitToKiosk(kioskId, "tryon_failed", { error: "Generation timed out" });
-        }
+    try {
+      const userId = (req as any).user.id;
+      const result = await TryOnService.runByGarment(
+        userId,
+        value.garmentId,
+        value.modelImage,
+        value.kioskId
+      );
 
-      } catch (err) {
-        logger.error(`Polling error for ${predictionId}:`, err);
-        clearInterval(interval);
-      }
-    }, 2000);
+      res.status(202).json({
+        status: "success",
+        data: result,
+        message: "Try-on process started",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Starts a try-on using a stored Outfit by ID.
+   */
+  static async runByOutfit(req: Request, res: Response, next: NextFunction) {
+    const schema = Joi.object({
+      outfitId: Joi.string().required(),
+      modelImage: Joi.string().uri().optional(),
+      kioskId: Joi.string().optional(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return next(validationError(error.message));
+
+    try {
+      const userId = (req as any).user.id;
+      const result = await TryOnService.runByOutfit(
+        userId,
+        value.outfitId,
+        value.modelImage,
+        value.kioskId
+      );
+
+      res.status(202).json({
+        status: "success",
+        data: result,
+        message: "Try-on process started",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Video variant: try-on using a stored Garment by ID.
+   * FASHN model id comes from FASHN_VIDEO_MODEL env var.
+   */
+  static async runVideoByGarment(req: Request, res: Response, next: NextFunction) {
+    const schema = Joi.object({
+      garmentId: Joi.string().required(),
+      modelImage: Joi.string().uri().optional(),
+      kioskId: Joi.string().optional(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return next(validationError(error.message));
+
+    try {
+      const userId = (req as any).user.id;
+      const result = await TryOnService.runVideoByGarment(
+        userId,
+        value.garmentId,
+        value.modelImage,
+        value.kioskId
+      );
+
+      res.status(202).json({
+        status: "success",
+        data: result,
+        message: "Video try-on process started",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Video variant: try-on using a stored Outfit by ID.
+   */
+  static async runVideoByOutfit(req: Request, res: Response, next: NextFunction) {
+    const schema = Joi.object({
+      outfitId: Joi.string().required(),
+      modelImage: Joi.string().uri().optional(),
+      kioskId: Joi.string().optional(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return next(validationError(error.message));
+
+    try {
+      const userId = (req as any).user.id;
+      const result = await TryOnService.runVideoByOutfit(
+        userId,
+        value.outfitId,
+        value.modelImage,
+        value.kioskId
+      );
+
+      res.status(202).json({
+        status: "success",
+        data: result,
+        message: "Video try-on process started",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /try-on/:predictionId/status
+   */
+  static async status(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { predictionId } = req.params;
+      if (!predictionId) return next(validationError("predictionId is required"));
+
+      const statusData = await FashnService.getStatus(predictionId);
+      res.json({
+        status: "success",
+        data: {
+          predictionId,
+          predictionStatus: statusData.status,
+          outputUrl: statusData.output?.[0] || null,
+          error: statusData.error || null,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
   }
 }

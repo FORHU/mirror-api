@@ -24,9 +24,15 @@ export const S3_CDN_URL = process.env.S3_CDN_URL || "";
 
 export const FASHN_API_KEY = process.env.FASHN_API_KEY || "";
 export const FASHN_BASE_URL = process.env.FASHN_BASE_URL || "https://api.fashn.ai/v1";
+// FASHN model identifier for video try-on. Set from your FASHN dashboard;
+// the image flow uses "tryon-v1.6". Empty value disables the video endpoints.
+export const FASHN_VIDEO_MODEL = process.env.FASHN_VIDEO_MODEL || "";
 
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 export const CHAT_WONDER_API_URL = process.env.CHAT_WONDER_API_URL || "";
+
+// Shared secret kiosk devices must present when calling `register_kiosk` over the socket.
+export const KIOSK_DEVICE_SECRET = process.env.KIOSK_DEVICE_SECRET || "";
 
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 

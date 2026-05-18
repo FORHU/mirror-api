@@ -14,6 +14,8 @@ import mirrorMapRoute from './mirror/map.route';
 import mirrorWeatherRoute from './mirror/weather.route';
 import mirrorVoiceRoute from './mirror/voice.route';
 import devTokenHandler from "../controllers/mirror/dev.controller";
+import mirrorGenerationRoute from './shared/generation.route';
+import chatWonderRoute from './shared/chat-wonder.route';
 
 const router = express.Router();
 
@@ -33,6 +35,10 @@ router.post("/companion/map/directions", MapController.directions);
 router.use('/remote/auth', remoteAuthRoute);
 router.use('/remote/users', remoteUserRoute);
 router.use('/remote/kiosks', remoteKioskRoute);
+router.use('/remote/generation', mirrorGenerationRoute);
+router.use('/remote/file-uploads', mirrorFileUploadRoute);
+router.use('/remote/garments', mirrorGarmentRoute);
+router.use('/remote/outfits', mirrorOutfitRoute);
 
 // Mirror endpoints
 router.use('/mirror/try-on', mirrorTryOnRoute);
@@ -42,5 +48,6 @@ router.use("/mirror/file-uploads", mirrorFileUploadRoute);
 router.use("/mirror/map", mirrorMapRoute);
 router.use("/mirror/weather", mirrorWeatherRoute);
 router.use("/mirror/voice", mirrorVoiceRoute);
+router.use('/mirror/chat-wonder', chatWonderRoute);
 
 export default router;
