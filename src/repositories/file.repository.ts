@@ -27,6 +27,22 @@ export default class FileRepo {
     });
   }
 
+  /**
+   * Fetch a File along with markers for every model that could be holding
+   * onto it. Used by `discardIfUnreferenced` to decide whether the row is
+   * safe to delete.
+   */
+  static async findByIdWithRelations(id: string) {
+    return prisma.file.findUnique({
+      where: { id },
+      include: {
+        garment: { select: { id: true } },
+        outfitDisplay: { select: { id: true } },
+        userAvatar: { select: { id: true } },
+      },
+    });
+  }
+
   static async softDelete(id: string) {
     return prisma.file.delete({
       where: { id },
