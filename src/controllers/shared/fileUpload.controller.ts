@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import FileUploadService from "../../services/shared/fileUpload.service";
+import { responseSuccess } from "../../helpers/response.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -19,11 +20,7 @@ export default class FileUploadController {
 
     try {
       const data = await FileUploadService.generatePresignedUrl(value.filename, value.mimetype);
-      return res.json({
-        status: "success",
-        data,
-        message: "Presigned URL generated successfully",
-      });
+      return responseSuccess(res, 200, data, "Presigned URL generated successfully");
     } catch (err) {
       next(err);
     }
@@ -52,11 +49,7 @@ export default class FileUploadController {
         value.size,
         value.mimetype
       );
-      return res.status(201).json({
-        status: "success",
-        data,
-        message: "File record saved successfully",
-      });
+      return responseSuccess(res, 201, data, "File record saved successfully");
     } catch (err) {
       next(err);
     }

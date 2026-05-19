@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import TryOnModelService from "../../services/mirror/tryOnModel.service";
+import { responseSuccess } from "../../helpers/response.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -16,7 +17,7 @@ export default class TryOnModelController {
 
       const data = await TryOnModelService.uploadModel(userId, req.file);
       console.log("------ Model has been captured and saved to S3 ------");
-      res.status(201).json({ status: "success", data, message: "Model image saved" });
+      responseSuccess(res, 201, data, "Model image saved");
     } catch (err) {
       next(err);
     }
@@ -30,7 +31,7 @@ export default class TryOnModelController {
     try {
       const userId = (req as any).user.id;
       const data = await TryOnModelService.getUserModel(userId);
-      res.json({ status: "success", data });
+      responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
     }

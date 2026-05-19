@@ -5,6 +5,7 @@ import { streamChat } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
 import { parseChatWonderResponse } from "../../utils/parse-response.util";
 import logger from "../../utils/logger";
+import { responseError } from "../../helpers/response.helper";
 
 export default class ChatWonderController {
   /**
@@ -15,7 +16,7 @@ export default class ChatWonderController {
     const userId = (req as any).user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return responseError(res, 401, "Unauthorized");
     }
 
     const schema = Joi.object({
@@ -26,7 +27,7 @@ export default class ChatWonderController {
 
     const { error } = schema.validate(req.body);
     if (error) {
-      return res.status(400).json({ error: error.message });
+      return responseError(res, 400, error.message);
     }
 
     try {
@@ -92,7 +93,7 @@ export default class ChatWonderController {
         onError: (err: Error) => {
           logger.error(`[ChatWonderController] Stream error: ${err.message}`);
           if (!res.headersSent) {
-            res.status(500).json({ error: "Stream failed" });
+            responseError(res, 500, "Stream failed");
           } else {
             res.write(`data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`);
             res.end();
@@ -102,7 +103,7 @@ export default class ChatWonderController {
     } catch (err: any) {
       logger.error(`[ChatWonderController] Controller error: ${err.message}`);
       if (!res.headersSent) {
-        res.status(500).json({ error: err.message || "Internal server error" });
+        responseError(res, 500, err.message || "Internal server error");
       }
     }
   }

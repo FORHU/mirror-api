@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import UserService from "../../services/shared/user.service";
+import { responseSuccess } from "../../helpers/response.helper";
+import { buildPage } from "../../helpers/pagination.helper";
 
 const updateSchema = Joi.object({
   username: Joi.string().optional(),
@@ -17,7 +19,7 @@ export default class UserController {
     try {
       const userId = (req as any).user.id;
       const user = await UserService.getUser(userId);
-      return res.json({ status: "success", data: user });
+      return responseSuccess(res, 200, user);
     } catch (error) {
       next(error);
     }
@@ -30,8 +32,12 @@ export default class UserController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
-      const data = await UserService.listUsers(page, limit);
-      return res.json({ status: "success", data });
+      const result = await UserService.listUsers(page, limit);
+      return responseSuccess(
+        res,
+        200,
+        buildPage(result.users, result.total, { page: result.page, limit: result.limit }),
+      );
     } catch (error) {
       next(error);
     }
@@ -49,7 +55,7 @@ export default class UserController {
       }
 
       const user = await UserService.updateUser(userId, value);
-      return res.json({ status: "success", data: user });
+      return responseSuccess(res, 200, user);
     } catch (error) {
       next(error);
     }

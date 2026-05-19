@@ -6,6 +6,8 @@ import { evaluateGarmentImage } from "../../utils/openai/evaluate-garment.util";
 import { emitToKiosk } from "../../utils/socket.util";
 import logger from "../../utils/logger";
 import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, SILHOUETTE } from "@prisma/client";
+import { responseSuccess } from "../../helpers/response.helper";
+import { pageFromRepo } from "../../helpers/pagination.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -61,8 +63,8 @@ const evaluationSchema = Joi.object({
 export default class GarmentController {
   static async index(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await GarmentService.getGarments(req.query);
-      res.json({ status: "success", data });
+      const result = await GarmentService.getGarments(req.query);
+      responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
       next(err);
     }
@@ -71,7 +73,7 @@ export default class GarmentController {
   static async show(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await GarmentService.getGarmentById(req.params.id);
-      res.json({ status: "success", data });
+      responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
     }
@@ -121,7 +123,7 @@ export default class GarmentController {
       }
 
       const data = await GarmentService.createGarment(finalValue);
-      res.status(201).json({ status: "success", data });
+      responseSuccess(res, 201, data);
     } catch (err) {
       next(err);
     }
@@ -144,7 +146,7 @@ export default class GarmentController {
       }
 
       const data = await GarmentService.updateGarment(req.params.id, finalValue);
-      res.json({ status: "success", data });
+      responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
     }
@@ -153,7 +155,7 @@ export default class GarmentController {
   static async destroy(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await GarmentService.deleteGarment(req.params.id);
-      res.json({ status: "success", data });
+      responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
     }
@@ -192,15 +194,16 @@ export default class GarmentController {
         await GarmentService.uploadGarmentFile(req.file, imageUrl);
 
       // Step 2: respond immediately. AI work continues below.
-      res.status(202).json({
-        status: "queued",
-        data: {
+      responseSuccess(
+        res,
+        202,
+        {
           fileId: fileRecord?.id || null,
           imageUrl: finalImageUrl,
           kioskId: kioskId || null,
         },
-        message: "Upload received. Evaluation in progress.",
-      });
+        "Upload received. Evaluation in progress.",
+      );
 
       // Step 3: background AI work — no await on the response path.
       (async () => {

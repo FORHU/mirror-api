@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import TryOnService from "../../services/mirror/tryOn.service";
 import FashnService from "../../platforms/fashnAi/fashn.service";
+import { responseSuccess } from "../../helpers/response.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -28,11 +29,7 @@ export default class TryOnController {
         value.category
       );
 
-      res.status(202).json({
-        status: "success",
-        data: { predictionId: result.id },
-        message: "Try-on process started",
-      });
+      responseSuccess(res, 202, { predictionId: result.id }, "Try-on process started");
 
       TryOnService.pollStatus(result.id, value.kioskId);
       
@@ -63,11 +60,7 @@ export default class TryOnController {
         value.kioskId
       );
 
-      res.status(202).json({
-        status: "success",
-        data: result,
-        message: "Try-on process started",
-      });
+      responseSuccess(res, 202, result, "Try-on process started");
     } catch (err) {
       next(err);
     }
@@ -95,11 +88,7 @@ export default class TryOnController {
         value.kioskId
       );
 
-      res.status(202).json({
-        status: "success",
-        data: result,
-        message: "Try-on process started",
-      });
+      responseSuccess(res, 202, result, "Try-on process started");
     } catch (err) {
       next(err);
     }
@@ -128,11 +117,7 @@ export default class TryOnController {
         value.kioskId
       );
 
-      res.status(202).json({
-        status: "success",
-        data: result,
-        message: "Video try-on process started",
-      });
+      responseSuccess(res, 202, result, "Video try-on process started");
     } catch (err) {
       next(err);
     }
@@ -160,11 +145,7 @@ export default class TryOnController {
         value.kioskId
       );
 
-      res.status(202).json({
-        status: "success",
-        data: result,
-        message: "Video try-on process started",
-      });
+      responseSuccess(res, 202, result, "Video try-on process started");
     } catch (err) {
       next(err);
     }
@@ -179,14 +160,11 @@ export default class TryOnController {
       if (!predictionId) return next(validationError("predictionId is required"));
 
       const statusData = await FashnService.getStatus(predictionId);
-      res.json({
-        status: "success",
-        data: {
-          predictionId,
-          predictionStatus: statusData.status,
-          outputUrl: statusData.output?.[0] || null,
-          error: statusData.error || null,
-        },
+      responseSuccess(res, 200, {
+        predictionId,
+        predictionStatus: statusData.status,
+        outputUrl: statusData.output?.[0] || null,
+        error: statusData.error || null,
       });
     } catch (err) {
       next(err);

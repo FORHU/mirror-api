@@ -42,20 +42,13 @@ const storageS3 = multerS3({
   },
 });
 
-// Local Storage Fallback
-const localStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = crypto.randomBytes(16).toString("hex");
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${uniqueSuffix}${ext}`);
-  },
-});
+if (!S3_BUCKET_NAME || !AWS_ACCESS_KEY_ID) {
+  throw new Error(
+    "S3 upload requires S3_BUCKET_NAME and AWS_ACCESS_KEY_ID — local disk storage has been removed.",
+  );
+}
 
-// Choose storage based on environment
-const storage = (S3_BUCKET_NAME && AWS_ACCESS_KEY_ID) ? storageS3 : localStorage;
+const storage = storageS3;
 
 // File filter
 const fileFilter = (

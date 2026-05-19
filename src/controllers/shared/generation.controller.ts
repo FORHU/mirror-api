@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import GenerationService from "../../services/shared/generation.service";
+import { responseSuccess } from "../../helpers/response.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -31,7 +32,7 @@ export default class GenerationController {
         userPrompt,
       });
 
-      res.status(201).json({ status: "success", data });
+      responseSuccess(res, 201, data);
     } catch (err) {
       next(err);
     }

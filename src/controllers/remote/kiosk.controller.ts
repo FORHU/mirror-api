@@ -3,6 +3,7 @@ import Joi from "joi";
 import CacheUtil from "../../utils/cache.util";
 import { emitToKiosk, disconnectAll } from "../../utils/socket.util";
 import logger from "../../utils/logger";
+import { responseSuccess, responseError } from "../../helpers/response.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -25,11 +26,11 @@ export default class KioskController {
       const state = await CacheUtil.get<any>(kioskStateKey);
 
       if (!state) {
-        return res.status(404).json({ status: "error", message: "Kiosk not found or offline" });
+        return responseError(res, 404, "Kiosk not found or offline");
       }
 
       if (state.status === "in_use" && state.userId !== userId) {
-        return res.status(409).json({ status: "error", message: "Kiosk not currently available" });
+        return responseError(res, 409, "Kiosk not currently available");
       }
 
       // Lock it for this user
@@ -48,10 +49,7 @@ export default class KioskController {
 
       logger.info(`User ${userId} paired with Kiosk ${value.kioskId}`);
 
-      return res.json({
-        status: "success",
-        message: "Successfully paired with kiosk",
-      });
+      return responseSuccess(res, 200, null, "Successfully paired with kiosk");
     } catch (err) {
       next(err);
     }
@@ -85,10 +83,7 @@ export default class KioskController {
         emitToKiosk(value.kioskId, "kiosk_unpaired", { userId });
       }
 
-      return res.json({
-        status: "success",
-        message: "Disconnected from kiosk",
-      });
+      return responseSuccess(res, 200, null, "Disconnected from kiosk");
     } catch (err) {
       next(err);
     }
@@ -113,7 +108,7 @@ export default class KioskController {
 
       // Ensure the user actually owns the lock
       if (!state || state.userId !== userId) {
-        return res.status(403).json({ status: "error", message: "Not paired with this kiosk" });
+        return responseError(res, 403, "Not paired with this kiosk");
       }
 
       // Forward command via WebSocket
@@ -122,10 +117,7 @@ export default class KioskController {
         payload: value.payload,
       });
 
-      return res.json({
-        status: "success",
-        message: "Command sent to kiosk",
-      });
+      return responseSuccess(res, 200, null, "Command sent to kiosk");
     } catch (err) {
       next(err);
     }
@@ -147,7 +139,7 @@ export default class KioskController {
       const state = await CacheUtil.get<any>(`kiosk_state:${value.kioskId}`);
 
       if (!state) {
-        return res.status(404).json({ status: "error", message: "Kiosk not found or offline" });
+        return responseError(res, 404, "Kiosk not found or offline");
       }
 
       // Save the name to state for the rest of the session
@@ -165,10 +157,7 @@ export default class KioskController {
 
       logger.info(`Kiosk ${value.kioskId} notified of scan`);
 
-      return res.json({
-        status: "success",
-        message: "Kiosk notified of scan",
-      });
+      return responseSuccess(res, 200, null, "Kiosk notified of scan");
     } catch (err) {
       next(err);
     }
@@ -183,10 +172,7 @@ export default class KioskController {
       await CacheUtil.delByPattern("socket_to_kiosk:*");
       disconnectAll();
 
-      return res.json({
-        status: "success",
-        message: "All kiosk states cleared and sockets disconnected",
-      });
+      return responseSuccess(res, 200, null, "All kiosk states cleared and sockets disconnected");
     } catch (err) {
       next(err);
     }

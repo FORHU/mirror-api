@@ -12,7 +12,7 @@ export const REFRESH_TOKEN_EXPIRY = "7d";
 export const DATABASE_URL = process.env.DATABASE_URL;
 
 export const REDIS_HOST = process.env.REDIS_HOST || "localhost";
-export const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6377");
+export const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6380");
 export const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
 export const REDIS_TTL_SECONDS = parseInt(process.env.REDIS_TTL_SECONDS || "3600");
 
