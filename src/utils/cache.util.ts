@@ -67,4 +67,34 @@ export default class CacheUtil {
       throw error;
     }
   }
+
+  /**
+   * Cache-aside: return the cached value if present, otherwise run `fn`,
+   * store its result with `ttlSeconds`, and return it.
+   *
+   * If Redis is unreachable, `fn` still runs and its result is returned
+   * (the cache layer never blocks the caller).
+   *
+   *   const garment = await CacheUtil.remember(
+   *     `garment:${id}`,
+   *     300,
+   *     () => GarmentRepo.findById(id),
+   *   );
+   */
+  static async remember<T>(
+    key: string,
+    ttlSeconds: number,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const hit = await this.get<T>(key);
+    if (hit !== null && hit !== undefined) return hit;
+
+    const fresh = await fn();
+    // Don't cache null/undefined — usually means "not found" and should
+    // re-check the source next time rather than being remembered as missing.
+    if (fresh !== null && fresh !== undefined) {
+      await this.set(key, fresh, ttlSeconds);
+    }
+    return fresh;
+  }
 }

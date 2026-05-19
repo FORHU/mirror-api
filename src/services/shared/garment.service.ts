@@ -1,7 +1,11 @@
 import GarmentRepo from "../../repositories/garment.repository";
 import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, SILHOUETTE, Prisma } from "@prisma/client";
 import FileService from "./file.service";
+import CacheUtil from "../../utils/cache.util";
 import { evaluateGarmentImage, GarmentEvaluation } from "../../utils/openai/evaluate-garment.util";
+
+const GARMENT_CACHE_TTL = 1800; // 30 minutes — matches a typical user session
+const garmentKey = (id: string) => `garment:${id}`;
 
 export default class GarmentService {
   static async getGarments(query: any) {
@@ -68,7 +72,11 @@ export default class GarmentService {
   }
 
   static async getGarmentById(id: string) {
-    const garment = await GarmentRepo.findById(id);
+    const garment = await CacheUtil.remember(
+      garmentKey(id),
+      GARMENT_CACHE_TTL,
+      () => GarmentRepo.findById(id),
+    );
     if (!garment) throw { status: 404, message: "Garment not found" };
     return garment;
   }
@@ -154,6 +162,7 @@ export default class GarmentService {
     }
 
     const updated = await GarmentRepo.update(id, garmentData);
+    await CacheUtil.del(garmentKey(id));
 
     // If the file pointer changed (caller swapped fileId or uploaded a new
     // file), the previous File row is now unreferenced from this garment.
@@ -176,6 +185,7 @@ export default class GarmentService {
     const fileId = existing.fileId;
 
     await GarmentRepo.delete(id);
+    await CacheUtil.del(garmentKey(id));
 
     // The Garment is gone — nothing here points at the File anymore.
     // Defer to FileService.discardIfUnreferenced so S3 and the File row
