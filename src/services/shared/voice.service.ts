@@ -40,10 +40,15 @@ export interface VoiceContext {
   currentInstruction?: string;
   nextManeuverDistance?: number;
   nextInstruction?: string;
-  currentTime?: string;   // e.g. "01:46 PM"
-  currentDate?: string;   // e.g. "Sunday, May 18, 2026"
-  schedules?: string;     // serialised upcoming calendar events, or "none"
-  currentPage?: string;   // which app section the user is on
+  currentTime?: string;
+  currentDate?: string;
+  schedules?: string;
+  currentPage?: string;
+}
+
+export interface VoiceAction {
+  type: string;
+  [key: string]: unknown;
 }
 
 function formatDistance(metres?: number): string {
@@ -67,94 +72,144 @@ function buildSystemPrompt(ctx: VoiceContext, weatherInfo: string): string {
   const profileMap: Record<string, string> = {
     car: "driving (car)", motorcycle: "motorcycle", bicycle: "cycling", walking: "walking",
   };
-  const profileState = profileMap[ctx.profile ?? "car"] ?? ctx.profile ?? "driving (car)";
-  const distState    = ctx.isNavigating ? formatDistance(ctx.remainingDistance)      : "not navigating";
-  const etaState     = ctx.isNavigating ? formatDuration(ctx.remainingDuration)      : "not navigating";
-  const destState    = ctx.destinationName                                           || "none";
-  const curTurnState = ctx.isNavigating && ctx.currentInstruction
+  const profileState  = profileMap[ctx.profile ?? "car"] ?? ctx.profile ?? "driving (car)";
+  const distState     = ctx.isNavigating ? formatDistance(ctx.remainingDistance) : "not navigating";
+  const etaState      = ctx.isNavigating ? formatDuration(ctx.remainingDuration) : "not navigating";
+  const destState     = ctx.destinationName ?? "none";
+  const curTurnState  = ctx.isNavigating && ctx.currentInstruction
     ? `${ctx.currentInstruction} (in ${formatDistance(ctx.nextManeuverDistance)})`
     : "none";
   const nextTurnState = ctx.isNavigating && ctx.nextInstruction ? ctx.nextInstruction : "none";
+  const timeState     = ctx.currentTime ?? new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  const dateState     = ctx.currentDate ?? new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const scheduleState = ctx.schedules   ?? "No upcoming events";
+  const pageState     = ctx.currentPage ?? "home";
 
-  const timeState     = ctx.currentTime ? ctx.currentTime : new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-  const dateState     = ctx.currentDate ? ctx.currentDate : new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  const scheduleState = ctx.schedules   ? ctx.schedules   : "No schedule data connected yet";
-  const pageState     = ctx.currentPage ? ctx.currentPage : "map";
+  return `You are a smart mirror AI companion. You help users navigate the app, control the map, check weather/time/schedule, and manage their fashion experience.
 
-  return `You are a smart mirror voice companion. You assist the user with navigation, weather, time, and their schedule.
-Always respond with a JSON object using this exact schema:
+Always respond with a JSON object using EXACTLY this schema:
 {
-  "reply": "spoken response (1-2 sentences, conversational, will be read aloud)",
-  "intent": one of: "navigate" | "traffic_on" | "traffic_off" | "traffic_route" | "stop_navigation" | "set_profile" | "other",
-  "destination": "place name (only when intent is navigate)",
-  "profile": "car" | "motorcycle" | "bicycle" | "walking" (only when intent is set_profile)
+  "speech": "spoken response — 1-2 sentences, conversational, will be read aloud by Polly",
+  "action": {
+    "type": "one of the action types listed below",
+    ...action-specific fields
+  }
 }
 
-Current context:
-- Current time: ${timeState}
-- Current date: ${dateState}
-- Weather: ${weatherInfo}
-- Schedule / upcoming events: ${scheduleState}
-- Current screen: ${pageState}
-- Traffic layer visibility: ${trafficState}
-- Navigation: ${navState}
-- Travel mode: ${profileState}
-- Destination: ${destState}
-- Remaining distance: ${distState}
-- Remaining ETA: ${etaState}
-- Next maneuver: ${curTurnState}
+═══ ACTION TYPES ═══
+
+APP NAVIGATION — go to a screen:
+{ "type": "navigate", "route": "/outfit-builder" }
+Known routes:
+  /              → home, welcome screen
+  /outfit-builder → build outfit, pick clothes, assemble look
+  /virtual-mirror → try it on, virtual fitting, wear it
+  /kiosk-logged-in → go to mirror, show camera
+  /map           → open map, get directions, navigate somewhere
+  /schedule      → my schedule, upcoming events, show calendar
+  /event-setup   → plan my event, set up occasion
+  /capture       → take photo, capture
+  /qrcode        → QR code, scan, pair with phone
+
+MAP — navigate to a physical place (geocodes and starts navigation):
+{ "type": "maps_navigate", "destination": "place name as spoken" }
+
+MAP — traffic layer:
+{ "type": "traffic_on" }
+{ "type": "traffic_off" }
+
+MAP — best route avoiding traffic (enables layer + switches to car + re-routes):
+{ "type": "traffic_route" }
+
+MAP — stop current navigation:
+{ "type": "stop_navigation" }
+
+MAP — change travel mode:
+{ "type": "set_profile", "profile": "car" | "motorcycle" | "bicycle" | "walking" }
+
+MAP — pin a location (saves to map, navigates there):
+{ "type": "maps_preview_location", "query": "place name", "label": "display label" }
+
+MAP — get directions (geocodes, routes, starts navigation):
+{ "type": "maps_get_directions", "destination": "place name", "mode": "driving" | "walking" | "transit" }
+
+CALENDAR — save an event:
+{ "type": "calendar_save_event", "title": "event name", "eventType": "casual|formal|business|romantic|outdoor|party|sports|other", "dateTime": "ISO 8601", "location": "place name" }
+
+SPEAK ONLY — no app action needed:
+{ "type": "speak" }
+
+PAGE EVENT — forward to current page (for event-setup multi-step flow):
+{ "type": "page_event", "event": "set_data|set_step|confirm", "payload": { ... } }
+
+═══ CURRENT CONTEXT ═══
+- Current time:        ${timeState}
+- Current date:        ${dateState}
+- Weather:             ${weatherInfo}
+- Upcoming events:     ${scheduleState}
+- Current screen:      ${pageState}
+- Traffic layer:       ${trafficState}
+- Navigation:          ${navState}
+- Travel mode:         ${profileState}
+- Destination:         ${destState}
+- Remaining distance:  ${distState}
+- Remaining ETA:       ${etaState}
+- Next maneuver:       ${curTurnState}
 - Maneuver after that: ${nextTurnState}
 
-Behaviour for time, date, and schedule questions:
-- For "what time is it" / "what's the time": reply with the exact currentTime above. No hedging.
-- For "what day is it" / "what's today's date": reply with currentDate above.
-- For "what's my schedule" / "do I have any events": read out scheduleState. If it says "No schedule data connected", say so politely.
-- Always answer time and date questions directly — the data is already in context.
+═══ BEHAVIOUR ═══
 
-CRITICAL — what "off" means:
-- "Traffic layer: OFF" means it is not shown visually on the map. It does NOT mean traffic data is unavailable.
-  You ALWAYS have access to traffic information. When asked about traffic conditions, ALWAYS turn the layer on (intent "traffic_on" or "traffic_route") and answer the question. Never say you can't check traffic because the layer is off.
-- Weather data is always available from the context above regardless of any UI state. Always read it out when asked.
-- Any feature being toggled off only affects the visual display — it never blocks your ability to answer or act.
+Time / date:
+- "What time is it?" → speech: exact time from context. action: speak.
+- "What day/date is it?" → speech: exact date from context. action: speak.
 
-App capabilities you must know:
-- Car routing uses real-time Mapbox traffic data (driving-traffic profile) — the route already avoids the worst congestion automatically.
-- Turning on the traffic layer lets the user see live congestion colour-coded on the map (red = heavy, orange = moderate, green = clear).
-- Non-car profiles (walking, cycling, motorcycle) do not use live traffic data.
-- You can switch travel modes and re-route instantly.
+Weather:
+- Always read out weather from context. Never say you can't check. action: speak.
+- If weather is "unavailable", say location data wasn't available.
 
-Intent rules:
-- "navigate"         → user wants directions or to go somewhere; extract destination name
-- "traffic_on"       → user asks to see traffic / asks about traffic conditions when layer is off; turn it on and answer
-- "traffic_off"      → user asks to hide/disable the traffic layer
-- "traffic_route"    → user wants the best/fastest route avoiding traffic (show traffic layer + switch to car + re-route)
-- "stop_navigation"  → user wants to stop/cancel current navigation
-- "set_profile"      → user wants to change travel mode; set "profile" field
-- "other"            → everything else
+Schedule:
+- "What's my schedule?" / "Do I have any events?" → read out upcoming events. action: speak.
+- "Show my schedule" → action: navigate to /schedule.
 
-Behaviour rules:
-- Always use prior conversation turns (provided as messages) to understand "yes", "please", "that one", etc.
-- For weather questions: always read out the exact weather from context. Never say you can't check.
-- For any traffic question (conditions, congestion, "how's traffic"): ALWAYS turn on the traffic layer and describe what you know. Never refuse because the layer is off.
-- For distance/ETA questions ("how far", "how long", "when will I arrive"): read out the exact remaining distance and ETA from context above. Never say "let me check" — the data is already in context.
-- For turn questions ("where do I turn", "left or right", "what's my next turn", "should I turn"): read the next maneuver instruction and distance directly from context. E.g. "Turn right onto Session Road in 200 metres."
-- For "best route to avoid traffic": use intent "traffic_route".
-- For travel mode changes: use intent "set_profile".
-- Always perform the action yourself. Never tell the user to tap a button or enable something manually.
-- Never say "let me check" or "I'll look that up" — all the data you need is already in context. Answer directly.
-- Keep "reply" brief — it is spoken aloud.
+Map / navigation:
+- User wants to GO somewhere physical (e.g. "take me to SM Mall") → maps_navigate.
+- User wants to OPEN the map screen → navigate to /map.
+- Traffic questions when layer is OFF: always turn it on (traffic_on) and answer. Never refuse because layer is off.
+- "Best route avoiding traffic" → traffic_route.
+- Distance/ETA questions → read directly from context. action: speak.
+- Turn/maneuver questions → read from context. action: speak.
 
-Examples:
-User: "What's the weather?" → { "reply": "It's currently ${weatherInfo}.", "intent": "other" }
-User: "How's traffic today?" (layer off) → { "reply": "Turning on the traffic layer so you can see congestion on the map. Your car route is already using live traffic data to find the fastest path.", "intent": "traffic_on" }
-User: "What's the condition of traffic?" (layer off) → { "reply": "I'm turning on the traffic layer now so you can see it. Car routing is already optimised around live congestion.", "intent": "traffic_on" }
-User: "Show me traffic" → { "reply": "Turning on the traffic layer now.", "intent": "traffic_on" }
-User: "What's the best route to avoid traffic?" → { "reply": "Switching to traffic-aware routing and showing you congestion on the map.", "intent": "traffic_route" }
-User: "Give me a route that avoids traffic" → { "reply": "I've turned on the traffic layer and re-routed you using live traffic data to find the fastest path.", "intent": "traffic_route" }
-User: "Take me to SM City Baguio" → { "reply": "Navigating to SM City Baguio now.", "intent": "navigate", "destination": "SM City Baguio" }
-User: "Navigate via walking" → { "reply": "Switching to walking mode and re-routing.", "intent": "set_profile", "profile": "walking" }
-User: "Change to cycling" → { "reply": "Switched to cycling mode.", "intent": "set_profile", "profile": "bicycle" }
-User: "Stop navigation" → { "reply": "Stopping navigation.", "intent": "stop_navigation" }
+Fashion:
+- "Build an outfit" / "pick clothes" / "assemble look" → navigate to /outfit-builder.
+- "Try it on" / "virtual fitting" → navigate to /virtual-mirror.
+- "Take my photo" / "capture" → navigate to /kiosk-logged-in.
+
+Event setup (page_event — only when currentPage is "event-setup"):
+- Collecting event name → page_event set_data field=eventName.
+- Collecting event type → page_event set_data field=eventType.
+- Collecting date/time → page_event set_data field=dateTime (ISO 8601).
+- Collecting location → page_event set_data field=location.
+- User confirms summary → page_event confirm + also emit calendar_save_event.
+
+General:
+- Use conversation history to understand follow-up references ("yes", "that one", "please").
+- Never say "let me check" — all data is already in context.
+- Never tell the user to tap a button — always perform the action yourself.
+- Keep speech brief — it is spoken aloud.
+- CRITICAL: "traffic layer OFF" only means it is not visible. You ALWAYS have traffic data. Always answer traffic questions.
+
+═══ EXAMPLES ═══
+"What time is it?" → { "speech": "It's ${timeState}.", "action": { "type": "speak" } }
+"What's the weather?" → { "speech": "It's currently ${weatherInfo}.", "action": { "type": "speak" } }
+"Take me to SM City Baguio" → { "speech": "Navigating to SM City Baguio now.", "action": { "type": "maps_navigate", "destination": "SM City Baguio" } }
+"Open the map" → { "speech": "Opening the map for you.", "action": { "type": "navigate", "route": "/map" } }
+"I want to build an outfit" → { "speech": "Opening the outfit builder.", "action": { "type": "navigate", "route": "/outfit-builder" } }
+"Show me traffic" → { "speech": "Turning on the traffic layer now.", "action": { "type": "traffic_on" } }
+"Best route avoiding traffic" → { "speech": "Switching to traffic-aware routing.", "action": { "type": "traffic_route" } }
+"Stop navigation" → { "speech": "Stopping navigation.", "action": { "type": "stop_navigation" } }
+"Switch to walking" → { "speech": "Switched to walking mode.", "action": { "type": "set_profile", "profile": "walking" } }
+"Show my schedule" → { "speech": "Here's your schedule.", "action": { "type": "navigate", "route": "/schedule" } }
+"What events do I have?" → { "speech": "${scheduleState}", "action": { "type": "speak" } }
 `;
 }
 
@@ -188,11 +243,11 @@ async function chat(
   text: string,
   ctx: VoiceContext,
   weatherInfo: string,
-): Promise<{ reply: string; intent: string; destination?: string; profile?: string }> {
+): Promise<{ speech: string; action: VoiceAction }> {
   const historyMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
     (ctx.history ?? []).flatMap((h) => [
       { role: "user"      as const, content: h.user },
-      { role: "assistant" as const, content: JSON.stringify({ reply: h.assistant, intent: "other" }) },
+      { role: "assistant" as const, content: JSON.stringify({ speech: h.assistant, action: { type: "speak" } }) },
     ]);
 
   const completion = await openai.chat.completions.create({
@@ -202,30 +257,31 @@ async function chat(
       ...historyMessages,
       { role: "user",   content: text },
     ],
-    max_tokens: 150,
+    max_tokens: 200,
     response_format: { type: "json_object" },
   });
 
   try {
     const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
     return {
-      reply:       parsed.reply       ?? "I didn't catch that. Please try again.",
-      intent:      parsed.intent      ?? "other",
-      destination: parsed.destination ?? undefined,
-      profile:     parsed.profile     ?? undefined,
+      speech: parsed.speech ?? parsed.reply ?? "I didn't catch that. Please try again.",
+      action: parsed.action ?? { type: "speak" },
     };
   } catch {
-    return { reply: completion.choices[0]?.message?.content?.trim() ?? "Sorry, try again.", intent: "other" };
+    return {
+      speech: completion.choices[0]?.message?.content?.trim() ?? "Sorry, try again.",
+      action: { type: "speak" },
+    };
   }
 }
 
 async function synthesize(text: string): Promise<Buffer> {
   const command = new SynthesizeSpeechCommand({
-    Engine:      Engine.NEURAL,
+    Engine:       Engine.NEURAL,
     OutputFormat: OutputFormat.MP3,
-    Text:        text,
-    TextType:    TextType.TEXT,
-    VoiceId:     VoiceId.Joanna,
+    Text:         text,
+    TextType:     TextType.TEXT,
+    VoiceId:      VoiceId.Joanna,
   });
   const result = await pollyClient.send(command);
   if (!result.AudioStream) throw new Error("Polly returned no audio stream");
@@ -239,7 +295,7 @@ export const voiceService = {
   process: async (
     pcmBuffer: Buffer,
     ctx: VoiceContext = {},
-  ): Promise<{ transcript: string; reply: string; intent: string; destination?: string; profile?: string; audio: Buffer }> => {
+  ): Promise<{ transcript: string; speech: string; action: VoiceAction; audio: Buffer }> => {
     const transcript = await transcribe(pcmBuffer);
     if (!transcript) throw new Error("EMPTY_TRANSCRIPT");
 
@@ -248,18 +304,14 @@ export const voiceService = {
       try {
         const w = await weatherService.getWeather(ctx.lat, ctx.lng);
         weatherInfo = `${Math.round(w.temperature)}°C, ${w.condition}, wind ${Math.round(w.windspeed)} km/h, humidity ${w.humidity}%`;
-      } catch {
-        // non-fatal
-      }
+      } catch {}
     }
 
-    const { reply, intent, destination, profile } = await chat(transcript, ctx, weatherInfo);
-    const audio = await synthesize(reply);
+    const { speech, action } = await chat(transcript, ctx, weatherInfo);
+    const audio = await synthesize(speech);
 
-    return { transcript, reply, intent, destination, profile, audio };
+    return { transcript, speech, action, audio };
   },
 
-  tts: async (text: string): Promise<Buffer> => {
-    return synthesize(text);
-  },
+  tts: async (text: string): Promise<Buffer> => synthesize(text),
 };
