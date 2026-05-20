@@ -1,17 +1,6 @@
-import {
-  PollyClient,
-  SynthesizeSpeechCommand,
-  Engine,
-  OutputFormat,
-  VoiceId,
-  TextType,
-} from "@aws-sdk/client-polly";
 import OpenAI, { toFile } from "openai";
 import axios from "axios";
-import { Readable } from "stream";
 import {
-  AWS_ACCESS_KEY_ID,
-  AWS_SECRET_ACCESS_KEY,
   OPENAI_API_KEY,
   CHAT_WONDER_API_URL,
 } from "../../config";
@@ -22,16 +11,6 @@ import { parseChatWonderResponse } from "../../utils/parse-response.util";
 import logger from "../../utils/logger";
 import ChatRepository from "../../repositories/chat.repository";
 import WeatherSnapshotService from "./weather-snapshot.service";
-
-const VOICE_REGION = process.env.AWS_VOICE_REGION || "eu-west-1";
-
-const pollyClient = new PollyClient({
-  region: VOICE_REGION,
-  credentials: {
-    accessKeyId: AWS_ACCESS_KEY_ID,
-    secretAccessKey: AWS_SECRET_ACCESS_KEY,
-  },
-});
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
@@ -185,19 +164,14 @@ async function transcribe(pcmBuffer: Buffer): Promise<string> {
 
 
 async function synthesize(text: string): Promise<Buffer> {
-  const command = new SynthesizeSpeechCommand({
-    Engine:       Engine.NEURAL,
-    OutputFormat: OutputFormat.MP3,
-    Text:         text,
-    TextType:     TextType.TEXT,
-    VoiceId:      VoiceId.Joanna,
+  const response = await openai.audio.speech.create({
+    model: "tts-1",
+    voice: "nova",
+    input: text,
+    response_format: "mp3",
   });
-  const result = await pollyClient.send(command);
-  if (!result.AudioStream) throw new Error("Polly returned no audio stream");
-  const stream = result.AudioStream as Readable;
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  return Buffer.concat(chunks);
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
 }
 
 export const voiceService = {

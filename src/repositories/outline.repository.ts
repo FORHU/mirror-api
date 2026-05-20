@@ -4,18 +4,12 @@ export default class OutlineRepo {
   static async findById(id: string) {
     return prisma.userOutline.findUnique({
       where: { id },
-      include: {
-        outfits: true,
-      },
     });
   }
 
   static async findByUserId(userId: string) {
     return prisma.userOutline.findMany({
       where: { userId },
-      include: {
-        outfits: true,
-      },
       orderBy: { createdAt: "desc" },
     });
   }
