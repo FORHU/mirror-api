@@ -20,6 +20,7 @@ import { prisma } from "../../utils/prisma";
 import { streamChat } from "../../utils/chat-wonder-stream";
 import { parseChatWonderResponse } from "../../utils/parse-response.util";
 import logger from "../../utils/logger";
+import ChatRepository from "../../repositories/chat.repository";
 
 const VOICE_REGION = process.env.AWS_VOICE_REGION || "eu-west-1";
 
@@ -223,6 +224,50 @@ export const voiceService = {
     const action = detectIntent(transcript);
     const speech = await askChatWonder(transcript, ctx, weatherInfo);
     const audio  = await synthesize(speech);
+
+    if (ctx.userOutlineId) {
+      try {
+        const outline = await prisma.userOutline.findUnique({
+          where: { id: ctx.userOutlineId },
+          select: { userId: true, conversationId: true },
+        });
+
+        if (outline?.userId) {
+          let conversationId = outline.conversationId;
+
+          if (!conversationId) {
+            const conv = await ChatRepository.createConversation({
+              userId: outline.userId,
+              title: "Voice Session",
+            });
+            conversationId = conv.id;
+            await prisma.userOutline.update({
+              where: { id: ctx.userOutlineId },
+              data: { conversationId },
+            });
+          }
+
+          await ChatRepository.createMessage({
+            userId: outline.userId,
+            conversationId,
+            message: transcript,
+            role: "USER",
+          });
+          await ChatRepository.createMessage({
+            userId: outline.userId,
+            conversationId,
+            message: speech,
+            role: "AI",
+          });
+          await prisma.conversation.update({
+            where: { id: conversationId },
+            data: { lastMessageAt: new Date() },
+          });
+        }
+      } catch (err: any) {
+        logger.error(`[VoiceService] Failed to persist conversation: ${err.message}`);
+      }
+    }
 
     return { transcript, speech, action, audio };
   },
