@@ -1,21 +1,18 @@
-name: Build and Deploy to ECS EC2
+name: Build and Deploy via SSH
 
 on:
     workflow_dispatch:
 
 env:
     AWS_REGION: ap-southeast-1
-
     ECR_REPOSITORY: npx/mirror-api
 
-    ECS_CLUSTER: uncommon-deer-0vc0dh
-    ECS_SERVICE: uncommon-deer-0vc0dh-service
-
-    # existing task definition file in repo
-    TASK_DEFINITION_FILE: .aws/task-definition.json
-
-    # container name INSIDE task definition
-    CONTAINER_NAME: chumme-api
+    # On-host config
+    CONTAINER_NAME: mirror-api
+    HOST_PORT: 3000
+    CONTAINER_PORT: 3000
+    # Path to the .env file already placed on the EC2 host (user-managed).
+    HOST_ENV_FILE: /home/ubuntu/mirror-api.env
 
 jobs:
     deploy:
@@ -57,7 +54,6 @@ jobs:
                       type=raw,value=latest
 
             - name: Build and push Docker image
-              id: build-image
               uses: docker/build-push-action@v5
               with:
                   context: .
@@ -69,19 +65,41 @@ jobs:
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
-            - name: Render ECS task definition
-              id: task-def
-              uses: aws-actions/amazon-ecs-render-task-definition@v1
-              with:
-                  task-definition: ${{ env.TASK_DEFINITION_FILE }}
-                  container-name: ${{ env.CONTAINER_NAME }}
-                  image: |
-                      ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            # Short-lived ECR token the host will use to `docker login`.
+            # Masked so it never lands in logs.
+            - name: Get ECR login password
+              id: ecr-pw
+              run: |
+                  PW="$(aws ecr get-login-password --region $AWS_REGION)"
+                  echo "::add-mask::$PW"
+                  echo "password=$PW" >> "$GITHUB_OUTPUT"
 
-            - name: Deploy ECS task definition
-              uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+            - name: Deploy to EC2 over SSH
+              uses: appleboy/ssh-action@v1.2.0
               with:
-                  task-definition: ${{ steps.task-def.outputs.task-definition }}
-                  service: ${{ env.ECS_SERVICE }}
-                  cluster: ${{ env.ECS_CLUSTER }}
-                  wait-for-service-stability: true
+                  host: ${{ secrets.SSH_HOST }}
+                  username: ${{ secrets.SSH_USERNAME }}
+                  key: ${{ secrets.SSH_PRIVATE_KEY }}
+                  port: ${{ secrets.SSH_PORT || 22 }}
+                  envs: ECR_PASSWORD,ECR_REGISTRY,IMAGE_URI,CONTAINER_NAME,HOST_PORT,CONTAINER_PORT,HOST_ENV_FILE
+                  script: |
+                      set -euo pipefail
+                      echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+                      docker pull "$IMAGE_URI"
+                      docker stop "$CONTAINER_NAME" 2>/dev/null || true
+                      docker rm   "$CONTAINER_NAME" 2>/dev/null || true
+                      docker run -d \
+                        --name "$CONTAINER_NAME" \
+                        --restart unless-stopped \
+                        -p "${HOST_PORT}:${CONTAINER_PORT}" \
+                        --env-file "$HOST_ENV_FILE" \
+                        "$IMAGE_URI"
+                      docker image prune -f
+              env:
+                  ECR_PASSWORD: ${{ steps.ecr-pw.outputs.password }}
+                  ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+                  IMAGE_URI: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.version }}
+                  CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+                  HOST_PORT: ${{ env.HOST_PORT }}
+                  CONTAINER_PORT: ${{ env.CONTAINER_PORT }}
+                  HOST_ENV_FILE: ${{ env.HOST_ENV_FILE }}
