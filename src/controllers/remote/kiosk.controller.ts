@@ -23,7 +23,7 @@ export default class KioskController {
     try {
       const userId = (req as any).user.id;
       const kioskStateKey = `kiosk_state:${value.kioskId}`;
-      const state = await CacheUtil.get<any>(kioskStateKey);
+      let state = await CacheUtil.get<any>(kioskStateKey);
 
       if (!state) {
         return responseError(res, 404, "Kiosk not found or offline");
@@ -136,7 +136,7 @@ export default class KioskController {
     if (error) return next(validationError(error.message));
 
     try {
-      const state = await CacheUtil.get<any>(`kiosk_state:${value.kioskId}`);
+      let state = await CacheUtil.get<any>(`kiosk_state:${value.kioskId}`);
 
       if (!state) {
         return responseError(res, 404, "Kiosk not found or offline");
