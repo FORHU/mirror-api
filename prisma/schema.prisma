@@ -176,12 +176,14 @@ model UserMap {
 }
 
 model CosmeticProduct {
-  id        String         @id @default(cuid())
-  name      String
-  brand     String?
-  imageUrl  String?
-  hexColor  String? // For UI color swatches
-  metaData  Json?
+  id         String  @id @default(cuid())
+  name       String
+  brand      String?
+  details    String?
+  fileUrl   File?   @relation("CosmeticProductImage", fields: [fileUrlId], references: [id])
+  fileUrlId String? // Foreign key to File
+  hexColor   String? // For UI color swatches
+  metaData   Json?
 
   type      COSMETIC_TYPE?
   createdAt DateTime       @default(now())
@@ -198,9 +200,9 @@ model CosmeticRecommendation {
   cosmeticProductId String
   cosmeticProduct   CosmeticProduct @relation(fields: [cosmeticProductId], references: [id])
 
-  score  Float?
-  rank   Int?
-  reason String?
+  score   Float?
+  rank    Int?
+  reason  String?
   signals Json?
 
   createdAt DateTime @default(now())
@@ -220,8 +222,6 @@ model Calendar {
   createdAt DateTime @default(now())
 }
 
-
-
 model File {
   id           String  @id @default(cuid())
   filename     String
@@ -238,9 +238,10 @@ model File {
 
   createdAt DateTime @default(now())
 
-  garment       Garment? @relation("GarmentFile")
-  userAvatar    User?    @relation("UserAvatar")
-  outfitDisplay Outfit?  @relation("OutfitDisplayFile")
+  garment          Garment?          @relation("GarmentFile")
+  userAvatar       User?             @relation("UserAvatar")
+  outfitDisplay    Outfit?           @relation("OutfitDisplayFile")
+  cosmeticProducts CosmeticProduct[] @relation("CosmeticProductImage")
 }
 
 model Garment {
