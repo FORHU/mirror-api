@@ -311,64 +311,29 @@ export default class MapController {
 
   /**
    * GET /mirror/map/home-location
+   *
+   * TODO: requires `homeLocationLat` / `homeLocationLng` on `User` model.
+   * Disabled until schema fields land + migration runs.
    */
-  static async getHomeLocation(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { homeLocationLat: true, homeLocationLng: true },
-      });
-
-      if (!user || (user.homeLocationLat === null && user.homeLocationLng === null)) {
-        return res.status(200).json({ homeLocation: null });
-      }
-
-      res.status(200).json({
-        homeLocation: {
-          lat: user.homeLocationLat,
-          lng: user.homeLocationLng,
-        },
-      });
-    } catch (err) {
-      next(err);
-    }
+  static async getHomeLocation(_req: Request, res: Response, _next: NextFunction) {
+    return res.status(501).json({
+      status: "error",
+      statusCode: 501,
+      message: "Home location not implemented — User schema missing homeLocationLat/Lng",
+    });
   }
 
   /**
    * PATCH /mirror/map/home-location
+   *
+   * TODO: requires `homeLocationLat` / `homeLocationLng` on `User` model.
+   * Disabled until schema fields land + migration runs.
    */
-  static async updateHomeLocation(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
-    const schema = Joi.object({
-      lat: Joi.number().min(-90).max(90).required(),
-      lng: Joi.number().min(-180).max(180).required(),
+  static async updateHomeLocation(_req: Request, res: Response, _next: NextFunction) {
+    return res.status(501).json({
+      status: "error",
+      statusCode: 501,
+      message: "Home location not implemented — User schema missing homeLocationLat/Lng",
     });
-
-    const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.message });
-
-    try {
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          homeLocationLat: value.lat,
-          homeLocationLng: value.lng,
-        },
-      });
-
-      res.status(200).json({
-        homeLocation: {
-          lat: value.lat,
-          lng: value.lng,
-        },
-      });
-    } catch (err) {
-      next(err);
-    }
   }
 }
