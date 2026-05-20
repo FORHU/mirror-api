@@ -8,7 +8,7 @@ export default class VoiceController {
     if (!Buffer.isBuffer(pcmBuffer) || pcmBuffer.length === 0) {
       return res.status(400).json({ error: "No audio data received" });
     }
-    if (pcmBuffer.length < 8000) {
+    if (pcmBuffer.length < 1000) {
       return res.status(400).json({ error: "Audio too short" });
     }
 

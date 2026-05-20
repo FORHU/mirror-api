@@ -19,7 +19,7 @@ export default class ChatWonderService {
           return "";
         }
         
-        const response = await axios.get(`${CHAT_WONDER_API_URL}/session`);
+        const response = await axios.get(`${CHAT_WONDER_API_URL}/session-id`);
         sessionId = response.data?.session_id || "";
         
         if (sessionId) {

@@ -1,17 +1,6 @@
-import {
-  PollyClient,
-  SynthesizeSpeechCommand,
-  Engine,
-  OutputFormat,
-  VoiceId,
-  TextType,
-} from "@aws-sdk/client-polly";
 import OpenAI, { toFile } from "openai";
 import axios from "axios";
-import { Readable } from "stream";
 import {
-  AWS_ACCESS_KEY_ID,
-  AWS_SECRET_ACCESS_KEY,
   OPENAI_API_KEY,
   CHAT_WONDER_API_URL,
 } from "../../config";
@@ -22,16 +11,6 @@ import { parseChatWonderResponse } from "../../utils/parse-response.util";
 import logger from "../../utils/logger";
 import ChatRepository from "../../repositories/chat.repository";
 import WeatherSnapshotService from "./weather-snapshot.service";
-
-const VOICE_REGION = process.env.AWS_VOICE_REGION || "eu-west-1";
-
-const pollyClient = new PollyClient({
-  region: VOICE_REGION,
-  credentials: {
-    accessKeyId: AWS_ACCESS_KEY_ID,
-    secretAccessKey: AWS_SECRET_ACCESS_KEY,
-  },
-});
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
@@ -130,10 +109,13 @@ function detectIntent(transcript: string): VoiceAction {
 async function getChatWonderSession(sessionId?: string): Promise<string> {
   if (sessionId) return sessionId;
   try {
-    const res = await axios.get(`${CHAT_WONDER_API_URL}/session`);
-    return res.data?.session_id || "mirror-voice";
-  } catch {
-    return "mirror-voice";
+    const res = await axios.get(`${CHAT_WONDER_API_URL}/session-id`);
+    const sid = res.data?.session_id;
+    if (!sid) logger.warn("[VoiceService] /session returned no session_id, response:", res.data);
+    return sid || "";
+  } catch (err: any) {
+    logger.error(`[VoiceService] Failed to create ChatWonder session: ${err.message}`);
+    return "";
   }
 }
 
@@ -141,6 +123,12 @@ async function askChatWonder(transcript: string, ctx: VoiceContext, weatherInfo:
   const query = buildChatWonderQuery(transcript, ctx, weatherInfo);
   const sid   = await getChatWonderSession(ctx.sessionId);
 
+  if (!sid) {
+    logger.error("[VoiceService] No ChatWonder session ID available — cannot stream chat");
+    return "I'm here to help — could you say that again?";
+  }
+
+  logger.info(`[VoiceService] Using ChatWonder session: ${sid}`);
   let raw = "";
   try {
     await streamChat(query, sid, "mirror", {
@@ -177,27 +165,21 @@ function pcmToWav(pcm: Buffer, sampleRate = 16000, channels = 1, bitsPerSample =
 }
 
 async function transcribe(pcmBuffer: Buffer): Promise<string> {
-  const wav  = pcmToWav(pcmBuffer);
-  const file = await toFile(wav, "audio.wav", { type: "audio/wav" });
+  const file = await toFile(pcmToWav(pcmBuffer), "audio.wav", { type: "audio/wav" });
   const result = await openai.audio.transcriptions.create({ model: "whisper-1", file, language: "en" });
   return result.text.trim();
 }
 
 
 async function synthesize(text: string): Promise<Buffer> {
-  const command = new SynthesizeSpeechCommand({
-    Engine:       Engine.NEURAL,
-    OutputFormat: OutputFormat.MP3,
-    Text:         text,
-    TextType:     TextType.TEXT,
-    VoiceId:      VoiceId.Joanna,
+  const response = await openai.audio.speech.create({
+    model: "tts-1",
+    voice: "nova",
+    input: text,
+    response_format: "mp3",
   });
-  const result = await pollyClient.send(command);
-  if (!result.AudioStream) throw new Error("Polly returned no audio stream");
-  const stream = result.AudioStream as Readable;
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  return Buffer.concat(chunks);
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
 }
 
 export const voiceService = {

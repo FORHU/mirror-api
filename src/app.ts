@@ -26,8 +26,8 @@ const corsOptions: cors.CorsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  exposedHeaders: ["X-Transcript", "X-Reply", "X-Intent", "X-Destination", "X-Profile"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-platform"],
+  exposedHeaders: ["X-Transcript", "X-Reply", "X-Action", "X-Intent", "X-Destination", "X-Profile"],
 };
 
 app.use(cors(corsOptions));

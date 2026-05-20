@@ -309,31 +309,37 @@ export default class MapController {
     }
   }
 
-  /**
-   * GET /mirror/map/home-location
-   *
-   * TODO: requires `homeLocationLat` / `homeLocationLng` on `User` model.
-   * Disabled until schema fields land + migration runs.
-   */
-  static async getHomeLocation(_req: Request, res: Response, _next: NextFunction) {
-    return res.status(501).json({
-      status: "error",
-      statusCode: 501,
-      message: "Home location not implemented — User schema missing homeLocationLat/Lng",
-    });
+  static async getHomeLocation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user?.id;
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { homeLocationLat: true, homeLocationLng: true },
+      });
+      const homeLocation =
+        user?.homeLocationLat != null && user?.homeLocationLng != null
+          ? { lat: user.homeLocationLat, lng: user.homeLocationLng }
+          : null;
+      return res.json({ homeLocation });
+    } catch (err) {
+      next(err);
+    }
   }
 
-  /**
-   * PATCH /mirror/map/home-location
-   *
-   * TODO: requires `homeLocationLat` / `homeLocationLng` on `User` model.
-   * Disabled until schema fields land + migration runs.
-   */
-  static async updateHomeLocation(_req: Request, res: Response, _next: NextFunction) {
-    return res.status(501).json({
-      status: "error",
-      statusCode: 501,
-      message: "Home location not implemented — User schema missing homeLocationLat/Lng",
-    });
+  static async updateHomeLocation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user?.id;
+      const { lat, lng } = req.body as { lat: number; lng: number };
+      if (typeof lat !== "number" || typeof lng !== "number") {
+        return res.status(400).json({ message: "lat and lng are required numbers" });
+      }
+      await prisma.user.update({
+        where: { id: userId },
+        data: { homeLocationLat: lat, homeLocationLng: lng },
+      });
+      return res.json({ homeLocation: { lat, lng } });
+    } catch (err) {
+      next(err);
+    }
   }
 }
