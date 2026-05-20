@@ -11,16 +11,18 @@ export default class GenerationService {
     userId?: string;
     userPrompt: string[];
     location?: string;
+    latitude?: number;
+    longitude?: number;
     startTime?: Date;
-    weather?: any;
   }) {
     // 1. Create/Update UserOutline
     const outline = await OutlineRepo.create({
       userId: data.userId,
       userPrompt: data.userPrompt,
       location: data.location,
+      latitude: data.latitude,
+      longitude: data.longitude,
       startTime: data.startTime,
-      weather: data.weather,
     });
 
     // 2. Search for garments (Basic implementation: find one for each slot)

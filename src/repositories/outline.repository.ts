@@ -24,16 +24,18 @@ export default class OutlineRepo {
     userId?: string;
     userPrompt: string[];
     location?: string;
+    latitude?: number;
+    longitude?: number;
     startTime?: Date;
-    weather?: any;
   }) {
     return prisma.userOutline.create({
       data: {
         userId: data.userId,
         userPrompt: data.userPrompt,
         location: data.location,
+        latitude: data.latitude,
+        longitude: data.longitude,
         startTime: data.startTime,
-        weather: data.weather,
       },
     });
   }
@@ -41,8 +43,9 @@ export default class OutlineRepo {
   static async update(id: string, data: {
     userPrompt?: string[];
     location?: string;
+    latitude?: number;
+    longitude?: number;
     startTime?: Date;
-    weather?: any;
   }) {
     return prisma.userOutline.update({
       where: { id },
