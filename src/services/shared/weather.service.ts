@@ -6,6 +6,8 @@ export interface WeatherData {
   icon: string;
   windspeed: number;
   humidity: number;
+  uvIndex: number;
+  precipitationProb: number;
   unit: string;
 }
 
@@ -48,13 +50,16 @@ export const weatherService = {
           latitude: lat,
           longitude: lng,
           current_weather: true,
-          hourly: "relativehumidity_2m",
+          hourly: "relativehumidity_2m,uv_index,precipitation_probability",
         },
       });
 
       const current = response.data.current_weather;
-      const humidity = response.data.hourly.relativehumidity_2m[0];
-      const code = current.weathercode;
+      const hourly  = response.data.hourly;
+      const humidity         = hourly.relativehumidity_2m[0] ?? 0;
+      const uvIndex          = hourly.uv_index[0] ?? 0;
+      const precipitationProb = hourly.precipitation_probability[0] ?? 0;
+      const code   = current.weathercode;
       const mapped = weatherCodeMap[code] || { condition: "Unknown", icon: "Cloud" };
 
       return {
@@ -62,7 +67,9 @@ export const weatherService = {
         condition: mapped.condition,
         icon: mapped.icon,
         windspeed: current.windspeed,
-        humidity: humidity,
+        humidity,
+        uvIndex,
+        precipitationProb,
         unit: "celsius",
       };
     } catch (error) {
