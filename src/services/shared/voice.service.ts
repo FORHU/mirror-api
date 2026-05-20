@@ -7,13 +7,19 @@ import {
   TextType,
 } from "@aws-sdk/client-polly";
 import OpenAI, { toFile } from "openai";
+import axios from "axios";
 import { Readable } from "stream";
 import {
   AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY,
   OPENAI_API_KEY,
+  CHAT_WONDER_API_URL,
 } from "../../config";
 import { weatherService } from "./weather.service";
+import { prisma } from "../../utils/prisma";
+import { streamChat } from "../../utils/chat-wonder-stream";
+import { parseChatWonderResponse } from "../../utils/parse-response.util";
+import logger from "../../utils/logger";
 
 const VOICE_REGION = process.env.AWS_VOICE_REGION || "eu-west-1";
 
@@ -44,6 +50,9 @@ export interface VoiceContext {
   currentDate?: string;
   schedules?: string;
   currentPage?: string;
+  userOutlineId?: string;
+  staffClarification?: string;
+  sessionId?: string;
 }
 
 export interface VoiceAction {
@@ -66,152 +75,85 @@ function formatDuration(seconds?: number): string {
   return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
 }
 
-function buildSystemPrompt(ctx: VoiceContext, weatherInfo: string): string {
-  const trafficState = ctx.trafficEnabled ? "ON (live congestion visible)" : "OFF";
-  const navState     = ctx.isNavigating   ? "active"                        : "not active";
-  const profileMap: Record<string, string> = {
-    car: "driving (car)", motorcycle: "motorcycle", bicycle: "cycling", walking: "walking",
-  };
-  const profileState  = profileMap[ctx.profile ?? "car"] ?? ctx.profile ?? "driving (car)";
-  const distState     = ctx.isNavigating ? formatDistance(ctx.remainingDistance) : "not navigating";
-  const etaState      = ctx.isNavigating ? formatDuration(ctx.remainingDuration) : "not navigating";
-  const destState     = ctx.destinationName ?? "none";
-  const curTurnState  = ctx.isNavigating && ctx.currentInstruction
-    ? `${ctx.currentInstruction} (in ${formatDistance(ctx.nextManeuverDistance)})`
-    : "none";
-  const nextTurnState = ctx.isNavigating && ctx.nextInstruction ? ctx.nextInstruction : "none";
-  const timeState     = ctx.currentTime ?? new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-  const dateState     = ctx.currentDate ?? new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  const scheduleState = ctx.schedules   ?? "No upcoming events";
-  const pageState     = ctx.currentPage ?? "home";
+function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo: string): string {
+  const time = ctx.currentTime ?? new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  const date = ctx.currentDate ?? new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
-  return `You are a smart mirror AI companion. You help users navigate the app, control the map, check weather/time/schedule, and manage their fashion experience.
+  const contextLines = [
+    `[Smart Mirror — ${date}, ${time}]`,
+    `Weather: ${weatherInfo}`,
+    ctx.schedules                          ? `Schedule: ${ctx.schedules}`                                                                                                     : null,
+    ctx.currentPage                        ? `Current screen: ${ctx.currentPage}`                                                                                             : null,
+    ctx.isNavigating                       ? `Navigation: active | destination: ${ctx.destinationName ?? "unknown"} | distance: ${formatDistance(ctx.remainingDistance)} | ETA: ${formatDuration(ctx.remainingDuration)}` : null,
+    ctx.staffClarification?.trim()         ? `Staff note: ${ctx.staffClarification.trim()}`                                                                                   : null,
+  ].filter(Boolean).join("\n");
 
-Always respond with a JSON object using EXACTLY this schema:
-{
-  "speech": "spoken response — 1-2 sentences, conversational, will be read aloud by Polly",
-  "action": {
-    "type": "one of the action types listed below",
-    ...action-specific fields
+  return `${contextLines}\n\nUser: ${transcript}`;
+}
+
+function detectIntent(transcript: string): VoiceAction {
+  const t = transcript.toLowerCase().trim();
+
+  // Navigate to a physical place
+  const navMatch = t.match(/(?:take me to|navigate to|directions? to|drive to|go to)\s+(.+)/i);
+  if (navMatch) return { type: "maps_navigate", destination: navMatch[1].trim() };
+
+  // Travel mode
+  const modeMatch = t.match(/(?:switch|change|set).{0,10}(?:to|mode).{0,5}(car|motorcycle|bicycle|bike|walking|walk)\b/i);
+  if (modeMatch) {
+    const modeMap: Record<string, string> = { bike: "bicycle", walk: "walking" };
+    const raw = modeMatch[1].toLowerCase();
+    return { type: "set_profile", profile: modeMap[raw] ?? raw };
+  }
+
+  // Map controls
+  if (/\b(best route|avoid traffic|traffic.{0,10}route)\b/i.test(t)) return { type: "traffic_route" };
+  if (/\b(turn on|enable|show)\s+traffic\b/i.test(t))               return { type: "traffic_on" };
+  if (/\b(turn off|disable|hide)\s+traffic\b/i.test(t))             return { type: "traffic_off" };
+  if (/\b(stop|cancel|end)\s+navigation\b/i.test(t))                return { type: "stop_navigation" };
+
+  // Screen navigation
+  if (/\b(open|show|go\s+to)\s+(the\s+)?map\b/i.test(t))                                                        return { type: "navigate", route: "/map" };
+  if (/\b(build|create|make|assemble)\s+(an?\s+)?(outfit|look|style)\b|\b(pick|choose)\s+(clothes|outfit)\b/i.test(t)) return { type: "navigate", route: "/outfit-builder" };
+  if (/\btry\s+it\s+on\b|\bvirtual\s+(fitting|mirror|try)\b/i.test(t))                                          return { type: "navigate", route: "/virtual-mirror" };
+  if (/\b(show|open|go\s+to)\s+(my\s+)?schedule\b/i.test(t))                                                    return { type: "navigate", route: "/schedule" };
+  if (/\b(take\s+(a\s+)?photo|capture|camera)\b/i.test(t))                                                      return { type: "navigate", route: "/kiosk-logged-in" };
+  if (/\b(scan|qr\s*code|pair)\b/i.test(t))                                                                     return { type: "navigate", route: "/qrcode" };
+  if (/\b(plan|set\s+up).{0,10}event\b/i.test(t))                                                               return { type: "navigate", route: "/event-setup" };
+  if (/\b(home|main\s+screen|welcome)\b/i.test(t))                                                              return { type: "navigate", route: "/" };
+
+  return { type: "speak" };
+}
+
+async function getChatWonderSession(sessionId?: string): Promise<string> {
+  if (sessionId) return sessionId;
+  try {
+    const res = await axios.get(`${CHAT_WONDER_API_URL}/session`);
+    return res.data?.session_id || "mirror-voice";
+  } catch {
+    return "mirror-voice";
   }
 }
 
-═══ ACTION TYPES ═══
+async function askChatWonder(transcript: string, ctx: VoiceContext, weatherInfo: string): Promise<string> {
+  const query = buildChatWonderQuery(transcript, ctx, weatherInfo);
+  const sid   = await getChatWonderSession(ctx.sessionId);
 
-APP NAVIGATION — go to a screen:
-{ "type": "navigate", "route": "/outfit-builder" }
-Known routes:
-  /              → home, welcome screen
-  /outfit-builder → build outfit, pick clothes, assemble look
-  /virtual-mirror → try it on, virtual fitting, wear it
-  /kiosk-logged-in → go to mirror, show camera
-  /map           → open map, get directions, navigate somewhere
-  /schedule      → my schedule, upcoming events, show calendar
-  /event-setup   → plan my event, set up occasion
-  /capture       → take photo, capture
-  /qrcode        → QR code, scan, pair with phone
+  let raw = "";
+  try {
+    await streamChat(query, sid, "mirror", {
+      onChunk:    (chunk) => { raw += chunk; },
+      onComplete: () => {},
+      onError:    (err)  => { logger.error(`[VoiceService] ChatWonder stream error: ${err.message}`); },
+    });
+  } catch (err: any) {
+    logger.error(`[VoiceService] ChatWonder failed: ${err.message}`);
+    return "I'm here to help — could you say that again?";
+  }
 
-MAP — navigate to a physical place (geocodes and starts navigation):
-{ "type": "maps_navigate", "destination": "place name as spoken" }
-
-MAP — traffic layer:
-{ "type": "traffic_on" }
-{ "type": "traffic_off" }
-
-MAP — best route avoiding traffic (enables layer + switches to car + re-routes):
-{ "type": "traffic_route" }
-
-MAP — stop current navigation:
-{ "type": "stop_navigation" }
-
-MAP — change travel mode:
-{ "type": "set_profile", "profile": "car" | "motorcycle" | "bicycle" | "walking" }
-
-MAP — pin a location (saves to map, navigates there):
-{ "type": "maps_preview_location", "query": "place name", "label": "display label" }
-
-MAP — get directions (geocodes, routes, starts navigation):
-{ "type": "maps_get_directions", "destination": "place name", "mode": "driving" | "walking" | "transit" }
-
-CALENDAR — save an event:
-{ "type": "calendar_save_event", "title": "event name", "eventType": "casual|formal|business|romantic|outdoor|party|sports|other", "dateTime": "ISO 8601", "location": "place name" }
-
-SPEAK ONLY — no app action needed:
-{ "type": "speak" }
-
-PAGE EVENT — forward to current page (for event-setup multi-step flow):
-{ "type": "page_event", "event": "set_data|set_step|confirm", "payload": { ... } }
-
-═══ CURRENT CONTEXT ═══
-- Current time:        ${timeState}
-- Current date:        ${dateState}
-- Weather:             ${weatherInfo}
-- Upcoming events:     ${scheduleState}
-- Current screen:      ${pageState}
-- Traffic layer:       ${trafficState}
-- Navigation:          ${navState}
-- Travel mode:         ${profileState}
-- Destination:         ${destState}
-- Remaining distance:  ${distState}
-- Remaining ETA:       ${etaState}
-- Next maneuver:       ${curTurnState}
-- Maneuver after that: ${nextTurnState}
-
-═══ BEHAVIOUR ═══
-
-Time / date:
-- "What time is it?" → speech: exact time from context. action: speak.
-- "What day/date is it?" → speech: exact date from context. action: speak.
-
-Weather:
-- Always read out weather from context. Never say you can't check. action: speak.
-- If weather is "unavailable", say location data wasn't available.
-
-Schedule:
-- "What's my schedule?" / "Do I have any events?" → read out upcoming events. action: speak.
-- "Show my schedule" → action: navigate to /schedule.
-
-Map / navigation:
-- User wants to GO somewhere physical (e.g. "take me to SM Mall") → maps_navigate.
-- User wants to OPEN the map screen → navigate to /map.
-- Traffic questions when layer is OFF: always turn it on (traffic_on) and answer. Never refuse because layer is off.
-- "Best route avoiding traffic" → traffic_route.
-- Distance/ETA questions → read directly from context. action: speak.
-- Turn/maneuver questions → read from context. action: speak.
-
-Fashion:
-- "Build an outfit" / "pick clothes" / "assemble look" → navigate to /outfit-builder.
-- "Try it on" / "virtual fitting" → navigate to /virtual-mirror.
-- "Take my photo" / "capture" → navigate to /kiosk-logged-in.
-
-Event setup (page_event — only when currentPage is "event-setup"):
-- Collecting event name → page_event set_data field=eventName.
-- Collecting event type → page_event set_data field=eventType.
-- Collecting date/time → page_event set_data field=dateTime (ISO 8601).
-- Collecting location → page_event set_data field=location.
-- User confirms summary → page_event confirm + also emit calendar_save_event.
-
-General:
-- Use conversation history to understand follow-up references ("yes", "that one", "please").
-- Never say "let me check" — all data is already in context.
-- Never tell the user to tap a button — always perform the action yourself.
-- Keep speech brief — it is spoken aloud.
-- CRITICAL: "traffic layer OFF" only means it is not visible. You ALWAYS have traffic data. Always answer traffic questions.
-
-═══ EXAMPLES ═══
-"What time is it?" → { "speech": "It's ${timeState}.", "action": { "type": "speak" } }
-"What's the weather?" → { "speech": "It's currently ${weatherInfo}.", "action": { "type": "speak" } }
-"Take me to SM City Baguio" → { "speech": "Navigating to SM City Baguio now.", "action": { "type": "maps_navigate", "destination": "SM City Baguio" } }
-"Open the map" → { "speech": "Opening the map for you.", "action": { "type": "navigate", "route": "/map" } }
-"I want to build an outfit" → { "speech": "Opening the outfit builder.", "action": { "type": "navigate", "route": "/outfit-builder" } }
-"Show me traffic" → { "speech": "Turning on the traffic layer now.", "action": { "type": "traffic_on" } }
-"Best route avoiding traffic" → { "speech": "Switching to traffic-aware routing.", "action": { "type": "traffic_route" } }
-"Stop navigation" → { "speech": "Stopping navigation.", "action": { "type": "stop_navigation" } }
-"Switch to walking" → { "speech": "Switched to walking mode.", "action": { "type": "set_profile", "profile": "walking" } }
-"Show my schedule" → { "speech": "Here's your schedule.", "action": { "type": "navigate", "route": "/schedule" } }
-"What events do I have?" → { "speech": "${scheduleState}", "action": { "type": "speak" } }
-`;
+  return parseChatWonderResponse(raw).message || "I'm here to help with your style and more.";
 }
+
 
 function pcmToWav(pcm: Buffer, sampleRate = 16000, channels = 1, bitsPerSample = 16): Buffer {
   const dataSize = pcm.length;
@@ -239,41 +181,6 @@ async function transcribe(pcmBuffer: Buffer): Promise<string> {
   return result.text.trim();
 }
 
-async function chat(
-  text: string,
-  ctx: VoiceContext,
-  weatherInfo: string,
-): Promise<{ speech: string; action: VoiceAction }> {
-  const historyMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
-    (ctx.history ?? []).flatMap((h) => [
-      { role: "user"      as const, content: h.user },
-      { role: "assistant" as const, content: JSON.stringify({ speech: h.assistant, action: { type: "speak" } }) },
-    ]);
-
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: buildSystemPrompt(ctx, weatherInfo) },
-      ...historyMessages,
-      { role: "user",   content: text },
-    ],
-    max_tokens: 200,
-    response_format: { type: "json_object" },
-  });
-
-  try {
-    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
-    return {
-      speech: parsed.speech ?? parsed.reply ?? "I didn't catch that. Please try again.",
-      action: parsed.action ?? { type: "speak" },
-    };
-  } catch {
-    return {
-      speech: completion.choices[0]?.message?.content?.trim() ?? "Sorry, try again.",
-      action: { type: "speak" },
-    };
-  }
-}
 
 async function synthesize(text: string): Promise<Buffer> {
   const command = new SynthesizeSpeechCommand({
@@ -304,11 +211,18 @@ export const voiceService = {
       try {
         const w = await weatherService.getWeather(ctx.lat, ctx.lng);
         weatherInfo = `${Math.round(w.temperature)}°C, ${w.condition}, wind ${Math.round(w.windspeed)} km/h, humidity ${w.humidity}%`;
+        if (ctx.userOutlineId) {
+          await prisma.userOutline.update({
+            where: { id: ctx.userOutlineId },
+            data: { weather: w as any },
+          });
+        }
       } catch {}
     }
 
-    const { speech, action } = await chat(transcript, ctx, weatherInfo);
-    const audio = await synthesize(speech);
+    const action = detectIntent(transcript);
+    const speech = await askChatWonder(transcript, ctx, weatherInfo);
+    const audio  = await synthesize(speech);
 
     return { transcript, speech, action, audio };
   },

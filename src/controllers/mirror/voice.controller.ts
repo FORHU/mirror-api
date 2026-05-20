@@ -33,6 +33,8 @@ export default class VoiceController {
       currentDate:          req.query.currentDate           ? decodeURIComponent(req.query.currentDate as string)                      : undefined,
       schedules:            req.query.schedules             ? decodeURIComponent(req.query.schedules as string)                        : undefined,
       currentPage:          req.query.currentPage           ? decodeURIComponent(req.query.currentPage as string)                      : undefined,
+      userOutlineId:        (req.query.userOutlineId as string) || undefined,
+      staffClarification:   (req.query.staffClarification as string) ? decodeURIComponent(req.query.staffClarification as string) : undefined,
       history,
     };
 
