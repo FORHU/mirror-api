@@ -15,16 +15,16 @@ const createSchema = Joi.object({
   metaData:   Joi.object().optional().allow(null),
 });
 
-// PATCH: every field optional. `cosmeticId: null` clears the image link;
+// PATCH: every field optional. `fileUrlId: null` clears the image link;
 // omit the field entirely to leave it alone.
 const updateSchema = Joi.object({
-  name:       Joi.string().optional(),
-  brand:      Joi.string().optional().allow(null, ""),
-  details:    Joi.string().optional().allow(null, ""),
-  cosmeticId: Joi.string().optional().allow(null),
-  hexColor:   Joi.string().pattern(/^#?[0-9a-fA-F]{3,8}$/).optional().allow(null, ""),
-  type:       Joi.string().valid(...Object.values(COSMETIC_TYPE)).optional(),
-  metaData:   Joi.object().optional().allow(null),
+  name:      Joi.string().optional(),
+  brand:     Joi.string().optional().allow(null, ""),
+  details:   Joi.string().optional().allow(null, ""),
+  fileUrlId: Joi.string().optional().allow(null),
+  hexColor:  Joi.string().pattern(/^#?[0-9a-fA-F]{3,8}$/).optional().allow(null, ""),
+  type:      Joi.string().valid(...Object.values(COSMETIC_TYPE)).optional(),
+  metaData:  Joi.object().optional().allow(null),
 });
 
 export default class CosmeticProductController {
