@@ -24,14 +24,12 @@ export default class ChatRepository {
   }
 
   static async createMessage(data: {
-    userId: string;
     conversationId: string;
     message: string;
     role: ChatMessageRole;
   }) {
     return prisma.chatMessage.create({
       data: {
-        userId: data.userId,
         conversationId: data.conversationId,
         message: data.message,
         role: data.role,

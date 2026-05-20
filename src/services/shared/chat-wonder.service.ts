@@ -54,7 +54,6 @@ export default class ChatWonderService {
    */
   static async saveUserMessage(userId: string, conversationId: string, message: string) {
     return ChatRepository.createMessage({
-      userId,
       conversationId,
       message,
       role: "USER",
@@ -66,7 +65,6 @@ export default class ChatWonderService {
    */
   static async saveAIMessage(userId: string, conversationId: string, message: string) {
     return ChatRepository.createMessage({
-      userId,
       conversationId,
       message,
       role: "AI",

@@ -256,13 +256,11 @@ export const voiceService = {
           }
 
           await ChatRepository.createMessage({
-            userId: outline.userId,
             conversationId,
             message: transcript,
             role: "USER",
           });
           await ChatRepository.createMessage({
-            userId: outline.userId,
             conversationId,
             message: speech,
             role: "AI",

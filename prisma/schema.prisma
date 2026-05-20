@@ -16,34 +16,37 @@ model User {
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  homeLocationLat  Float?
-  homeLocationLng  Float?
+
+  homeLocationLat Float?
+  homeLocationLng Float?
 
   userMeasurement Json? // For detailed { height: 90, wight: 70, usualSize: "M" }
   avatarId        String?       @unique
   avatar          File?         @relation("UserAvatar", fields: [avatarId], references: [id])
-  sessions        Session[]
   outlines        UserOutline[]
   outfits         Outfit[]
 
   conversations   Conversation[]
-  chatMessages    ChatMessage[]
+  sessions        Session[]
   emotionMemories EmotionMemory[]
 
   userGarments Garment[] @relation("UserGarments")
 }
 
-model ChatSession {
-  id           String   @id @default(cuid())
-  userId       String
-  platform     String
-  expiresAt    DateTime
-  accessToken  String
-  refreshToken String   @unique
+model Session {
+  id                String   @id @default(cuid())
+  userId            String
+  platform          String
+  expiresAt         DateTime
+  accessToken       String
+  refreshToken      String   @unique
+  provider          String?
+  providerUserId    String?
+  providerAvatarUrl String?
 
-  createdAt DateTime    @default(now())
-  user      UserOutline @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 model UserOutline {
@@ -62,15 +65,13 @@ model UserOutline {
   startTime  DateTime? // Parsed: Sunday @ 6pm
 
   // Relationships
-  cosmetics Cosmetics[]
+  cosmeticRecommendations CosmeticRecommendation[]
 
   // 1-to-1 with Calendar
   calendarId String?   @unique
   calendar   Calendar? @relation(fields: [calendarId], references: [id])
 
   userMap UserMap?
-
-  chatSessions ChatSession[]
 
   weather WeatherSnapshot?
 
@@ -105,26 +106,8 @@ model WeatherSnapshot {
   recordedAt DateTime      @default(now())
 
   userOutline UserOutline @relation(fields: [userOutlineId], references: [id], onDelete: Cascade)
-}
 
-enum WeatherType {
-  HOT_HUMID
-  HOT_DRY
-  COLD_WET
-  COLD_DRY
-  RAINY
-  MILD
-}
-
-enum WeatherIntensity {
-  LOW
-  MEDIUM
-  HIGH
-}
-
-enum WeatherSource {
-  API
-  SENTINEL
+  @@index([userOutlineId])
 }
 
 model Conversation {
@@ -145,19 +128,16 @@ model Conversation {
 
 model ChatMessage {
   id             String          @id @default(cuid())
-  userId         String
   createdAt      DateTime        @default(now())
   message        String
   mediaUrl       String?
   conversationId String?
   role           ChatMessageRole @default(USER)
   conversation   Conversation?   @relation(fields: [conversationId], references: [id])
-  user           User            @relation(fields: [userId], references: [id])
   embedding      Embedding?
   emotionMemory  EmotionMemory?
 
   @@index([conversationId, createdAt])
-  @@index([userId, conversationId])
 }
 
 model Embedding {
@@ -195,16 +175,33 @@ model UserMap {
   createdAt DateTime @default(now())
 }
 
-model Cosmetics {
-  id       String  @id @default(cuid())
-  name     String
-  brand    String?
-  type     String? // Lipstick, Eye Shadow, etc.
-  imageUrl String?
-  hexColor String? // For UI color swatches
+model CosmeticProduct {
+  id        String         @id @default(cuid())
+  name      String
+  brand     String?
+  imageUrl  String?
+  hexColor  String? // For UI color swatches
+  metaData  Json?
 
-  userOutlineId String?
-  userOutline   UserOutline? @relation(fields: [userOutlineId], references: [id])
+  type      COSMETIC_TYPE?
+  createdAt DateTime       @default(now())
+
+  recommendations CosmeticRecommendation[]
+}
+
+model CosmeticRecommendation {
+  id String @id @default(cuid())
+
+  userOutlineId String
+  userOutline   UserOutline @relation(fields: [userOutlineId], references: [id])
+
+  cosmeticProductId String
+  cosmeticProduct   CosmeticProduct @relation(fields: [cosmeticProductId], references: [id])
+
+  score  Float?
+  rank   Int?
+  reason String?
+  signals Json?
 
   createdAt DateTime @default(now())
 }
@@ -223,20 +220,7 @@ model Calendar {
   createdAt DateTime @default(now())
 }
 
-model Session {
-  id                String   @id @default(cuid())
-  userId            String
-  platform          String
-  expiresAt         DateTime
-  accessToken       String
-  refreshToken      String   @unique
-  provider          String?
-  providerUserId    String?
-  providerAvatarUrl String?
 
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-}
 
 model File {
   id           String  @id @default(cuid())
@@ -529,4 +513,53 @@ enum SILHOUETTE {
   /// Strong and defined shape with rigid form.
   /// Example: Blazer, tailored coat, structured jacket.
   Structured
+}
+
+enum COSMETIC_TYPE {
+  NONE
+
+  // Lips
+  LIPSTICK
+  LIP_TINT
+  LIP_GLOSS
+
+  // Face
+  FOUNDATION
+  CONCEALER
+  POWDER
+  BLUSH
+  HIGHLIGHTER
+  CONTOUR
+
+  // Eyes
+  EYESHADOW
+  EYELINER
+  MASCARA
+
+  // Brows
+  BROW
+
+  // Base / Prep / Finish
+  PRIMER
+  SETTING_SPRAY
+}
+
+enum WeatherType {
+  HOT_HUMID
+  HOT_DRY
+  COLD_WET
+  COLD_DRY
+  RAINY
+  MILD
+}
+
+enum WeatherIntensity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum WeatherSource {
+  API
+  SENTINEL
 }
