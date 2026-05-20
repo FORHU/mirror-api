@@ -17,6 +17,8 @@ import devTokenHandler from "../controllers/mirror/dev.controller";
 import mirrorGenerationRoute from './shared/generation.route';
 import chatWonderRoute from './shared/chat-wonder.route';
 import outlineRoute from './shared/outline.route';
+import cosmeticProductRoute from './shared/cosmetic-product.route';
+import cosmeticRecommendationRoute from './shared/cosmetic-recommendation.route';
 
 const router = express.Router();
 
@@ -41,6 +43,8 @@ router.use('/remote/file-uploads', mirrorFileUploadRoute);
 router.use('/remote/garments', mirrorGarmentRoute);
 router.use('/remote/outfits', mirrorOutfitRoute);
 router.use('/remote/outlines', outlineRoute);
+router.use('/remote/cosmetic-products', cosmeticProductRoute);
+router.use('/remote/cosmetic-recommendations', cosmeticRecommendationRoute);
 
 // Mirror endpoints
 router.use('/mirror/try-on', mirrorTryOnRoute);
@@ -52,5 +56,7 @@ router.use("/mirror/weather", mirrorWeatherRoute);
 router.use("/mirror/voice", mirrorVoiceRoute);
 router.use('/mirror/chat-wonder', chatWonderRoute);
 router.use('/mirror/outlines', outlineRoute);
+router.use('/mirror/cosmetic-products', cosmeticProductRoute);
+router.use('/mirror/cosmetic-recommendations', cosmeticRecommendationRoute);
 
 export default router;
