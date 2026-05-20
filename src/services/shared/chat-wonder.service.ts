@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { CHAT_WONDER_API_URL } from "../../config";
 import logger from "../../utils/logger";
 import CacheUtil from "../../utils/cache.util";

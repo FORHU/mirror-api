@@ -21,6 +21,7 @@ import { streamChat } from "../../utils/chat-wonder-stream";
 import { parseChatWonderResponse } from "../../utils/parse-response.util";
 import logger from "../../utils/logger";
 import ChatRepository from "../../repositories/chat.repository";
+import WeatherSnapshotService from "./weather-snapshot.service";
 
 const VOICE_REGION = process.env.AWS_VOICE_REGION || "eu-west-1";
 
@@ -217,6 +218,13 @@ export const voiceService = {
             where: { id: ctx.userOutlineId },
             data: { weather: w as any },
           });
+          WeatherSnapshotService.ingestObservation(ctx.userOutlineId, {
+            temperature:      Math.round(w.temperature),
+            humidity:         Math.round(w.humidity),
+            uvIndex:          Math.round(w.uvIndex),
+            precipitationProb: Math.round(w.precipitationProb),
+            windSpeed:        Math.round(w.windspeed),
+          }).catch((err) => logger.error(`[VoiceService] Weather snapshot failed: ${err.message}`));
         }
       } catch {}
     }
