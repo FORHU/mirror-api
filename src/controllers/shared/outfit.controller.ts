@@ -16,6 +16,8 @@ import {
 import { emitToKiosk } from "../../utils/socket.util";
 import logger from "../../utils/logger";
 import { CATEGORY, DESIGN_TYPE, FITTING_SLOT, GARMENT_GENDER, LAYER_LEVEL } from "@prisma/client";
+import { responseSuccess } from "../../helpers/response.helper";
+import { pageFromRepo } from "../../helpers/pagination.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
 const unauthorizedError = () => ({ status: 401, message: "Authentication required" });
@@ -76,12 +78,8 @@ export default class OutfitController {
   static async index(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user?.id;
-      const data = await OutfitService.getUserOutfits(userId, req.query);
-      const hydratedData = {
-        ...data,
-        data: await FileService.attachPresignedUrls(data.data)
-      };
-      res.json({ status: "success", data: hydratedData });
+      const result = await OutfitService.getUserOutfits(userId, req.query);
+      responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
       next(err);
     }
@@ -96,12 +94,8 @@ export default class OutfitController {
   static async indexNeedingImage(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user?.id;
-      const data = await OutfitService.getOutfitsNeedingImage(userId, req.query);
-      const hydratedData = {
-        ...data,
-        data: await FileService.attachPresignedUrls(data.data)
-      };
-      res.json({ status: "success", data: hydratedData });
+      const result = await OutfitService.getOutfitsNeedingImage(userId, req.query);
+      responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
       next(err);
     }
@@ -115,12 +109,8 @@ export default class OutfitController {
   static async indexComplete(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user?.id;
-      const data = await OutfitService.getOutfitsWithUploadedImage(userId, req.query);
-      const hydratedData = {
-        ...data,
-        data: await FileService.attachPresignedUrls(data.data)
-      };
-      res.json({ status: "success", data: hydratedData });
+      const result = await OutfitService.getOutfitsWithUploadedImage(userId, req.query);
+      responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
       next(err);
     }
@@ -130,8 +120,7 @@ export default class OutfitController {
     try {
       const userId = (req as any).user?.id;
       const data = await OutfitService.getOutfitById(req.params.id, userId);
-      const hydratedData = await FileService.attachPresignedUrls(data);
-      res.json({ status: "success", data: hydratedData });
+      responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
     }
@@ -222,9 +211,8 @@ export default class OutfitController {
       // upload entirely so we don't orphan an S3 object either.
       const existing = await findExistingComposition(userId, finalValue.items);
       if (existing) {
-        const hydratedExisting = await FileService.attachPresignedUrls(existing);
         logger.info(`Outfit reused (same composition): ${existing.id}`);
-        return res.status(200).json({ status: "success", data: hydratedExisting });
+        return responseSuccess(res, 200, existing);
       }
 
       if (req.file) {
@@ -234,9 +222,8 @@ export default class OutfitController {
       }
 
       const data = await OutfitService.createOutfit(userId, finalValue);
-      const hydratedData = await FileService.attachPresignedUrls(data);
       logger.info(`Outfit created: ${data.id}`);
-      res.status(201).json({ status: "success", data: hydratedData });
+      responseSuccess(res, 201, data);
     } catch (err) {
       next(err);
     }
@@ -274,8 +261,7 @@ export default class OutfitController {
       }
 
       const data = await OutfitService.updateOutfit(req.params.id, userId, finalValue);
-      const hydratedData = await FileService.attachPresignedUrls(data);
-      res.json({ status: "success", data: hydratedData });
+      responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
     }
@@ -285,7 +271,7 @@ export default class OutfitController {
     try {
       const userId = (req as any).user?.id;
       const data = await OutfitService.deleteOutfit(req.params.id, userId);
-      res.json({ status: "success", data });
+      responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
     }
@@ -338,25 +324,24 @@ export default class OutfitController {
       // different AI text).
       const existing = await findExistingComposition(userId, items);
       if (existing) {
-        const hydratedExisting = await FileService.attachPresignedUrls(existing);
         logger.info(`[OutfitEvaluate] Reused existing composition: ${existing.id}`);
-        if (kioskId) emitToKiosk(kioskId, "outfit_evaluated", { fileId: null, outfit: hydratedExisting, reused: true });
-        return res.status(200).json({ status: "success", data: hydratedExisting });
+        if (kioskId) emitToKiosk(kioskId, "outfit_evaluated", { fileId: null, outfit: existing, reused: true });
+        return responseSuccess(res, 200, existing);
       }
 
       const { file: fileRecord, imageUrl: finalImageUrl } =
         await OutfitService.uploadOutfitFile(req.file, imageUrl);
 
-      res.status(202).json({
-        status: "success",
-        statusCode: 202,
-        data: {
+      responseSuccess(
+        res,
+        202,
+        {
           fileId: fileRecord?.id || null,
           imageUrl: finalImageUrl,
           kioskId: kioskId || null,
         },
-        message: "Upload received. Outfit evaluation in progress.",
-      });
+        "Upload received. Outfit evaluation in progress.",
+      );
 
       const garmentIds = items.map((i: any) => i.garmentId).filter(Boolean);
 
@@ -413,12 +398,7 @@ export default class OutfitController {
 
       const { prompt, kioskId } = value;
 
-      res.status(202).json({
-        status: "success",
-        statusCode: 202,
-        data: { kioskId: kioskId || null },
-        message: "Composing outfit from wardrobe.",
-      });
+      responseSuccess(res, 202, { kioskId: kioskId || null }, "Composing outfit from wardrobe.");
 
       (async () => {
         try {
@@ -472,16 +452,16 @@ export default class OutfitController {
       const { file: fileRecord, imageUrl: finalImageUrl } =
         await OutfitService.uploadOutfitFile(req.file, imageUrl);
 
-      res.status(202).json({
-        status: "success",
-        statusCode: 202,
-        data: {
+      responseSuccess(
+        res,
+        202,
+        {
           fileId: fileRecord?.id || null,
           imageUrl: finalImageUrl,
           kioskId: kioskId || null,
         },
-        message: "Upload received. Hybrid outfit match in progress.",
-      });
+        "Upload received. Hybrid outfit match in progress.",
+      );
 
       (async () => {
         try {
@@ -545,11 +525,10 @@ export default class OutfitController {
         userId,
       });
 
-      const hydratedData = await FileService.attachPresignedUrls(outfit);
       if (value.kioskId) emitToKiosk(value.kioskId, "outfit_recommended", { outfit });
       logger.info(`[OutfitRecommend] Created outfit ${outfit.id} from category ${value.category}`);
 
-      res.status(201).json({ status: "success", data: hydratedData });
+      responseSuccess(res, 201, outfit);
     } catch (err) {
       next(err);
     }

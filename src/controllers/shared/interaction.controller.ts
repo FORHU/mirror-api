@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import InteractionService from "../../services/shared/interaction.service";
+import { responseSuccess, responseError } from "../../helpers/response.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -15,10 +16,10 @@ export default class InteractionController {
     try {
       const { outfitId } = req.query;
       if (!outfitId) {
-        return res.status(400).json({ status: "error", message: "outfitId query param is required" });
+        return responseError(res, 400, "outfitId query param is required");
       }
       const data = await InteractionService.getOutfitInteractions(outfitId as string, req.query);
-      res.json({ status: "success", data });
+      responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
     }
@@ -30,7 +31,7 @@ export default class InteractionController {
 
     try {
       const data = await InteractionService.logInteraction(value);
-      res.status(201).json({ status: "success", data });
+      responseSuccess(res, 201, data);
     } catch (err) {
       next(err);
     }

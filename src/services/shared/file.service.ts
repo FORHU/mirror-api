@@ -6,137 +6,58 @@ import logger from "../../utils/logger";
 import { S3_CDN_URL, S3_BUCKET_NAME } from "../../config";
 import { s3Client } from "../../utils/s3";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 
 export default class FileService {
-  /**
-   * Generates a presigned URL for an S3 object
-   */
-  static async getPresignedUrl(key: string, bucket: string = S3_BUCKET_NAME) {
-    try {
-      const command = new GetObjectCommand({
-        Bucket: bucket,
-        Key: key,
-      });
-      
-      // Default to 1 hour (3600 seconds)
-      return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-    } catch (error) {
-      logger.error("Error generating presigned URL:", error);
-      return null;
-    }
-  }
-
-  /**
-   * Recursively traverses an object and replaces S3 file URLs with presigned ones.
-   * This ensures that any "imageUrl" or "fileUrl" coming from S3 is valid and temporary.
-   */
-  static async attachPresignedUrls(data: any): Promise<any> {
-    if (!data) return data;
-
-    if (Array.isArray(data)) {
-      return Promise.all(data.map((item) => this.attachPresignedUrls(item)));
-    }
-
-    if (typeof data === "object") {
-      const result = { ...data };
-
-      // Case 1: This is a File object from our database
-      if (result.provider === "S3" && result.path) {
-        const signedUrl = await this.getPresignedUrl(result.path, result.bucket || undefined);
-        if (signedUrl) {
-          result.fileUrl = signedUrl;
-        }
-      }
-
-      // Case 2: Recursively process all properties (handles nested files/items)
-      for (const key in result) {
-        if (result[key] && typeof result[key] === "object") {
-          result[key] = await this.attachPresignedUrls(result[key]);
-        }
-      }
-
-      // Case 3: Convenience fix for Garments/Outfits that have an "imageUrl" 
-      // but also include their "file" relation. Use the signed fileUrl.
-      if (result.file && result.file.fileUrl) {
-        result.imageUrl = result.file.fileUrl;
-      }
-
-      return result;
-    }
-
-    return data;
-  }
 
   /**
    * Process an uploaded file and save its metadata
    */
   static async uploadFile(file: any, manualMetaData: any = {}) {
     try {
-      const { filename, originalname, mimetype, size, path: localPath, location, key, bucket } = file;
+      const { originalname, mimetype, size, location, key, bucket } = file;
 
-      // multer-s3 v3 + newer AWS SDK sometimes return `location` as undefined
-      // even on successful S3 uploads (e.g. single-part PUTs). Detect S3 by
-      // `bucket && key` instead, which are always populated by multer-s3.
-      const isS3 = Boolean(bucket && key);
-
-      let buffer: Buffer;
-
-      // 1. Get buffer for analysis
-      if (isS3) {
-        const command = new GetObjectCommand({
-          Bucket: bucket,
-          Key: key,
-        });
-        const response = await s3Client.send(command);
-        const byteArray = await response.Body?.transformToByteArray();
-        buffer = Buffer.from(byteArray!);
-      } else {
-        const fs = require("fs/promises");
-        buffer = await fs.readFile(localPath);
+      if (!bucket || !key) {
+        throw new Error("uploadFile expects a multer-s3 file with bucket + key");
       }
 
-      // 2. Analyze image with Sharp
+      const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+      const response = await s3Client.send(command);
+      const byteArray = await response.Body?.transformToByteArray();
+      const buffer = Buffer.from(byteArray!);
+
       const image = sharp(buffer);
       const metadata = await image.metadata();
       const stats = await image.stats();
-      
+
       const autoDominantColor = this.rgbToHex(
         Math.round(stats.channels[0].mean),
         Math.round(stats.channels[1].mean),
         Math.round(stats.channels[2].mean)
       );
 
-      // 3. Merge Manual Metadata with Auto-Detected (Manual wins)
       const finalMetaData = {
         width: manualMetaData.width || metadata.width,
         height: manualMetaData.height || metadata.height,
         dominantColor: manualMetaData.dominantColor || autoDominantColor,
         isAlpha: manualMetaData.isAlpha !== undefined ? manualMetaData.isAlpha : metadata.hasAlpha,
         format: manualMetaData.format || metadata.format,
-        ...manualMetaData // Include any other custom fields
+        ...manualMetaData
       };
 
-      // 5. Construct URL. Prefer CDN; fall back to multer-s3's location or a
-      // bucket+key derived URL when location isn't returned by the SDK.
-      const s3DirectUrl =
-        location || (isS3 ? `https://${bucket}.s3.amazonaws.com/${key}` : null);
-      const finalUrl = isS3
-        ? (S3_CDN_URL ? `${S3_CDN_URL}/${key}` : s3DirectUrl)
-        : `/uploads/${filename}`;
+      const s3DirectUrl = location || `https://${bucket}.s3.amazonaws.com/${key}`;
+      const finalUrl = S3_CDN_URL ? `${S3_CDN_URL}/${key}` : s3DirectUrl;
 
-      // 6. Create record in DB
       const fileRecord = await FileRepo.create({
-        filename: filename || key,
+        filename: key,
         originalName: originalname,
         fileUrl: finalUrl,
         mimeType: mimetype,
-        extension: path.extname(originalname || filename || key).replace(".", ""),
+        extension: path.extname(originalname || key).replace(".", ""),
         size,
-        provider: isS3 ? "S3" : "LOCAL",
-        bucket: bucket,
-        path: key || localPath,
+        provider: "S3",
+        bucket,
+        path: key,
         metaData: finalMetaData,
       });
 

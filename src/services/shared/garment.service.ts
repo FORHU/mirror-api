@@ -11,9 +11,46 @@ export default class GarmentService {
     if (garmentType) {
       filters.garmentType = { hasSome: Array.isArray(garmentType) ? garmentType : [garmentType] };
     }
+    
     if (fittingSlot) {
-      filters.fittingSlot = { hasSome: Array.isArray(fittingSlot) ? fittingSlot : [fittingSlot] };
+      const SLOT_MAP: Record<string, FITTING_SLOT> = {
+        headgarments: FITTING_SLOT.HeadGarment,
+        headgarment: FITTING_SLOT.HeadGarment,
+        glasses: FITTING_SLOT.Glasses,
+        earrings: FITTING_SLOT.Earrings,
+        uppergarments: FITTING_SLOT.UpperGarment,
+        uppergarment: FITTING_SLOT.UpperGarment,
+        lowergarments: FITTING_SLOT.LowerGarment,
+        lowergarment: FITTING_SLOT.LowerGarment,
+        fullgarments: FITTING_SLOT.FullGarment,
+        fullgarment: FITTING_SLOT.FullGarment,
+        footgarments: FITTING_SLOT.FootGarment,
+        footgarment: FITTING_SLOT.FootGarment,
+        lefthandaccessories: FITTING_SLOT.LeftHandAccessory,
+        lefthandaccessory: FITTING_SLOT.LeftHandAccessory,
+        righthandaccessories: FITTING_SLOT.RightHandAccessory,
+        righthandaccessory: FITTING_SLOT.RightHandAccessory,
+        neckaccessories: FITTING_SLOT.NeckAccessory,
+        neckaccessory: FITTING_SLOT.NeckAccessory,
+        waistaccessories: FITTING_SLOT.WaistAccessory,
+        waistaccessory: FITTING_SLOT.WaistAccessory,
+        none: FITTING_SLOT.None,
+      };
+
+      const rawSlots = Array.isArray(fittingSlot) ? fittingSlot : [fittingSlot];
+      const mappedSlots = rawSlots
+        .map((s) => {
+          if (typeof s !== "string") return null;
+          const clean = s.trim().toLowerCase();
+          return SLOT_MAP[clean] || (Object.values(FITTING_SLOT) as string[]).find((val) => val.toLowerCase() === clean);
+        })
+        .filter((s): s is FITTING_SLOT => Boolean(s));
+
+      if (mappedSlots.length > 0) {
+        filters.fittingSlot = { hasSome: mappedSlots };
+      }
     }
+
     if (category) {
       filters.category = { hasSome: Array.isArray(category) ? category : [category] };
     }

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import AuthSvc from "../../services/remote/auth.service";
 import { emitToKiosk } from "../../utils/socket.util";
+import { responseSuccess } from "../../helpers/response.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -27,11 +28,7 @@ export default class AuthController {
         emitToKiosk(value.kioskId, "kiosk_login", data);
       }
 
-      return res.json({
-        status: "success",
-        data,
-        message: "Login successful",
-      });
+      return responseSuccess(res, 200, data, "Login successful");
     } catch (err) {
       next(err);
     }
@@ -57,11 +54,7 @@ export default class AuthController {
         emitToKiosk(value.kioskId, "kiosk_login", data);
       }
 
-      return res.json({
-        status: "success",
-        data,
-        message: "Google login successful",
-      });
+      return responseSuccess(res, 200, data, "Google login successful");
     } catch (err) {
       next(err);
     }
@@ -80,7 +73,7 @@ export default class AuthController {
 
     try {
       const data = await AuthSvc.refreshToken(value.refreshToken);
-      return res.json({ status: "success", data });
+      return responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
     }
@@ -100,11 +93,7 @@ export default class AuthController {
     try {
       const userId = (req as any).user?.id;
       const data = await AuthSvc.logout(userId, value.refreshToken);
-      return res.json({
-        status: "success",
-        data,
-        message: "Logged out successfully",
-      });
+      return responseSuccess(res, 200, data, "Logged out successfully");
     } catch (err) {
       next(err);
     }
