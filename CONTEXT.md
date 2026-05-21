@@ -2,6 +2,16 @@
 
 The canonical vocabulary for the mirror-api domain. Implementation details belong elsewhere — this file is for terms only.
 
+## Language
+
+**Redis**:
+Ephemeral runtime store for kiosk pairing locks, Socket.IO scaling, and hot-path cache. Not the system of record for domain entities (those live in PostgreSQL).
+_Avoid_: Treating Redis data as durable user history.
+
+**Environment-specific Redis credentials**:
+Staging and production each connect to their own Redis host; connection secrets (host, port, password) are configured per GitHub Environment, not shared across staging and production. Staging requires a password; production may omit it when Redis has no auth.
+_Avoid_: One global `REDIS_*` secret pair used for both environments.
+
 ---
 
 ## UserOutline
