@@ -2,13 +2,13 @@ name: Deploy
 
 on:
   push:
-    branches: [main, staging]
+    branches: [main]
 
 jobs:
   deploy:
     name: Build, Push & Deploy
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    environment: production
 
     permissions:
       id-token: write  # required for OIDC AWS auth
