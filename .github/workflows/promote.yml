@@ -1,0 +1,34 @@
+name: Promote staging → main
+
+on:
+  push:
+    branches: [staging]
+
+jobs:
+  promote:
+    name: Open PR & enable auto-merge
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create PR if not exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh pr list --head staging --base main --json number --jq '.[0].number')
+          if [ -z "$existing" ]; then
+            gh pr create \
+              --base main \
+              --head staging \
+              --title "chore: promote staging → main" \
+              --body "Automated promotion from staging. Merges automatically once CI passes."
+          fi
+
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge staging --merge --auto
