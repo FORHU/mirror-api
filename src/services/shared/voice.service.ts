@@ -1,7 +1,10 @@
-import OpenAI, { toFile } from "openai";
 import axios from "axios";
+import { PollyClient, SynthesizeSpeechCommand, Engine, VoiceId, OutputFormat } from "@aws-sdk/client-polly";
+import { TranscribeStreamingClient, StartStreamTranscriptionCommand, LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 import {
-  OPENAI_API_KEY,
+  AWS_VOICE_REGION,
+  AWS_ACCESS_KEY_ID,
+  AWS_SECRET_ACCESS_KEY,
   CHAT_WONDER_API_URL,
 } from "../../config";
 import { weatherService } from "./weather.service";
@@ -11,8 +14,6 @@ import { parseChatWonderResponse } from "../../utils/parse-response.util";
 import logger from "../../utils/logger";
 import ChatRepository from "../../repositories/chat.repository";
 import WeatherSnapshotService from "./weather-snapshot.service";
-
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 export interface VoiceContext {
   lat?: number;
@@ -145,41 +146,56 @@ async function askChatWonder(transcript: string, ctx: VoiceContext, weatherInfo:
 }
 
 
-function pcmToWav(pcm: Buffer, sampleRate = 16000, channels = 1, bitsPerSample = 16): Buffer {
-  const dataSize = pcm.length;
-  const header   = Buffer.alloc(44);
-  header.write("RIFF", 0);
-  header.writeUInt32LE(dataSize + 36, 4);
-  header.write("WAVE", 8);
-  header.write("fmt ", 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(channels, 22);
-  header.writeUInt32LE(sampleRate, 24);
-  header.writeUInt32LE(sampleRate * channels * (bitsPerSample / 8), 28);
-  header.writeUInt16LE(channels * (bitsPerSample / 8), 32);
-  header.writeUInt16LE(bitsPerSample, 34);
-  header.write("data", 36);
-  header.writeUInt32LE(dataSize, 40);
-  return Buffer.concat([header, pcm]);
-}
+const awsCredentials = { accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY };
+const pollyClient = new PollyClient({ region: AWS_VOICE_REGION, credentials: awsCredentials });
+const transcribeClient = new TranscribeStreamingClient({ region: AWS_VOICE_REGION, credentials: awsCredentials });
 
 async function transcribe(pcmBuffer: Buffer): Promise<string> {
-  const file = await toFile(pcmToWav(pcmBuffer), "audio.wav", { type: "audio/wav" });
-  const result = await openai.audio.transcriptions.create({ model: "whisper-1", file, language: "en" });
-  return result.text.trim();
+  async function* audioStream() {
+    // Transcribe Streaming requires chunks ≤ 32 KB
+    const CHUNK = 32000;
+    for (let offset = 0; offset < pcmBuffer.length; offset += CHUNK) {
+      yield { AudioEvent: { AudioChunk: pcmBuffer.subarray(offset, offset + CHUNK) } };
+    }
+  }
+
+  const cmd = new StartStreamTranscriptionCommand({
+    LanguageCode: LanguageCode.EN_US,
+    MediaEncoding: "pcm",
+    MediaSampleRateHertz: 16000,
+    AudioStream: audioStream(),
+  });
+
+  const response = await transcribeClient.send(cmd);
+  const parts: string[] = [];
+
+  for await (const event of response.TranscriptResultStream!) {
+    const results = event.TranscriptEvent?.Transcript?.Results ?? [];
+    for (const result of results) {
+      if (!result.IsPartial) {
+        const alt = result.Alternatives?.[0]?.Transcript;
+        if (alt) parts.push(alt);
+      }
+    }
+  }
+
+  return parts.join(" ").trim();
 }
 
-
 async function synthesize(text: string): Promise<Buffer> {
-  const response = await openai.audio.speech.create({
-    model: "tts-1",
-    voice: "nova",
-    input: text,
-    response_format: "mp3",
+  const cmd = new SynthesizeSpeechCommand({
+    Engine: Engine.NEURAL,
+    VoiceId: VoiceId.Joanna,
+    OutputFormat: OutputFormat.MP3,
+    Text: text,
   });
-  const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+
+  const response = await pollyClient.send(cmd);
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of response.AudioStream as AsyncIterable<Uint8Array>) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 export const voiceService = {
