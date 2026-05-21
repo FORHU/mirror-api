@@ -93,17 +93,30 @@ jobs:
           EOF
           chmod 600 /tmp/mirror-api.env
 
+      - name: Copy env file to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host:     ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          source:   /tmp/mirror-api.env
+          target:   /home/ec2-user/
+
       - name: Deploy to EC2
-        run: |
-          echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/key && chmod 600 /tmp/key
-          scp -i /tmp/key -o StrictHostKeyChecking=no /tmp/mirror-api.env ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/mirror-api.env
-          ssh -i /tmp/key -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_HOST }} \
-            "set -e
-             chmod 600 /home/ec2-user/mirror-api.env
-             aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin '${{ steps.login-ecr.outputs.registry }}'
-             docker pull '${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }}'
-             docker stop mirror-api 2>/dev/null || true
-             docker rm mirror-api 2>/dev/null || true
-             docker run -d --name mirror-api --restart unless-stopped --env-file /home/ec2-user/mirror-api.env -p 3007:3007 '${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }}'
-             docker image prune -f"
-          rm -f /tmp/key /tmp/mirror-api.env
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            chmod 600 /home/ec2-user/mirror-api.env
+            aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+            docker pull ${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }}
+            docker stop mirror-api 2>/dev/null || true
+            docker rm   mirror-api 2>/dev/null || true
+            docker run -d --name mirror-api --restart unless-stopped \
+              --env-file /home/ec2-user/mirror-api.env \
+              -p 3007:3007 \
+              ${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }}
+            docker image prune -f
