@@ -14,17 +14,17 @@ jobs:
     environment: production
 
     permissions:
-      id-token: write  # required for OIDC AWS auth
       contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id:     ${{ secrets.DEPLOY_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.DEPLOY_AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-1
 
       - name: Login to Amazon ECR
@@ -40,24 +40,72 @@ jobs:
 
       - name: Write env file
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL:          ${{ secrets.DATABASE_URL }}
+          REDIS_HOST:            ${{ secrets.REDIS_HOST }}
+          REDIS_PORT:            ${{ secrets.REDIS_PORT }}
+          REDIS_PASSWORD:        ${{ secrets.REDIS_PASSWORD }}
+          REDIS_TTL_SECONDS:     ${{ secrets.REDIS_TTL_SECONDS }}
+          ACCESS_TOKEN_SECRET:   ${{ secrets.ACCESS_TOKEN_SECRET }}
+          ACCESS_TOKEN_EXPIRY:   ${{ secrets.ACCESS_TOKEN_EXPIRY }}
+          REFRESH_TOKEN_SECRET:  ${{ secrets.REFRESH_TOKEN_SECRET }}
+          OPENAI_API_KEY:        ${{ secrets.OPENAI_API_KEY }}
+          AWS_REGION:            ${{ secrets.AWS_REGION }}
+          AWS_VOICE_REGION:      ${{ secrets.AWS_VOICE_REGION }}
+          AWS_ACCESS_KEY_ID:     ${{ secrets.APP_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.APP_AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_BUCKET_NAME:    ${{ secrets.AWS_S3_BUCKET_NAME }}
+          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
+          MAPBOX_SECRET_TOKEN:   ${{ secrets.MAPBOX_SECRET_TOKEN }}
+          ORS_API_KEY:           ${{ secrets.ORS_API_KEY }}
+          ALLOWED_ORIGINS:       ${{ secrets.ALLOWED_ORIGINS }}
+          KIOSK_DEVICE_SECRET:   ${{ secrets.KIOSK_DEVICE_SECRET }}
+          FASHN_API_KEY:         ${{ secrets.FASHN_API_KEY }}
+          FASHN_BASE_URL:        ${{ secrets.FASHN_BASE_URL }}
+          FASHN_VIDEO_MODEL:     ${{ secrets.FASHN_VIDEO_MODEL }}
+          CHAT_WONDER_API_URL:   ${{ secrets.CHAT_WONDER_API_URL }}
+          NODE_ENV:              production
+          PORT:                  3007
         run: |
           cat > /tmp/mirror-api.env << EOF
           DATABASE_URL=${DATABASE_URL}
+          REDIS_HOST=${REDIS_HOST}
+          REDIS_PORT=${REDIS_PORT}
+          REDIS_PASSWORD=${REDIS_PASSWORD}
+          REDIS_TTL_SECONDS=${REDIS_TTL_SECONDS}
+          ACCESS_TOKEN_SECRET=${ACCESS_TOKEN_SECRET}
+          ACCESS_TOKEN_EXPIRY=${ACCESS_TOKEN_EXPIRY}
+          REFRESH_TOKEN_SECRET=${REFRESH_TOKEN_SECRET}
+          OPENAI_API_KEY=${OPENAI_API_KEY}
+          AWS_REGION=${AWS_REGION}
+          AWS_VOICE_REGION=${AWS_VOICE_REGION}
+          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+          AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME}
+          GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+          MAPBOX_SECRET_TOKEN=${MAPBOX_SECRET_TOKEN}
+          ORS_API_KEY=${ORS_API_KEY}
+          ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+          KIOSK_DEVICE_SECRET=${KIOSK_DEVICE_SECRET}
+          FASHN_API_KEY=${FASHN_API_KEY}
+          FASHN_BASE_URL=${FASHN_BASE_URL}
+          FASHN_VIDEO_MODEL=${FASHN_VIDEO_MODEL}
+          CHAT_WONDER_API_URL=${CHAT_WONDER_API_URL}
+          NODE_ENV=${NODE_ENV}
+          PORT=${PORT}
           EOF
           chmod 600 /tmp/mirror-api.env
 
       - name: Deploy to EC2
         run: |
           echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/key && chmod 600 /tmp/key
-          scp -i /tmp/key -o StrictHostKeyChecking=no /tmp/mirror-api.env ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/mirror-api.env
-          ssh -i /tmp/key -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} \
+          scp -i /tmp/key -o StrictHostKeyChecking=no /tmp/mirror-api.env ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/mirror-api.env
+          ssh -i /tmp/key -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_HOST }} \
             "set -e
-             chmod 600 /home/ubuntu/mirror-api.env
+             chmod 600 /home/ec2-user/mirror-api.env
              aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin '${{ steps.login-ecr.outputs.registry }}'
              docker pull '${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }}'
              docker stop mirror-api 2>/dev/null || true
              docker rm mirror-api 2>/dev/null || true
-             docker run -d --name mirror-api --restart unless-stopped --env-file /home/ubuntu/mirror-api.env -p 3007:3007 '${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }}'
+             docker run -d --name mirror-api --restart unless-stopped --env-file /home/ec2-user/mirror-api.env -p 3007:3007 '${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }}'
              docker image prune -f"
           rm -f /tmp/key /tmp/mirror-api.env
