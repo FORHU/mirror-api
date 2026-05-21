@@ -26,9 +26,17 @@ import {
 } from "../../utils/openai/evaluate-outfit.util";
 
 export default class OutfitService {
-  static async getUserOutfits(userId?: string, query: Record<string, string | undefined> = {}) {
-    const { page, limit } = query;
-    return OutfitRepo.findByUserId(userId, page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
+  static async getUserOutfits(
+    userId?: string | null,
+    query: Record<string, string | undefined> = {}
+  ) {
+    const { page, limit, systemOnly } = query;
+    const effectiveUserId = systemOnly === "true" ? null : userId;
+    return OutfitRepo.findByUserId(
+      effectiveUserId,
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20
+    );
   }
 
   /**

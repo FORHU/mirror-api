@@ -18,9 +18,25 @@ const garmentKey = (id: string) => `garment:${id}`;
 
 export default class GarmentService {
   static async getGarments(query: Record<string, string | string[] | undefined>) {
-    const { page, limit, garmentType, fittingSlot, category, gender, silhouette, tag } = query;
+    const {
+      page,
+      limit,
+      garmentType,
+      fittingSlot,
+      category,
+      gender,
+      silhouette,
+      tag,
+      userId,
+      systemOnly,
+    } = query;
 
     const filters: Prisma.GarmentWhereInput = {};
+    if (systemOnly === "true") {
+      filters.userId = null;
+    } else if (userId) {
+      filters.userId = userId as string;
+    }
     if (garmentType) {
       filters.garmentType = {
         hasSome: (Array.isArray(garmentType) ? garmentType : [garmentType]) as GARMENT_TYPES[],

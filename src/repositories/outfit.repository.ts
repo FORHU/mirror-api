@@ -3,14 +3,17 @@ import { Prisma, DESIGN_TYPE, FITTING_SLOT, LAYER_LEVEL } from "@prisma/client";
 
 export default class OutfitRepo {
   static async findByUserId(
-    userId?: string,
+    userId?: string | null,
     page: number = 1,
     limit: number = 20,
     filters: { fileProvider?: string; fileProviderNot?: string } = {}
   ) {
     const skip = (page - 1) * limit;
 
-    const where: Prisma.OutfitWhereInput = { userId };
+    const where: Prisma.OutfitWhereInput = {};
+    if (userId !== undefined) {
+      where.userId = userId;
+    }
     if (filters.fileProvider) {
       where.file = { provider: filters.fileProvider };
     } else if (filters.fileProviderNot) {
