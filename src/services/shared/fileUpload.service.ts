@@ -4,14 +4,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 import path from "path";
-import {
-  AWS_REGION,
-  AWS_ACCESS_KEY_ID,
-  AWS_SECRET_ACCESS_KEY,
-  S3_BUCKET_NAME,
-  S3_CDN_URL,
-  REDIS_TTL_SECONDS,
-} from "../../config";
+import { AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME } from "../../config";
 
 const s3Client = new S3Client({
   region: AWS_REGION,
@@ -50,7 +43,13 @@ export default class FileUploadService {
   /**
    * Called by the frontend AFTER a successful upload to save it to the database
    */
-  static async confirmUpload(filename: string, fileUrl: string, key: string, size: number, mimetype: string) {
+  static async confirmUpload(
+    filename: string,
+    fileUrl: string,
+    key: string,
+    size: number,
+    mimetype: string
+  ) {
     logger.info(`Confirming upload for S3 key: ${key}`);
 
     const savedFile = await FileRepo.create({

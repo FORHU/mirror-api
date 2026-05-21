@@ -6,16 +6,12 @@ import { ACCESS_TOKEN_SECRET } from "../config";
 declare global {
   namespace Express {
     interface Request {
-      user?: any;
+      user?: { id: string; [key: string]: unknown };
     }
   }
 }
 
-export const authenticate = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   const token = req.headers.authorization?.split(" ")[1];
 
   if (!token) {
@@ -27,12 +23,12 @@ export const authenticate = async (
       userId: string;
     };
     const user = await AuthRepo.findUserById(decoded.userId);
-    if (!user || (user as any).isDeleted) {
+    if (!user || (user as { isDeleted?: boolean }).isDeleted) {
       return res.status(404).json({ message: "User not found" });
     }
     req.user = user;
     next();
-  } catch (error: any) {
+  } catch (error) {
     return res.status(401).json({ message: "Invalid token" });
   }
 };

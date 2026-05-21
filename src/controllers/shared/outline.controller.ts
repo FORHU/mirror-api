@@ -5,15 +5,15 @@ import { responseSuccess, responseError } from "../../helpers/response.helper";
 
 const createSchema = Joi.object({
   userPrompt: Joi.array().items(Joi.string()).default([]),
-  location:   Joi.string().optional().allow(null, ""),
-  latitude:   Joi.number().optional(),
-  longitude:  Joi.number().optional(),
-  startTime:  Joi.date().iso().optional(),
+  location: Joi.string().optional().allow(null, ""),
+  latitude: Joi.number().optional(),
+  longitude: Joi.number().optional(),
+  startTime: Joi.date().iso().optional(),
 });
 
 export default class OutlineController {
   static async create(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     const { error, value } = createSchema.validate(req.body, { abortEarly: false });
@@ -28,7 +28,7 @@ export default class OutlineController {
   }
 
   static async getActive(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {
@@ -42,12 +42,13 @@ export default class OutlineController {
   }
 
   static async getById(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {
       const outline = await OutlineRepo.findById(req.params.id);
-      if (!outline || outline.userId !== userId) return responseError(res, 404, "Outline not found");
+      if (!outline || outline.userId !== userId)
+        return responseError(res, 404, "Outline not found");
       return responseSuccess(res, 200, outline);
     } catch (err) {
       next(err);
@@ -55,7 +56,7 @@ export default class OutlineController {
   }
 
   static async list(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {

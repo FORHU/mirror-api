@@ -1,12 +1,7 @@
 import openai from "./ai-request.util";
 import { DESIGN_TYPE, FITTING_SLOT, LAYER_LEVEL } from "@prisma/client";
 
-export type GenerableField =
-  | "name"
-  | "description"
-  | "designType"
-  | "tags"
-  | "dominantColor";
+export type GenerableField = "name" | "description" | "designType" | "tags" | "dominantColor";
 
 export const GENERABLE_FIELDS: GenerableField[] = [
   "name",
@@ -64,9 +59,7 @@ const FIELD_SCHEMA: Record<GenerableField, string> = {
 };
 
 function buildSchemaBlock(extra: string[], generate: Set<GenerableField>): string {
-  const lines = GENERABLE_FIELDS
-    .filter((f) => generate.has(f))
-    .map((f) => `  ${FIELD_SCHEMA[f]}`);
+  const lines = GENERABLE_FIELDS.filter((f) => generate.has(f)).map((f) => `  ${FIELD_SCHEMA[f]}`);
   const all = [...lines, ...extra.map((l) => `  ${l}`)];
   if (!all.length) return `{}`;
   return `{\n${all.join(",\n")}\n}`;
@@ -83,10 +76,11 @@ HARD RULES:
 function evaluatePrompt(
   garments: WardrobeGarment[] | undefined,
   userPrompt: string | undefined,
-  generate: Set<GenerableField>,
+  generate: Set<GenerableField>
 ): string {
-  const grounding = garments && garments.length
-    ? `
+  const grounding =
+    garments && garments.length
+      ? `
 The outfit is composed of these specific garments (authoritative — the image
 may include extras like background or partial views, but THESE are the items
 the caller has tagged as part of the outfit). Do not invent items beyond this
@@ -95,15 +89,16 @@ list and do not modify how these garments are described.
 Garments (JSON):
 ${JSON.stringify(garments)}
 `
-    : "";
+      : "";
 
-  const hint = userPrompt && userPrompt.trim()
-    ? `
+  const hint =
+    userPrompt && userPrompt.trim()
+      ? `
 User-provided context for this outfit (use it only to bias the requested
 fields below; never override the garments or invent items from it):
 "${userPrompt.trim()}"
 `
-    : "";
+      : "";
 
   const schema = buildSchemaBlock([], generate);
 
@@ -125,10 +120,7 @@ Return ONLY the JSON. No markdown, no commentary.
 `.trim();
 }
 
-const composePrompt = (
-  wardrobe: WardrobeGarment[],
-  userPrompt: string,
-) => `
+const composePrompt = (wardrobe: WardrobeGarment[], userPrompt: string) => `
 You are a personal stylist composing an outfit from a user's wardrobe.
 Pick 2-6 garments from the wardrobe below that best satisfy the user's request.
 You MUST only use garmentIds present in the wardrobe. Do not invent garments,
@@ -161,11 +153,12 @@ Return ONLY the JSON. No markdown.
 function matchPrompt(
   wardrobe: WardrobeGarment[],
   userPrompt: string | undefined,
-  generate: Set<GenerableField>,
+  generate: Set<GenerableField>
 ): string {
-  const hint = userPrompt && userPrompt.trim()
-    ? `\nUser-provided context (bias the requested fields below; never invent garments from it):\n"${userPrompt.trim()}"\n`
-    : "";
+  const hint =
+    userPrompt && userPrompt.trim()
+      ? `\nUser-provided context (bias the requested fields below; never invent garments from it):\n"${userPrompt.trim()}"\n`
+      : "";
 
   const extra = [
     `"items": [ { "garmentId": "<wardrobe id>", "slot": "...", "layerLevel": "..." } ]`,
@@ -208,15 +201,15 @@ function parseJson<T>(raw: string | undefined | null): T {
   }
 }
 
-function sanitizeDesignType(value: any): DESIGN_TYPE | undefined {
+function sanitizeDesignType(value: unknown): DESIGN_TYPE | undefined {
   if (value == null) return undefined;
   const allowed = Object.values(DESIGN_TYPE) as string[];
-  return allowed.includes(value) ? (value as DESIGN_TYPE) : undefined;
+  return allowed.includes(value as string) ? (value as DESIGN_TYPE) : undefined;
 }
 
 function sanitizeItems(
-  rawItems: any,
-  wardrobeIds: Set<string>,
+  rawItems: unknown,
+  wardrobeIds: Set<string>
 ): { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[] {
   if (!Array.isArray(rawItems)) return [];
   const slotSet = new Set(Object.values(FITTING_SLOT) as string[]);
@@ -224,14 +217,17 @@ function sanitizeItems(
   const seen = new Set<string>();
   const result: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[] = [];
 
-  for (const item of rawItems) {
+  for (const raw of rawItems as unknown[]) {
+    const item = raw as Record<string, unknown>;
     const id = item?.garmentId;
     if (typeof id !== "string" || !wardrobeIds.has(id) || seen.has(id)) continue;
     seen.add(id);
     result.push({
-      garmentId: id,
-      slot: slotSet.has(item.slot) ? (item.slot as FITTING_SLOT) : undefined,
-      layerLevel: layerSet.has(item.layerLevel) ? (item.layerLevel as LAYER_LEVEL) : undefined,
+      garmentId: id as string,
+      slot: slotSet.has(item.slot as string) ? (item.slot as FITTING_SLOT) : undefined,
+      layerLevel: layerSet.has(item.layerLevel as string)
+        ? (item.layerLevel as LAYER_LEVEL)
+        : undefined,
     });
   }
   return result;
@@ -249,9 +245,9 @@ function normalizeGenerate(input?: GenerableField[] | null): Set<GenerableField>
  * persist layer can tell "leave empty" apart from "AI failed".
  */
 function mergeEvaluation(
-  ai: any,
+  ai: Record<string, unknown> | null,
   provided: Partial<OutfitEvaluation> | undefined,
-  generate: Set<GenerableField>,
+  generate: Set<GenerableField>
 ): OutfitEvaluation {
   const out: OutfitEvaluation = {};
   const take = <K extends GenerableField>(field: K, aiValue: OutfitEvaluation[K]) => {
@@ -268,7 +264,7 @@ function mergeEvaluation(
   take("designType", sanitizeDesignType(ai?.designType));
   take(
     "tags",
-    Array.isArray(ai?.tags) ? ai.tags.filter((t: any) => typeof t === "string") : undefined,
+    Array.isArray(ai?.tags) ? ai.tags.filter((t: unknown) => typeof t === "string") : undefined
   );
   take("dominantColor", typeof ai?.dominantColor === "string" ? ai.dominantColor : undefined);
   return out;
@@ -289,9 +285,7 @@ export interface EvaluateOutfitOptions {
  * omitted from the result — the persist layer must NOT fall back to a
  * generated default.
  */
-export async function evaluateOutfitImage(
-  opts: EvaluateOutfitOptions,
-): Promise<OutfitEvaluation> {
+export async function evaluateOutfitImage(opts: EvaluateOutfitOptions): Promise<OutfitEvaluation> {
   const generate = normalizeGenerate(opts.generate);
 
   if (generate.size === 0) {
@@ -319,13 +313,13 @@ export async function evaluateOutfitImage(
     ],
   });
 
-  const parsed = parseJson<any>(response.choices[0]?.message?.content);
+  const parsed = parseJson<Record<string, unknown>>(response.choices[0]?.message?.content);
   return mergeEvaluation(parsed, opts.provided, generate);
 }
 
 export async function composeOutfitFromWardrobe(
   wardrobe: WardrobeGarment[],
-  userPrompt: string,
+  userPrompt: string
 ): Promise<OutfitComposition> {
   if (!wardrobe.length) {
     throw { status: 400, message: "Wardrobe is empty — add garments before composing" };
@@ -379,9 +373,7 @@ export interface MatchOutfitOptions {
  * endpoint), but the descriptive fields (name/description/tags/etc.) follow
  * the same `generate` + `provided` rules as evaluateOutfitImage.
  */
-export async function matchOutfitToWardrobe(
-  opts: MatchOutfitOptions,
-): Promise<OutfitMatch> {
+export async function matchOutfitToWardrobe(opts: MatchOutfitOptions): Promise<OutfitMatch> {
   const generate = normalizeGenerate(opts.generate);
 
   const response = await openai.chat.completions.create({
@@ -405,7 +397,7 @@ export async function matchOutfitToWardrobe(
     ],
   });
 
-  const parsed = parseJson<any>(response.choices[0]?.message?.content);
+  const parsed = parseJson<Record<string, unknown>>(response.choices[0]?.message?.content);
   const wardrobeIds = new Set(opts.wardrobe.map((g) => g.id));
   const descriptive = mergeEvaluation(parsed, opts.provided, generate);
 
@@ -413,7 +405,7 @@ export async function matchOutfitToWardrobe(
     ...descriptive,
     items: sanitizeItems(parsed?.items, wardrobeIds),
     unmatchedDescriptions: Array.isArray(parsed?.unmatchedDescriptions)
-      ? parsed.unmatchedDescriptions.filter((s: any) => typeof s === "string")
+      ? (parsed.unmatchedDescriptions as unknown[]).filter((s: unknown) => typeof s === "string")
       : [],
   };
 }

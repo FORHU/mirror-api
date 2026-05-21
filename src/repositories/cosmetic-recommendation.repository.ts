@@ -7,11 +7,7 @@ export default class CosmeticRecommendationRepo {
    * verifying the outline belongs to the requesting user — this repo does
    * not enforce ownership.
    */
-  static async findByOutline(
-    outlineId: string,
-    page: number = 1,
-    limit: number = 20,
-  ) {
+  static async findByOutline(outlineId: string, page: number = 1, limit: number = 20) {
     const skip = (page - 1) * limit;
     const where: Prisma.CosmeticRecommendationWhereInput = { userOutlineId: outlineId };
 
@@ -45,15 +41,15 @@ export default class CosmeticRecommendationRepo {
     score?: number;
     rank?: number;
     reason?: string;
-    signals?: any;
+    signals?: Prisma.InputJsonValue;
   }) {
     return prisma.cosmeticRecommendation.create({
       data: {
-        userOutline:     { connect: { id: data.userOutlineId } },
+        userOutline: { connect: { id: data.userOutlineId } },
         cosmeticProduct: { connect: { id: data.cosmeticProductId } },
-        score:   data.score,
-        rank:    data.rank,
-        reason:  data.reason,
+        score: data.score,
+        rank: data.rank,
+        reason: data.reason,
         signals: data.signals,
       },
       include: { cosmeticProduct: true },
@@ -67,8 +63,8 @@ export default class CosmeticRecommendationRepo {
       score?: number;
       rank?: number;
       reason?: string;
-      signals?: any;
-    },
+      signals?: Prisma.InputJsonValue;
+    }
   ) {
     return prisma.cosmeticRecommendation.update({
       where: { id },
@@ -76,9 +72,9 @@ export default class CosmeticRecommendationRepo {
         ...(data.cosmeticProductId && {
           cosmeticProduct: { connect: { id: data.cosmeticProductId } },
         }),
-        score:   data.score,
-        rank:    data.rank,
-        reason:  data.reason,
+        score: data.score,
+        rank: data.rank,
+        reason: data.reason,
         signals: data.signals,
       },
       include: { cosmeticProduct: true },

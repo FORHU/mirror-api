@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import { Request, Response } from "express";
 import Joi from "joi";
 import ChatWonderService from "../../services/shared/chat-wonder.service";
 import { streamChat } from "../../utils/chat-wonder-stream";
@@ -11,9 +11,9 @@ export default class ChatWonderController {
   /**
    * Handles streaming chat requests using Server-Sent Events (SSE).
    */
-  static async streamChat(req: Request, res: Response, next: NextFunction) {
+  static async streamChat(req: Request, res: Response) {
     const { input, conversationId: inputConversationId, persona } = req.body;
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
 
     if (!userId) {
       return responseError(res, 401, "Unauthorized");
@@ -56,11 +56,12 @@ export default class ChatWonderController {
       let fullResponse = "";
 
       // 6. Stream from external ChatWonder API
-      await streamChat(wrappedInput, sessionId, persona, {
+      await streamChat(wrappedInput, sessionId as string, persona as string, {
         onChunk: (chunk: string) => {
           fullResponse += chunk;
           res.write(`data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`);
-          if ((res as any).flush) (res as any).flush();
+          if ((res as Response & { flush?: () => void }).flush)
+            (res as Response & { flush?: () => void }).flush?.();
         },
         onComplete: async () => {
           try {
@@ -69,7 +70,11 @@ export default class ChatWonderController {
             const parsed = parseChatWonderResponse(cleaned);
 
             // Save AI response to history
-            const aiMessage = await ChatWonderService.saveAIMessage(userId, conversationId, parsed.message);
+            const aiMessage = await ChatWonderService.saveAIMessage(
+              userId,
+              conversationId,
+              parsed.message
+            );
 
             res.write(
               `data: ${JSON.stringify({
@@ -84,26 +89,28 @@ export default class ChatWonderController {
               })}\n\n`
             );
             res.end();
-          } catch (err: any) {
-            logger.error(`[ChatWonderController] Error saving response: ${err.message}`);
-            res.write(`data: ${JSON.stringify({ type: "error", message: "Failed to save response" })}\n\n`);
+          } catch (err) {
+            logger.error(`[ChatWonderController] Error saving response: ${(err as Error).message}`);
+            res.write(
+              `data: ${JSON.stringify({ type: "error", message: "Failed to save response" })}\n\n`
+            );
             res.end();
           }
         },
         onError: (err: Error) => {
           logger.error(`[ChatWonderController] Stream error: ${err.message}`);
           if (!res.headersSent) {
-            responseError(res, 500, "Stream failed");
+            responseError(res, 500, err.message || "Stream failed");
           } else {
             res.write(`data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`);
             res.end();
           }
         },
       });
-    } catch (err: any) {
-      logger.error(`[ChatWonderController] Controller error: ${err.message}`);
+    } catch (err) {
+      logger.error(`[ChatWonderController] Controller error: ${(err as Error).message}`);
       if (!res.headersSent) {
-        responseError(res, 500, err.message || "Internal server error");
+        responseError(res, 500, (err as Error).message || "Internal server error");
       }
     }
   }

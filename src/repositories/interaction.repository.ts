@@ -17,11 +17,7 @@ export default class InteractionRepo {
     return { data, total, page, limit };
   }
 
-  static async create(data: {
-    type: string;
-    garmentId: string;
-    outfitId?: string;
-  }) {
+  static async create(data: { type: string; garmentId: string; outfitId?: string }) {
     return prisma.interaction.create({
       data,
     });

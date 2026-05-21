@@ -1,4 +1,5 @@
 import { defaultOpenAIRequest } from "./ai-request.util";
+import logger from "../logger";
 
 export async function detectEmotion(text: string): Promise<{
   emotion: string;
@@ -28,8 +29,8 @@ export async function detectEmotion(text: string): Promise<{
     // Clean response if it contains markdown code blocks
     const cleaned = response.replace(/```json|```/g, "").trim();
     return JSON.parse(cleaned);
-  } catch (error: any) {
-    console.error("[OpenAI-Emotion] Error:", error.message);
+  } catch (error) {
+    logger.error(`[OpenAI-Emotion] Error: ${(error as Error).message}`);
     return { emotion: "neutral", confidence: 0 };
   }
 }

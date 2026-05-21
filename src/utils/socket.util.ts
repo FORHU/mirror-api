@@ -35,7 +35,7 @@ export const initSocketServer = async (httpServer: HttpServer) => {
 /**
  * Helper to emit events to a specific kiosk room
  */
-export const emitToKiosk = (kioskId: string, event: string, data: any) => {
+export const emitToKiosk = (kioskId: string, event: string, data: unknown) => {
   if (io) {
     io.to(kioskId).emit(event, data);
   }
@@ -45,7 +45,7 @@ export const emitToKiosk = (kioskId: string, event: string, data: any) => {
  * Helper to emit events to a specific companion (mobile app) via user room.
  * Companion must join `user:${userId}` room on connect via `register_user` event.
  */
-export const notifyCompanion = (userId: string, event: string, data: any) => {
+export const notifyCompanion = (userId: string, event: string, data: unknown) => {
   if (io) {
     io.to(`user:${userId}`).emit(event, data);
   }

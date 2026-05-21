@@ -1,5 +1,6 @@
 import axios from "axios";
 import { MAPBOX_SECRET_TOKEN } from "../../config";
+import logger from "../../utils/logger";
 
 export interface GeocodingFeature {
   id: string;
@@ -33,7 +34,7 @@ export interface DirectionsStep {
 }
 
 export interface DirectionsFormatted {
-  geojson: any;
+  geojson: Record<string, unknown>;
   steps: DirectionsStep[];
   distance: number;
   duration: number;
@@ -41,7 +42,7 @@ export interface DirectionsFormatted {
 
 export interface DirectionsResponse {
   routes: Array<{
-    geometry: string | any;
+    geometry: string | Record<string, unknown>;
     duration: number;
     distance: number;
     legs: Array<{
@@ -59,9 +60,9 @@ export interface DirectionsResponse {
 export const mapService = {
   search: async (query: string, proximity?: string): Promise<GeocodingFeature[]> => {
     if (!query) return [];
-    
+
     try {
-      const params: any = {
+      const params: Record<string, string | number | boolean> = {
         access_token: MAPBOX_SECRET_TOKEN,
         autocomplete: true,
         limit: 5,
@@ -75,15 +76,19 @@ export const mapService = {
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`,
         { params }
       );
-      
+
       return response.data.features;
     } catch (error) {
-      console.error("Mapbox Geocoding Error:", error);
+      logger.error(`Mapbox Geocoding Error: ${(error as Error).message}`);
       throw new Error("Failed to search locations");
     }
   },
 
-  getDirections: async (origin: string, destination: string, profile: string = "driving"): Promise<DirectionsResponse> => {
+  getDirections: async (
+    origin: string,
+    destination: string,
+    profile: string = "driving"
+  ): Promise<DirectionsResponse> => {
     try {
       const response = await axios.get<DirectionsResponse>(
         `https://api.mapbox.com/directions/v5/mapbox/${profile}/${origin};${destination}`,
@@ -93,20 +98,20 @@ export const mapService = {
             geometries: "geojson",
             steps: true,
             overview: "full",
-          }
+          },
         }
       );
 
       return response.data;
     } catch (error) {
-      console.error("Mapbox Directions Error:", error);
+      logger.error(`Mapbox Directions Error: ${(error as Error).message}`);
       throw new Error("Failed to calculate route");
     }
   },
 
   geocodeAddress: async (
     query: string,
-    proximityLng: number = 120.5960,
+    proximityLng: number = 120.596,
     proximityLat: number = 16.3971
   ): Promise<GeocodeResult[]> => {
     try {
@@ -131,7 +136,7 @@ export const mapService = {
         placeId: f.id,
       }));
     } catch (error) {
-      console.error("Mapbox Geocode Error:", error);
+      logger.error(`Mapbox Geocode Error: ${(error as Error).message}`);
       throw new Error("Geocoding service unavailable");
     }
   },
@@ -142,7 +147,8 @@ export const mapService = {
     profile: string = "driving"
   ): Promise<DirectionsFormatted> => {
     try {
-      const isBaguio = origin[1] > 16.39 && origin[1] < 16.43 && origin[0] > 120.58 && origin[0] < 120.62;
+      const isBaguio =
+        origin[1] > 16.39 && origin[1] < 16.43 && origin[0] > 120.58 && origin[0] < 120.62;
       let effectiveProfile = profile;
 
       // BAGUIO LOCAL OVERRIDE: Use walking profile for cycling in city center
@@ -153,23 +159,40 @@ export const mapService = {
 
       const waypointStr = `${origin[0]},${origin[1]};${destination[0]},${destination[1]}`;
 
-      const response = await axios.get<any>(
-        `https://api.mapbox.com/directions/v5/mapbox/${effectiveProfile}/${waypointStr}`,
-        {
-          params: {
-            access_token: MAPBOX_SECRET_TOKEN,
-            geometries: "geojson",
-            steps: true,
-            overview: "full",
-            annotations: "duration,distance",
-          },
-        }
-      );
+      const response = await axios.get<{
+        routes?: Array<{
+          geometry: Record<string, unknown>;
+          duration: number;
+          distance: number;
+          legs?: Array<{
+            steps?: Array<{
+              maneuver?: {
+                instruction?: string;
+                type?: string;
+                modifier?: string;
+                bearing_after?: number;
+                bearing_before?: number;
+              };
+              distance?: number;
+              duration?: number;
+              name?: string;
+            }>;
+          }>;
+        }>;
+      }>(`https://api.mapbox.com/directions/v5/mapbox/${effectiveProfile}/${waypointStr}`, {
+        params: {
+          access_token: MAPBOX_SECRET_TOKEN,
+          geometries: "geojson",
+          steps: true,
+          overview: "full",
+          annotations: "duration,distance",
+        },
+      });
 
       const route = response.data.routes?.[0];
       if (!route) throw new Error("No route found");
 
-      const steps: DirectionsStep[] = (route.legs?.[0]?.steps ?? []).map((s: any) => ({
+      const steps: DirectionsStep[] = (route.legs?.[0]?.steps ?? []).map((s) => ({
         instruction: s.maneuver?.instruction ?? "",
         maneuver: {
           type: s.maneuver?.type ?? "turn",
@@ -182,9 +205,8 @@ export const mapService = {
         name: s.name ?? "",
       }));
 
-      const finalDuration = (profile === "cycling" && isBaguio) 
-        ? Math.round(route.duration / 3.2) 
-        : route.duration;
+      const finalDuration =
+        profile === "cycling" && isBaguio ? Math.round(route.duration / 3.2) : route.duration;
 
       return {
         geojson: {
@@ -195,12 +217,16 @@ export const mapService = {
         distance: route.distance,
         duration: finalDuration,
       };
-    } catch (error: any) {
-      if (error.message === "No route found") throw error;
-      const status = error.response?.status;
-      const data = error.response?.data;
-      console.error(`Mapbox Directions Error [${status}]:`, data || error.message);
-      throw new Error(`Directions service unavailable: ${data?.message || error.message}`);
+    } catch (error) {
+      if ((error as Error).message === "No route found") throw error;
+      const err = error as {
+        response?: { status?: number; data?: { message?: string } };
+        message: string;
+      };
+      const status = err.response?.status;
+      const data = err.response?.data;
+      logger.error(`Mapbox Directions Error [${status}]: ${JSON.stringify(data) || err.message}`);
+      throw new Error(`Directions service unavailable: ${data?.message || err.message}`);
     }
   },
 };

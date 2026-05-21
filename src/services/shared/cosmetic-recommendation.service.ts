@@ -1,6 +1,7 @@
 import CosmeticRecommendationRepo from "../../repositories/cosmetic-recommendation.repository";
 import CosmeticProductRepo from "../../repositories/cosmetic-product.repository";
 import OutlineRepo from "../../repositories/outline.repository";
+import { Prisma } from "@prisma/client";
 
 const notFound = () => ({ status: 404, message: "Cosmetic recommendation not found" });
 const productNotFound = () => ({ status: 404, message: "Cosmetic product not found" });
@@ -22,13 +23,17 @@ export default class CosmeticRecommendationService {
    * Lists recommendations for the caller's outline. Refuses to serve
    * recommendations for outlines that don't belong to the user.
    */
-  static async listForOutline(outlineId: string, userId: string, query: any = {}) {
+  static async listForOutline(
+    outlineId: string,
+    userId: string,
+    query: Record<string, string | undefined> = {}
+  ) {
     await assertOutlineOwned(outlineId, userId);
     const { page, limit } = query;
     return CosmeticRecommendationRepo.findByOutline(
       outlineId,
       page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 20,
+      limit ? parseInt(limit, 10) : 20
     );
   }
 
@@ -46,9 +51,9 @@ export default class CosmeticRecommendationService {
       score?: number;
       rank?: number;
       reason?: string;
-      signals?: any;
+      signals?: Prisma.InputJsonValue;
     },
-    userId: string,
+    userId: string
   ) {
     await assertOutlineOwned(data.userOutlineId, userId);
     const product = await CosmeticProductRepo.findById(data.cosmeticProductId);
@@ -63,9 +68,9 @@ export default class CosmeticRecommendationService {
       score?: number;
       rank?: number;
       reason?: string;
-      signals?: any;
+      signals?: Prisma.InputJsonValue;
     },
-    userId: string,
+    userId: string
   ) {
     await this.getById(id, userId); // ownership check
     if (data.cosmeticProductId) {

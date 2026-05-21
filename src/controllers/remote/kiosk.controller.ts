@@ -21,9 +21,11 @@ export default class KioskController {
     if (error) return next(validationError(error.message));
 
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as Request & { user: { id: string } }).user.id;
       const kioskStateKey = `kiosk_state:${value.kioskId}`;
-      let state = await CacheUtil.get<any>(kioskStateKey);
+      const state = await CacheUtil.get<{ status: string; userId: string; kioskName: string }>(
+        kioskStateKey
+      );
 
       if (!state) {
         return responseError(res, 404, "Kiosk not found or offline");
@@ -42,9 +44,9 @@ export default class KioskController {
       });
 
       // Notify the Kiosk that it has been paired
-      emitToKiosk(value.kioskId, "kiosk_paired", { 
-        userId, 
-        kioskName: value.kioskName || state.kioskName 
+      emitToKiosk(value.kioskId, "kiosk_paired", {
+        userId,
+        kioskName: value.kioskName || state.kioskName,
       });
 
       logger.info(`User ${userId} paired with Kiosk ${value.kioskId}`);
@@ -67,9 +69,11 @@ export default class KioskController {
     if (error) return next(validationError(error.message));
 
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as Request & { user: { id: string } }).user.id;
       const kioskStateKey = `kiosk_state:${value.kioskId}`;
-      const state = await CacheUtil.get<any>(kioskStateKey);
+      const state = await CacheUtil.get<{ status: string; userId: string; kioskName: string }>(
+        kioskStateKey
+      );
 
       if (state && state.userId === userId) {
         // Unlock it
@@ -103,8 +107,10 @@ export default class KioskController {
     if (error) return next(validationError(error.message));
 
     try {
-      const userId = (req as any).user.id;
-      const state = await CacheUtil.get<any>(`kiosk_state:${value.kioskId}`);
+      const userId = (req as Request & { user: { id: string } }).user.id;
+      const state = await CacheUtil.get<{ status: string; userId: string; kioskName: string }>(
+        `kiosk_state:${value.kioskId}`
+      );
 
       // Ensure the user actually owns the lock
       if (!state || state.userId !== userId) {
@@ -136,7 +142,9 @@ export default class KioskController {
     if (error) return next(validationError(error.message));
 
     try {
-      let state = await CacheUtil.get<any>(`kiosk_state:${value.kioskId}`);
+      const state = await CacheUtil.get<{ status: string; userId: string; kioskName: string }>(
+        `kiosk_state:${value.kioskId}`
+      );
 
       if (!state) {
         return responseError(res, 404, "Kiosk not found or offline");
@@ -150,9 +158,9 @@ export default class KioskController {
       });
 
       // Notify the Kiosk that it has been scanned
-      emitToKiosk(value.kioskId, "kiosk_scanning", { 
+      emitToKiosk(value.kioskId, "kiosk_scanning", {
         status: "pending_login",
-        kioskName: value.kioskName || state.kioskName || value.kioskId 
+        kioskName: value.kioskName || state.kioskName || value.kioskId,
       });
 
       logger.info(`Kiosk ${value.kioskId} notified of scan`);

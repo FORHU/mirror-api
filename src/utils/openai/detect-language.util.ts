@@ -1,4 +1,5 @@
 import { defaultOpenAIRequest } from "./ai-request.util";
+import logger from "../logger";
 
 export async function detectLanguage(text: string): Promise<string | null> {
   const prompt = `
@@ -16,8 +17,8 @@ export async function detectLanguage(text: string): Promise<string | null> {
 
     if (!response || response.toLowerCase() === "unknown") return null;
     return response.trim();
-  } catch (error: any) {
-    console.error("[OpenAI-Language] Error:", error.message);
+  } catch (error) {
+    logger.error(`[OpenAI-Language] Error: ${(error as Error).message}`);
     return null;
   }
 }

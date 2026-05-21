@@ -34,7 +34,7 @@ export default class FileController {
         return responseError(res, 400, "No files uploaded");
       }
 
-      const uploadPromises = files.map(file => FileService.uploadFile(file));
+      const uploadPromises = files.map((file) => FileService.uploadFile(file));
       const results = await Promise.all(uploadPromises);
 
       return responseSuccess(res, 201, results, `${results.length} files processed successfully`);

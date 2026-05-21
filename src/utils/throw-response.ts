@@ -9,7 +9,7 @@
 export function throwResponse(
   status: number,
   message: string,
-  extra?: Record<string, any>,
+  extra?: Record<string, unknown>
 ): never {
   throw { status, message, ...(extra || {}) };
 }

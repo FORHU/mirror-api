@@ -2,10 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import OutfitService from "../../services/shared/outfit.service";
 import FileService from "../../services/shared/file.service";
-import {
-  findExistingComposition,
-  validateGarmentIds,
-} from "../../validations/outfit.validation";
+import { findExistingComposition, validateGarmentIds } from "../../validations/outfit.validation";
 import {
   evaluateOutfitImage,
   composeOutfitFromWardrobe,
@@ -24,8 +21,12 @@ const unauthorizedError = () => ({ status: 401, message: "Authentication require
 
 const itemSchema = Joi.object({
   garmentId: Joi.string().required(),
-  slot: Joi.string().valid(...Object.values(FITTING_SLOT)).optional(),
-  layerLevel: Joi.string().valid(...Object.values(LAYER_LEVEL)).optional(),
+  slot: Joi.string()
+    .valid(...Object.values(FITTING_SLOT))
+    .optional(),
+  layerLevel: Joi.string()
+    .valid(...Object.values(LAYER_LEVEL))
+    .optional(),
 });
 
 const outfitSchema = Joi.object({
@@ -33,7 +34,9 @@ const outfitSchema = Joi.object({
   description: Joi.string().optional().allow(null, ""),
   items: Joi.array().items(itemSchema).default([]),
   isPublic: Joi.boolean().optional().default(false),
-  designType: Joi.string().valid(...Object.values(DESIGN_TYPE)).optional(),
+  designType: Joi.string()
+    .valid(...Object.values(DESIGN_TYPE))
+    .optional(),
   fileId: Joi.string().optional(),
   file: Joi.object().optional(), // Manual file metadata
 });
@@ -46,7 +49,9 @@ const outfitUpdateSchema = Joi.object({
   description: Joi.string().optional().allow(null, ""),
   items: Joi.array().items(itemSchema).optional(),
   isPublic: Joi.boolean().optional(),
-  designType: Joi.string().valid(...Object.values(DESIGN_TYPE)).optional(),
+  designType: Joi.string()
+    .valid(...Object.values(DESIGN_TYPE))
+    .optional(),
   fileId: Joi.string().optional(),
   file: Joi.object().optional(),
 });
@@ -56,10 +61,14 @@ const outfitUpdateSchema = Joi.object({
 const aiProvidedFields = {
   name: Joi.string().optional(),
   description: Joi.string().optional().allow(null, ""),
-  designType: Joi.string().valid(...Object.values(DESIGN_TYPE)).optional(),
+  designType: Joi.string()
+    .valid(...Object.values(DESIGN_TYPE))
+    .optional(),
   tags: Joi.array().items(Joi.string()).optional(),
   dominantColor: Joi.string().optional(),
-  generate: Joi.array().items(Joi.string().valid(...GENERABLE_FIELDS)).optional(),
+  generate: Joi.array()
+    .items(Joi.string().valid(...GENERABLE_FIELDS))
+    .optional(),
   prompt: Joi.string().max(500).optional().allow(""),
   imageUrl: Joi.string().uri().optional(),
   kioskId: Joi.string().optional().allow(null, ""),
@@ -77,8 +86,11 @@ const evaluateHybridSchema = Joi.object({
 export default class OutfitController {
   static async index(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
-      const result = await OutfitService.getUserOutfits(userId, req.query);
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
+      const result = await OutfitService.getUserOutfits(
+        userId,
+        req.query as unknown as Record<string, string | undefined>
+      );
       responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
       next(err);
@@ -93,8 +105,11 @@ export default class OutfitController {
    */
   static async indexNeedingImage(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
-      const result = await OutfitService.getOutfitsNeedingImage(userId, req.query);
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
+      const result = await OutfitService.getOutfitsNeedingImage(
+        userId,
+        req.query as unknown as Record<string, string | undefined>
+      );
       responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
       next(err);
@@ -108,8 +123,11 @@ export default class OutfitController {
    */
   static async indexComplete(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
-      const result = await OutfitService.getOutfitsWithUploadedImage(userId, req.query);
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
+      const result = await OutfitService.getOutfitsWithUploadedImage(
+        userId,
+        req.query as unknown as Record<string, string | undefined>
+      );
       responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
       next(err);
@@ -118,7 +136,7 @@ export default class OutfitController {
 
   static async show(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
       const data = await OutfitService.getOutfitById(req.params.id, userId);
       responseSuccess(res, 200, data);
     } catch (err) {
@@ -137,23 +155,26 @@ export default class OutfitController {
    *   - `lenientJsonFields` — enum/boolean values that may arrive raw via
    *     multipart form encoding. Try JSON, fall back to raw, let Joi coerce.
    */
-  private static prepareBody(body: any) {
-    const cleaned = { ...body };
+  private static prepareBody(body: Record<string, unknown>) {
+    const cleaned = { ...body } as Record<string, unknown>;
 
-    const strictJsonFields = ['items', 'file', 'tags', 'generate'];
+    const strictJsonFields = ["items", "file", "tags", "generate"];
     for (const field of strictJsonFields) {
-      if (typeof cleaned[field] === 'string') {
+      if (typeof cleaned[field] === "string") {
         try {
           cleaned[field] = JSON.parse(cleaned[field]);
-        } catch (e: any) {
-          throw { status: 400, message: `Field "${field}" is not valid JSON: ${e.message}` };
+        } catch (e) {
+          throw {
+            status: 400,
+            message: `Field "${field}" is not valid JSON: ${(e as Error).message}`,
+          };
         }
       }
     }
 
-    const lenientJsonFields = ['isPublic', 'designType'];
+    const lenientJsonFields = ["isPublic", "designType"];
     for (const field of lenientJsonFields) {
-      if (typeof cleaned[field] === 'string') {
+      if (typeof cleaned[field] === "string") {
         try {
           cleaned[field] = JSON.parse(cleaned[field]);
         } catch {
@@ -170,16 +191,19 @@ export default class OutfitController {
    * Whatever the caller provides here passes through verbatim — the AI is
    * not asked to regenerate it.
    */
-  private static pickProvided(cleaned: any) {
-    const out: Record<string, any> = {};
+  private static pickProvided(cleaned: Record<string, unknown>) {
+    const out: Record<string, unknown> = {};
     if (typeof cleaned.name === "string" && cleaned.name.trim()) out.name = cleaned.name.trim();
-    if (typeof cleaned.description === "string" && cleaned.description.trim()) out.description = cleaned.description.trim();
-    if (typeof cleaned.designType === "string" && cleaned.designType.trim()) out.designType = cleaned.designType.trim();
+    if (typeof cleaned.description === "string" && cleaned.description.trim())
+      out.description = cleaned.description.trim();
+    if (typeof cleaned.designType === "string" && cleaned.designType.trim())
+      out.designType = cleaned.designType.trim();
     if (Array.isArray(cleaned.tags)) {
-      const tags = cleaned.tags.filter((t: any) => typeof t === "string");
+      const tags = (cleaned.tags as unknown[]).filter((t) => typeof t === "string");
       if (tags.length) out.tags = tags;
     }
-    if (typeof cleaned.dominantColor === "string" && cleaned.dominantColor.trim()) out.dominantColor = cleaned.dominantColor.trim();
+    if (typeof cleaned.dominantColor === "string" && cleaned.dominantColor.trim())
+      out.dominantColor = cleaned.dominantColor.trim();
     return out;
   }
 
@@ -190,7 +214,7 @@ export default class OutfitController {
       if (error) return next(validationError(error.message));
 
       const finalValue = value;
-      const userId = (req as any).user?.id;
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
 
       // Reject ambiguous input: caller sent both a multipart file and a fileId.
       if (req.file && finalValue.fileId) {
@@ -235,8 +259,8 @@ export default class OutfitController {
       const { error, value } = outfitUpdateSchema.validate(cleanedBody);
       if (error) return next(validationError(error.message));
 
-      let finalValue = { ...value };
-      const userId = (req as any).user?.id;
+      const finalValue = { ...value };
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
 
       // Match `create`'s guards: ambiguous input + non-image upload would
       // otherwise reach Sharp and surface as a 500.
@@ -269,7 +293,7 @@ export default class OutfitController {
 
   static async destroy(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
       const data = await OutfitService.deleteOutfit(req.params.id, userId);
       responseSuccess(res, 200, data);
     } catch (err) {
@@ -286,7 +310,7 @@ export default class OutfitController {
    */
   static async evaluate(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
       if (!userId) return next(unauthorizedError());
 
       const cleaned = OutfitController.prepareBody(req.body);
@@ -325,12 +349,19 @@ export default class OutfitController {
       const existing = await findExistingComposition(userId, items);
       if (existing) {
         logger.info(`[OutfitEvaluate] Reused existing composition: ${existing.id}`);
-        if (kioskId) emitToKiosk(kioskId, "outfit_evaluated", { fileId: null, outfit: existing, reused: true });
+        if (kioskId)
+          emitToKiosk(kioskId, "outfit_evaluated", {
+            fileId: null,
+            outfit: existing,
+            reused: true,
+          });
         return responseSuccess(res, 200, existing);
       }
 
-      const { file: fileRecord, imageUrl: finalImageUrl } =
-        await OutfitService.uploadOutfitFile(req.file, imageUrl);
+      const { file: fileRecord, imageUrl: finalImageUrl } = await OutfitService.uploadOutfitFile(
+        req.file as Express.Multer.File,
+        imageUrl
+      );
 
       responseSuccess(
         res,
@@ -340,10 +371,10 @@ export default class OutfitController {
           imageUrl: finalImageUrl,
           kioskId: kioskId || null,
         },
-        "Upload received. Outfit evaluation in progress.",
+        "Upload received. Outfit evaluation in progress."
       );
 
-      const garmentIds = items.map((i: any) => i.garmentId).filter(Boolean);
+      const garmentIds = items.map((i: { garmentId: string }) => i.garmentId).filter(Boolean);
 
       (async () => {
         try {
@@ -363,15 +394,19 @@ export default class OutfitController {
             evaluation,
             fileRecord,
             userId,
-            items,
+            items
           );
           logger.info(`[OutfitEvaluate] Completed outfit ${outfit.id} for user ${userId}`);
           if (kioskId) emitToKiosk(kioskId, "outfit_evaluated", { fileId: fileRecord?.id, outfit });
-        } catch (err: any) {
-          logger.error(`[OutfitEvaluate] Background failure: ${err.message}`);
+        } catch (err) {
+          logger.error(`[OutfitEvaluate] Background failure: ${(err as Error).message}`);
           // Clean up the just-uploaded image so we don't accumulate orphans.
-          await OutfitService.discardOrphanedFile(fileRecord);
-          if (kioskId) emitToKiosk(kioskId, "outfit_failed", { fileId: fileRecord?.id, error: err.message });
+          await OutfitService.discardOrphanedFile(fileRecord as unknown as Record<string, unknown>);
+          if (kioskId)
+            emitToKiosk(kioskId, "outfit_failed", {
+              fileId: fileRecord?.id,
+              error: (err as Error).message,
+            });
         }
       })();
     } catch (err) {
@@ -386,7 +421,7 @@ export default class OutfitController {
    */
   static async compose(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
       if (!userId) return next(unauthorizedError());
 
       const schema = Joi.object({
@@ -407,9 +442,10 @@ export default class OutfitController {
           const outfit = await OutfitService.persistComposedOutfit(composition, userId);
           logger.info(`[OutfitCompose] Completed outfit ${outfit.id} for user ${userId}`);
           if (kioskId) emitToKiosk(kioskId, "outfit_composed", { outfit });
-        } catch (err: any) {
-          logger.error(`[OutfitCompose] Background failure: ${err.message}`);
-          if (kioskId) emitToKiosk(kioskId, "outfit_compose_failed", { error: err.message });
+        } catch (err) {
+          logger.error(`[OutfitCompose] Background failure: ${(err as Error).message}`);
+          if (kioskId)
+            emitToKiosk(kioskId, "outfit_compose_failed", { error: (err as Error).message });
         }
       })();
     } catch (err) {
@@ -425,7 +461,7 @@ export default class OutfitController {
    */
   static async evaluateHybrid(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
       if (!userId) return next(unauthorizedError());
 
       const cleaned = OutfitController.prepareBody(req.body);
@@ -449,8 +485,10 @@ export default class OutfitController {
         return next(validationError("Uploaded file must be an image"));
       }
 
-      const { file: fileRecord, imageUrl: finalImageUrl } =
-        await OutfitService.uploadOutfitFile(req.file, imageUrl);
+      const { file: fileRecord, imageUrl: finalImageUrl } = await OutfitService.uploadOutfitFile(
+        req.file as Express.Multer.File,
+        imageUrl
+      );
 
       responseSuccess(
         res,
@@ -460,7 +498,7 @@ export default class OutfitController {
           imageUrl: finalImageUrl,
           kioskId: kioskId || null,
         },
-        "Upload received. Hybrid outfit match in progress.",
+        "Upload received. Hybrid outfit match in progress."
       );
 
       (async () => {
@@ -474,7 +512,9 @@ export default class OutfitController {
             generate: effectiveGenerate,
           });
           const outfit = await OutfitService.persistMatchedOutfit(match, fileRecord, userId);
-          logger.info(`[OutfitMatch] Completed outfit ${outfit.id} for user ${userId} (unmatched: ${match.unmatchedDescriptions.length})`);
+          logger.info(
+            `[OutfitMatch] Completed outfit ${outfit.id} for user ${userId} (unmatched: ${match.unmatchedDescriptions.length})`
+          );
           if (kioskId) {
             emitToKiosk(kioskId, "outfit_matched", {
               fileId: fileRecord?.id,
@@ -482,12 +522,16 @@ export default class OutfitController {
               unmatched: match.unmatchedDescriptions,
             });
           }
-        } catch (err: any) {
-          logger.error(`[OutfitMatch] Background failure: ${err.message}`);
+        } catch (err) {
+          logger.error(`[OutfitMatch] Background failure: ${(err as Error).message}`);
           // Mirror `evaluate`: clean up the orphaned S3 upload so failed
           // hybrid matches don't accumulate File rows + objects.
-          await OutfitService.discardOrphanedFile(fileRecord);
-          if (kioskId) emitToKiosk(kioskId, "outfit_match_failed", { fileId: fileRecord?.id, error: err.message });
+          await OutfitService.discardOrphanedFile(fileRecord as unknown as Record<string, unknown>);
+          if (kioskId)
+            emitToKiosk(kioskId, "outfit_match_failed", {
+              fileId: fileRecord?.id,
+              error: (err as Error).message,
+            });
         }
       })();
     } catch (err) {
@@ -504,12 +548,16 @@ export default class OutfitController {
    */
   static async recommend(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
       if (!userId) return next(unauthorizedError());
 
       const schema = Joi.object({
-        category: Joi.string().valid(...Object.values(CATEGORY)).required(),
-        gender: Joi.string().valid(...Object.values(GARMENT_GENDER)).optional(),
+        category: Joi.string()
+          .valid(...Object.values(CATEGORY))
+          .required(),
+        gender: Joi.string()
+          .valid(...Object.values(GARMENT_GENDER))
+          .optional(),
         name: Joi.string().optional().allow(null, ""),
         description: Joi.string().optional().allow(null, ""),
         kioskId: Joi.string().optional().allow(null, ""),

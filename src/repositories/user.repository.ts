@@ -1,4 +1,5 @@
-import { prisma } from '../utils/prisma';
+import { prisma } from "../utils/prisma";
+import { Prisma } from "@prisma/client";
 
 export default class UserRepository {
   /**
@@ -22,7 +23,7 @@ export default class UserRepository {
   /**
    * Create a new user
    */
-  static async create(data: any) {
+  static async create(data: Prisma.UserCreateInput) {
     return prisma.user.create({
       data,
     });
@@ -31,7 +32,7 @@ export default class UserRepository {
   /**
    * Update user details
    */
-  static async update(id: string, data: any) {
+  static async update(id: string, data: Prisma.UserUpdateInput) {
     return prisma.user.update({
       where: { id },
       data: { ...data, updatedAt: new Date() },
@@ -58,7 +59,7 @@ export default class UserRepository {
         where: { isDeleted: false },
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
       }),
       prisma.user.count({ where: { isDeleted: false } }),
     ]);

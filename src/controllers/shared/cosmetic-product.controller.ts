@@ -6,34 +6,46 @@ import { responseSuccess, responseError } from "../../helpers/response.helper";
 import { pageFromRepo } from "../../helpers/pagination.helper";
 
 const createSchema = Joi.object({
-  name:       Joi.string().required(),
-  brand:      Joi.string().optional().allow(null, ""),
-  details:    Joi.string().optional().allow(null, ""),
+  name: Joi.string().required(),
+  brand: Joi.string().optional().allow(null, ""),
+  details: Joi.string().optional().allow(null, ""),
   fileUrlId: Joi.string().optional().allow(null, ""),
-  hexColor:   Joi.string().pattern(/^#?[0-9a-fA-F]{3,8}$/).optional().allow(null, ""),
-  type:       Joi.string().valid(...Object.values(COSMETIC_TYPE)).optional(),
-  metaData:   Joi.object().optional().allow(null),
+  hexColor: Joi.string()
+    .pattern(/^#?[0-9a-fA-F]{3,8}$/)
+    .optional()
+    .allow(null, ""),
+  type: Joi.string()
+    .valid(...Object.values(COSMETIC_TYPE))
+    .optional(),
+  metaData: Joi.object().optional().allow(null),
 });
 
 // PATCH: every field optional. `fileUrlId: null` clears the image link;
 // omit the field entirely to leave it alone.
 const updateSchema = Joi.object({
-  name:      Joi.string().optional(),
-  brand:     Joi.string().optional().allow(null, ""),
-  details:   Joi.string().optional().allow(null, ""),
+  name: Joi.string().optional(),
+  brand: Joi.string().optional().allow(null, ""),
+  details: Joi.string().optional().allow(null, ""),
   fileUrlId: Joi.string().optional().allow(null),
-  hexColor:  Joi.string().pattern(/^#?[0-9a-fA-F]{3,8}$/).optional().allow(null, ""),
-  type:      Joi.string().valid(...Object.values(COSMETIC_TYPE)).optional(),
-  metaData:  Joi.object().optional().allow(null),
+  hexColor: Joi.string()
+    .pattern(/^#?[0-9a-fA-F]{3,8}$/)
+    .optional()
+    .allow(null, ""),
+  type: Joi.string()
+    .valid(...Object.values(COSMETIC_TYPE))
+    .optional(),
+  metaData: Joi.object().optional().allow(null),
 });
 
 export default class CosmeticProductController {
   static async index(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {
-      const result = await CosmeticProductService.getProducts(req.query);
+      const result = await CosmeticProductService.getProducts(
+        req.query as unknown as Record<string, string | undefined>
+      );
       return responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
       next(err);
@@ -41,7 +53,7 @@ export default class CosmeticProductController {
   }
 
   static async show(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {
@@ -53,7 +65,7 @@ export default class CosmeticProductController {
   }
 
   static async create(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     const { error, value } = createSchema.validate(req.body, { abortEarly: false });
@@ -68,7 +80,7 @@ export default class CosmeticProductController {
   }
 
   static async update(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     const { error, value } = updateSchema.validate(req.body, { abortEarly: false });
@@ -83,7 +95,7 @@ export default class CosmeticProductController {
   }
 
   static async destroy(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {

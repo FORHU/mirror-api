@@ -49,7 +49,7 @@ export function intensityFor(risks: WeatherRisks): WeatherIntensity {
     risks.drynessRisk,
     risks.uvRisk,
     risks.smudgeRisk,
-    risks.sweatRisk,
+    risks.sweatRisk
   );
   if (max >= 80) return WeatherIntensity.HIGH;
   if (max >= 50) return WeatherIntensity.MEDIUM;

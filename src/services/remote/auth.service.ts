@@ -3,8 +3,15 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import logger from "../../utils/logger";
 import CacheUtil from "../../utils/cache.util";
-import { ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET, REFRESH_TOKEN_EXPIRY, ACCESS_TOKEN_EXPIRY, GOOGLE_CLIENT_ID } from '../../config';
+import {
+  ACCESS_TOKEN_SECRET,
+  REFRESH_TOKEN_SECRET,
+  REFRESH_TOKEN_EXPIRY,
+  ACCESS_TOKEN_EXPIRY,
+  GOOGLE_CLIENT_ID,
+} from "../../config";
 import { OAuth2Client } from "google-auth-library";
+import { Prisma } from "@prisma/client";
 
 export default class AuthSvc {
   /**
@@ -29,15 +36,18 @@ export default class AuthSvc {
         }
       }
 
-      user = await AuthRepo.createUser({
+      user = (await AuthRepo.createUser({
         email,
         username,
-      }) as any;
+      })) as unknown as typeof user;
 
       logger.info(`New user registered via simple login: ${email}`);
     }
 
-    return this.generateAuthResponse(user, platform || "local");
+    return this.generateAuthResponse(
+      user as { id: string; email: string; username: string; avatar?: { fileUrl: string } | null },
+      platform || "local"
+    );
   }
 
   /**
@@ -72,9 +82,9 @@ export default class AuthSvc {
 
       // Complete OAuth login flow
       return this.generateAuthResponse(user, "google", payload.sub, payload.picture);
-    } catch (error: any) {
+    } catch (error) {
       logger.error("[AuthSvc] Google SSO verification failed:", error);
-      throw { status: 401, message: "Failed to verify Google token: " + (error.message || error) };
+      throw { status: 401, message: "Failed to verify Google token: " + (error as Error).message };
     }
   }
 
@@ -91,8 +101,8 @@ export default class AuthSvc {
       const user = await AuthRepo.findUserById(decoded.userId);
       if (!user) throw { status: 404, message: "User not found" };
 
-      const accessToken = jwt.sign({ userId: user.id }, ACCESS_TOKEN_SECRET, {
-        expiresIn: ACCESS_TOKEN_EXPIRY as any,
+      const accessToken = jwt.sign({ userId: user.id }, ACCESS_TOKEN_SECRET as string, {
+        expiresIn: ACCESS_TOKEN_EXPIRY as unknown as number,
       });
 
       return {
@@ -124,18 +134,18 @@ export default class AuthSvc {
    * Internal helper to generate tokens and session
    */
   private static async generateAuthResponse(
-    user: any,
+    user: { id: string; email: string; username: string; avatar?: { fileUrl: string } | null },
     platform: string,
     providerUserId?: string,
     providerAvatarUrl?: string
   ) {
-    const accessToken = jwt.sign({ userId: user.id }, ACCESS_TOKEN_SECRET, {
-      expiresIn: ACCESS_TOKEN_EXPIRY as any,
+    const accessToken = jwt.sign({ userId: user.id }, ACCESS_TOKEN_SECRET as string, {
+      expiresIn: ACCESS_TOKEN_EXPIRY as unknown as number,
     });
 
     const refreshToken = jwt.sign(
       { userId: user.id, jti: crypto.randomBytes(16).toString("hex") },
-      REFRESH_TOKEN_SECRET,
+      REFRESH_TOKEN_SECRET as string,
       { expiresIn: REFRESH_TOKEN_EXPIRY }
     );
 
@@ -164,14 +174,12 @@ export default class AuthSvc {
     };
   }
 
-  static async updateProfile(userId: string, data: any) {
+  static async updateProfile(userId: string, data: Prisma.UserUpdateInput) {
     try {
       const user = await AuthRepo.updateUser(userId, data);
       return user;
-    } catch (error: any) {
-      throw { status: 500, message: "Failed to update profile: " + (error.message || error) };
+    } catch (error) {
+      throw { status: 500, message: "Failed to update profile: " + (error as Error).message };
     }
   }
-
 }
-

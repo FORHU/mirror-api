@@ -1,5 +1,14 @@
 import GarmentRepo from "../../repositories/garment.repository";
-import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, SILHOUETTE, Prisma } from "@prisma/client";
+import {
+  GARMENT_TYPES,
+  FITTING_SLOT,
+  CATEGORY,
+  GARMENT_GENDER,
+  LAYER_LEVEL,
+  SILHOUETTE,
+  Prisma,
+  File,
+} from "@prisma/client";
 import FileService from "./file.service";
 import CacheUtil from "../../utils/cache.util";
 import { evaluateGarmentImage, GarmentEvaluation } from "../../utils/openai/evaluate-garment.util";
@@ -8,14 +17,16 @@ const GARMENT_CACHE_TTL = 1800; // 30 minutes — matches a typical user session
 const garmentKey = (id: string) => `garment:${id}`;
 
 export default class GarmentService {
-  static async getGarments(query: any) {
+  static async getGarments(query: Record<string, string | string[] | undefined>) {
     const { page, limit, garmentType, fittingSlot, category, gender, silhouette, tag } = query;
-    
-    const filters: any = {};
+
+    const filters: Prisma.GarmentWhereInput = {};
     if (garmentType) {
-      filters.garmentType = { hasSome: Array.isArray(garmentType) ? garmentType : [garmentType] };
+      filters.garmentType = {
+        hasSome: (Array.isArray(garmentType) ? garmentType : [garmentType]) as GARMENT_TYPES[],
+      };
     }
-    
+
     if (fittingSlot) {
       const SLOT_MAP: Record<string, FITTING_SLOT> = {
         headgarments: FITTING_SLOT.HeadGarment,
@@ -46,7 +57,10 @@ export default class GarmentService {
         .map((s) => {
           if (typeof s !== "string") return null;
           const clean = s.trim().toLowerCase();
-          return SLOT_MAP[clean] || (Object.values(FITTING_SLOT) as string[]).find((val) => val.toLowerCase() === clean);
+          return (
+            SLOT_MAP[clean] ||
+            (Object.values(FITTING_SLOT) as string[]).find((val) => val.toLowerCase() === clean)
+          );
         })
         .filter((s): s is FITTING_SLOT => Boolean(s));
 
@@ -56,36 +70,52 @@ export default class GarmentService {
     }
 
     if (category) {
-      filters.category = { hasSome: Array.isArray(category) ? category : [category] };
+      filters.category = {
+        hasSome: (Array.isArray(category) ? category : [category]) as CATEGORY[],
+      };
     }
-    if (gender) filters.gender = gender;
-    if (silhouette) filters.silhouette = silhouette;
+    if (gender) filters.gender = (Array.isArray(gender) ? gender[0] : gender) as GARMENT_GENDER;
+    if (silhouette)
+      filters.silhouette = (Array.isArray(silhouette) ? silhouette[0] : silhouette) as SILHOUETTE;
     if (tag) {
-      filters.tags = { some: { name: tag } };
+      filters.tags = { some: { name: Array.isArray(tag) ? tag[0] : tag } };
     }
 
     return GarmentRepo.findAll(
       filters,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20
+      page ? parseInt(page as string) : 1,
+      limit ? parseInt(limit as string) : 20
     );
   }
 
   static async getGarmentById(id: string) {
-    const garment = await CacheUtil.remember(
-      garmentKey(id),
-      GARMENT_CACHE_TTL,
-      () => GarmentRepo.findById(id),
+    const garment = await CacheUtil.remember(garmentKey(id), GARMENT_CACHE_TTL, () =>
+      GarmentRepo.findById(id)
     );
     if (!garment) throw { status: 404, message: "Garment not found" };
     return garment;
   }
 
-  static async createGarment(data: any) {
-    const garmentData: any = {
+  static async createGarment(data: {
+    name: string;
+    description?: string;
+    imageUrl?: string;
+    garmentType?: GARMENT_TYPES | GARMENT_TYPES[];
+    fittingSlot?: FITTING_SLOT | FITTING_SLOT[];
+    category?: CATEGORY | CATEGORY[];
+    gender?: GARMENT_GENDER;
+    layerLevel?: LAYER_LEVEL;
+    silhouette?: SILHOUETTE;
+    metaData?: Prisma.InputJsonValue;
+    userId?: string;
+    file?: Prisma.FileCreateWithoutGarmentInput;
+    fileId?: string;
+    tags?: string[];
+  }) {
+    const garmentData = {
       name: data.name,
       description: data.description,
-      imageUrl: data.imageUrl,
+      imageUrl: data.imageUrl || "",
       garmentType: data.garmentType as GARMENT_TYPES[],
       fittingSlot: data.fittingSlot as FITTING_SLOT[],
       category: data.category as CATEGORY[],
@@ -93,7 +123,7 @@ export default class GarmentService {
       layerLevel: data.layerLevel as LAYER_LEVEL,
       silhouette: data.silhouette as SILHOUETTE,
       metaData: data.metaData,
-    };
+    } as Prisma.GarmentCreateInput;
 
     if (data.userId) {
       garmentData.user = { connect: { id: data.userId } };
@@ -121,11 +151,28 @@ export default class GarmentService {
     return GarmentRepo.create(garmentData);
   }
 
-  static async updateGarment(id: string, data: any) {
+  static async updateGarment(
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      imageUrl?: string;
+      garmentType?: GARMENT_TYPES | GARMENT_TYPES[];
+      fittingSlot?: FITTING_SLOT | FITTING_SLOT[];
+      category?: CATEGORY | CATEGORY[];
+      gender?: GARMENT_GENDER;
+      layerLevel?: LAYER_LEVEL;
+      silhouette?: SILHOUETTE;
+      metaData?: Prisma.InputJsonValue;
+      file?: Prisma.FileCreateWithoutGarmentInput;
+      fileId?: string;
+      tags?: string[];
+    }
+  ) {
     const existing = await this.getGarmentById(id); // Ensure it exists
     const oldFileId = existing.fileId;
 
-    const garmentData: any = {
+    const garmentData: Prisma.GarmentUpdateInput = {
       name: data.name,
       description: data.description,
       imageUrl: data.imageUrl,
@@ -172,7 +219,7 @@ export default class GarmentService {
     if (data.fileId && oldFileId && data.fileId !== oldFileId) {
       try {
         await FileService.discardIfUnreferenced(oldFileId);
-      } catch (err: any) {
+      } catch (err) {
         // Already best-effort inside discardIfUnreferenced; this is belt-and-suspenders.
       }
     }
@@ -194,7 +241,7 @@ export default class GarmentService {
     if (fileId) {
       try {
         await FileService.discardIfUnreferenced(fileId);
-      } catch (err: any) {
+      } catch (err) {
         // Best-effort cleanup; the delete itself already succeeded.
       }
     }
@@ -209,10 +256,10 @@ export default class GarmentService {
    * early and finish AI work in the background.
    */
   static async uploadGarmentFile(
-    file: any,
-    fallbackImageUrl?: string,
-  ): Promise<{ file: any | null; imageUrl: string }> {
-    let fileRecord: any = null;
+    file: Express.Multer.File,
+    fallbackImageUrl?: string
+  ): Promise<{ file: File | null; imageUrl: string }> {
+    let fileRecord: File | null = null;
     let urlForAI = fallbackImageUrl;
 
     if (file) {
@@ -233,9 +280,9 @@ export default class GarmentService {
    * the AI output before we persist anything.
    */
   static async runGarmentEvaluation(
-    file: any,
-    options: { imageUrl?: string } = {},
-  ): Promise<{ evaluation: GarmentEvaluation; file: any | null; imageUrl: string }> {
+    file: Express.Multer.File,
+    options: { imageUrl?: string } = {}
+  ): Promise<{ evaluation: GarmentEvaluation; file: File | null; imageUrl: string }> {
     const { file: fileRecord, imageUrl } = await this.uploadGarmentFile(file, options.imageUrl);
     const evaluation = await evaluateGarmentImage(imageUrl);
     return { evaluation, file: fileRecord, imageUrl };
@@ -246,9 +293,9 @@ export default class GarmentService {
    */
   static async persistEvaluatedGarment(
     evaluation: GarmentEvaluation,
-    fileRecord: any,
+    fileRecord: File | null,
     imageUrl: string,
-    userId: string,
+    userId: string
   ) {
     return this.createGarment({
       name: evaluation.name,

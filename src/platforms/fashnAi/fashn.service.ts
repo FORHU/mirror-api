@@ -23,7 +23,11 @@ export default class FashnService {
   /**
    * Triggers a virtual try-on run
    */
-  static async runTryOn(modelUrl: string, garmentUrl: string, category: string): Promise<FashnRunResponse> {
+  static async runTryOn(
+    modelUrl: string,
+    garmentUrl: string,
+    category: string
+  ): Promise<FashnRunResponse> {
     try {
       logger.info(`Triggering FASHN.AI try-on for model: ${modelUrl}`);
 
@@ -41,10 +45,14 @@ export default class FashnService {
       );
 
       return response.data;
-    } catch (error: any) {
-      const status = error.response?.status;
-      const data = error.response?.data;
-      logger.error(`FASHN.AI Run Error [${status}]:`, data || error.message);
+    } catch (error) {
+      const err = error as {
+        response?: { data?: { message?: string }; status?: number };
+        message: string;
+      };
+      const status = err.response?.status;
+      const data = err.response?.data;
+      logger.error(`FASHN.AI Run Error [${status}]:`, data || err.message);
       throw { status: status || 500, message: data?.message || "FASHN.AI request failed" };
     }
   }
@@ -59,7 +67,11 @@ export default class FashnService {
    *     model expects different field names (e.g. `model_video`, extra
    *     duration/fps params), adjust here once the model id is confirmed.
    */
-  static async runVideoTryOn(modelUrl: string, garmentUrl: string, category: string): Promise<FashnRunResponse> {
+  static async runVideoTryOn(
+    modelUrl: string,
+    garmentUrl: string,
+    category: string
+  ): Promise<FashnRunResponse> {
     if (!FASHN_VIDEO_MODEL) {
       throw { status: 503, message: "FASHN_VIDEO_MODEL not configured" };
     }
@@ -81,10 +93,14 @@ export default class FashnService {
       );
 
       return response.data;
-    } catch (error: any) {
-      const status = error.response?.status;
-      const data = error.response?.data;
-      logger.error(`FASHN.AI Video Run Error [${status}]:`, data || error.message);
+    } catch (error) {
+      const err = error as {
+        response?: { data?: { message?: string }; status?: number };
+        message: string;
+      };
+      const status = err.response?.status;
+      const data = err.response?.data;
+      logger.error(`FASHN.AI Video Run Error [${status}]:`, data || err.message);
       throw { status: status || 500, message: data?.message || "FASHN.AI video request failed" };
     }
   }
@@ -98,9 +114,10 @@ export default class FashnService {
         headers: this.headers,
       });
       return response.data;
-    } catch (error: any) {
-      logger.error(`FASHN.AI Status Error:`, error.response?.data || error.message);
-      throw { status: error.response?.status || 500, message: "Failed to fetch FASHN.AI status" };
+    } catch (error) {
+      const err = error as { response?: { data?: unknown; status?: number }; message: string };
+      logger.error(`FASHN.AI Status Error:`, err.response?.data || err.message);
+      throw { status: err.response?.status || 500, message: "Failed to fetch FASHN.AI status" };
     }
   }
 }

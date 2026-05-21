@@ -5,7 +5,14 @@ import FileService from "../../services/shared/file.service";
 import { evaluateGarmentImage } from "../../utils/openai/evaluate-garment.util";
 import { emitToKiosk } from "../../utils/socket.util";
 import logger from "../../utils/logger";
-import { GARMENT_TYPES, FITTING_SLOT, CATEGORY, GARMENT_GENDER, LAYER_LEVEL, SILHOUETTE } from "@prisma/client";
+import {
+  GARMENT_TYPES,
+  FITTING_SLOT,
+  CATEGORY,
+  GARMENT_GENDER,
+  LAYER_LEVEL,
+  SILHOUETTE,
+} from "@prisma/client";
 import { responseSuccess } from "../../helpers/response.helper";
 import { pageFromRepo } from "../../helpers/pagination.helper";
 
@@ -15,12 +22,24 @@ const garmentSchema = Joi.object({
   name: Joi.string().required(),
   description: Joi.string().optional().allow(null, ""),
   imageUrl: Joi.string().uri().optional(), // Now optional because it can be auto-set by the file upload
-  garmentType: Joi.array().items(Joi.string().valid(...Object.values(GARMENT_TYPES))).optional(),
-  fittingSlot: Joi.array().items(Joi.string().valid(...Object.values(FITTING_SLOT))).optional(),
-  category: Joi.array().items(Joi.string().valid(...Object.values(CATEGORY))).optional(),
-  gender: Joi.string().valid(...Object.values(GARMENT_GENDER)).optional(),
-  layerLevel: Joi.string().valid(...Object.values(LAYER_LEVEL)).optional(),
-  silhouette: Joi.string().valid(...Object.values(SILHOUETTE)).optional(),
+  garmentType: Joi.array()
+    .items(Joi.string().valid(...Object.values(GARMENT_TYPES)))
+    .optional(),
+  fittingSlot: Joi.array()
+    .items(Joi.string().valid(...Object.values(FITTING_SLOT)))
+    .optional(),
+  category: Joi.array()
+    .items(Joi.string().valid(...Object.values(CATEGORY)))
+    .optional(),
+  gender: Joi.string()
+    .valid(...Object.values(GARMENT_GENDER))
+    .optional(),
+  layerLevel: Joi.string()
+    .valid(...Object.values(LAYER_LEVEL))
+    .optional(),
+  silhouette: Joi.string()
+    .valid(...Object.values(SILHOUETTE))
+    .optional(),
   tags: Joi.array().items(Joi.string()).optional(),
   metaData: Joi.object().optional().allow(null),
   fileId: Joi.string().optional(),
@@ -34,12 +53,24 @@ const garmentUpdateSchema = Joi.object({
   name: Joi.string().optional(),
   description: Joi.string().optional().allow(null, ""),
   imageUrl: Joi.string().uri().optional(),
-  garmentType: Joi.array().items(Joi.string().valid(...Object.values(GARMENT_TYPES))).optional(),
-  fittingSlot: Joi.array().items(Joi.string().valid(...Object.values(FITTING_SLOT))).optional(),
-  category: Joi.array().items(Joi.string().valid(...Object.values(CATEGORY))).optional(),
-  gender: Joi.string().valid(...Object.values(GARMENT_GENDER)).optional(),
-  layerLevel: Joi.string().valid(...Object.values(LAYER_LEVEL)).optional(),
-  silhouette: Joi.string().valid(...Object.values(SILHOUETTE)).optional(),
+  garmentType: Joi.array()
+    .items(Joi.string().valid(...Object.values(GARMENT_TYPES)))
+    .optional(),
+  fittingSlot: Joi.array()
+    .items(Joi.string().valid(...Object.values(FITTING_SLOT)))
+    .optional(),
+  category: Joi.array()
+    .items(Joi.string().valid(...Object.values(CATEGORY)))
+    .optional(),
+  gender: Joi.string()
+    .valid(...Object.values(GARMENT_GENDER))
+    .optional(),
+  layerLevel: Joi.string()
+    .valid(...Object.values(LAYER_LEVEL))
+    .optional(),
+  silhouette: Joi.string()
+    .valid(...Object.values(SILHOUETTE))
+    .optional(),
   tags: Joi.array().items(Joi.string()).optional(),
   metaData: Joi.object().optional().allow(null),
   fileId: Joi.string().optional(),
@@ -50,12 +81,27 @@ const garmentUpdateSchema = Joi.object({
 const evaluationSchema = Joi.object({
   name: Joi.string().required(),
   description: Joi.string().required().allow(""),
-  garmentType: Joi.array().items(Joi.string().valid(...Object.values(GARMENT_TYPES))).min(1).required(),
-  fittingSlot: Joi.array().items(Joi.string().valid(...Object.values(FITTING_SLOT))).min(1).required(),
-  category: Joi.array().items(Joi.string().valid(...Object.values(CATEGORY))).min(1).required(),
-  gender: Joi.string().valid(...Object.values(GARMENT_GENDER)).required(),
-  layerLevel: Joi.string().valid(...Object.values(LAYER_LEVEL)).required(),
-  silhouette: Joi.string().valid(...Object.values(SILHOUETTE)).required(),
+  garmentType: Joi.array()
+    .items(Joi.string().valid(...Object.values(GARMENT_TYPES)))
+    .min(1)
+    .required(),
+  fittingSlot: Joi.array()
+    .items(Joi.string().valid(...Object.values(FITTING_SLOT)))
+    .min(1)
+    .required(),
+  category: Joi.array()
+    .items(Joi.string().valid(...Object.values(CATEGORY)))
+    .min(1)
+    .required(),
+  gender: Joi.string()
+    .valid(...Object.values(GARMENT_GENDER))
+    .required(),
+  layerLevel: Joi.string()
+    .valid(...Object.values(LAYER_LEVEL))
+    .required(),
+  silhouette: Joi.string()
+    .valid(...Object.values(SILHOUETTE))
+    .required(),
   tags: Joi.array().items(Joi.string()).required(), // strings only
   dominantColor: Joi.string().optional().allow(null, ""),
 });
@@ -63,7 +109,9 @@ const evaluationSchema = Joi.object({
 export default class GarmentController {
   static async index(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await GarmentService.getGarments(req.query);
+      const result = await GarmentService.getGarments(
+        req.query as unknown as Record<string, string | string[] | undefined>
+      );
       responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
       next(err);
@@ -87,16 +135,19 @@ export default class GarmentController {
    * of a downstream Joi type error); lenient fields fall back to raw string
    * for Joi to validate/coerce.
    */
-  private static prepareBody(body: any) {
-    const cleaned = { ...body };
+  private static prepareBody(body: Record<string, unknown>) {
+    const cleaned = { ...body } as Record<string, unknown>;
 
-    const strictJsonFields = ['garmentType', 'fittingSlot', 'category', 'tags', 'metaData', 'file'];
+    const strictJsonFields = ["garmentType", "fittingSlot", "category", "tags", "metaData", "file"];
     for (const field of strictJsonFields) {
-      if (typeof cleaned[field] === 'string') {
+      if (typeof cleaned[field] === "string") {
         try {
-          cleaned[field] = JSON.parse(cleaned[field]);
-        } catch (e: any) {
-          throw { status: 400, message: `Field "${field}" is not valid JSON: ${e.message}` };
+          cleaned[field] = JSON.parse(cleaned[field] as string);
+        } catch (e) {
+          throw {
+            status: 400,
+            message: `Field "${field}" is not valid JSON: ${(e as Error).message}`,
+          };
         }
       }
     }
@@ -110,14 +161,17 @@ export default class GarmentController {
       const { error, value } = garmentSchema.validate(cleanedBody);
       if (error) return next(validationError(error.message));
 
-      let finalValue = { ...value };
+      const finalValue = { ...value };
 
       // If a physical file was uploaded, the new file's URL is the source
       // of truth — overwrite any imageUrl the caller may have sent so the
       // two never diverge. Matches `update`'s rule.
       if (req.file) {
         const manualFileSpecs = finalValue.file || {};
-        const fileRecord = await FileService.uploadFile(req.file, manualFileSpecs.metaData);
+        const fileRecord = await FileService.uploadFile(
+          req.file as Express.Multer.File,
+          manualFileSpecs.metaData
+        );
         finalValue.fileId = fileRecord.id;
         finalValue.imageUrl = fileRecord.fileUrl;
       }
@@ -135,12 +189,15 @@ export default class GarmentController {
       const { error, value } = garmentUpdateSchema.validate(cleanedBody);
       if (error) return next(validationError(error.message));
 
-      let finalValue = { ...value };
+      const finalValue = { ...value };
 
       // If a new physical file was uploaded, process it
       if (req.file) {
         const manualFileSpecs = finalValue.file || {};
-        const fileRecord = await FileService.uploadFile(req.file, manualFileSpecs.metaData);
+        const fileRecord = await FileService.uploadFile(
+          req.file as Express.Multer.File,
+          manualFileSpecs.metaData
+        );
         finalValue.fileId = fileRecord.id;
         finalValue.imageUrl = fileRecord.fileUrl;
       }
@@ -179,7 +236,7 @@ export default class GarmentController {
    */
   static async evaluate(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
       if (!userId) return next({ status: 401, message: "Authentication required" });
 
       const imageUrl = req.body?.imageUrl;
@@ -190,8 +247,10 @@ export default class GarmentController {
 
       // Step 1: upload only — fast, blocks the response just long enough
       // for the client to know the upload itself succeeded.
-      const { file: fileRecord, imageUrl: finalImageUrl } =
-        await GarmentService.uploadGarmentFile(req.file, imageUrl);
+      const { file: fileRecord, imageUrl: finalImageUrl } = await GarmentService.uploadGarmentFile(
+        req.file as Express.Multer.File,
+        imageUrl
+      );
 
       // Step 2: respond immediately. AI work continues below.
       responseSuccess(
@@ -202,7 +261,7 @@ export default class GarmentController {
           imageUrl: finalImageUrl,
           kioskId: kioskId || null,
         },
-        "Upload received. Evaluation in progress.",
+        "Upload received. Evaluation in progress."
       );
 
       // Step 3: background AI work — no await on the response path.
@@ -217,7 +276,7 @@ export default class GarmentController {
             value,
             fileRecord,
             finalImageUrl,
-            userId,
+            userId
           );
 
           logger.info(`[GarmentEvaluate] Completed garment ${garment.id} for user ${userId}`);
@@ -228,12 +287,12 @@ export default class GarmentController {
               garment,
             });
           }
-        } catch (err: any) {
-          logger.error(`[GarmentEvaluate] Background failure: ${err.message}`);
+        } catch (err) {
+          logger.error(`[GarmentEvaluate] Background failure: ${(err as Error).message}`);
           if (kioskId) {
             emitToKiosk(kioskId, "garment_failed", {
               fileId: fileRecord?.id,
-              error: err.message,
+              error: (err as Error).message,
             });
           }
         }

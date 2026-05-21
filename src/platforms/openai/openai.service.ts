@@ -11,7 +11,10 @@ export default class OpenAIService {
   /**
    * Generates a chat completion using GPT-4o or GPT-3.5
    */
-  static async chat(prompt: string, systemMessage: string = "You are a helpful fashion assistant for a Smart Mirror.") {
+  static async chat(
+    prompt: string,
+    systemMessage: string = "You are a helpful fashion assistant for a Smart Mirror."
+  ) {
     try {
       const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -27,9 +30,10 @@ export default class OpenAIService {
       );
 
       return response.data.choices[0].message.content;
-    } catch (error: any) {
-      logger.error("OpenAI Chat Error:", error.response?.data || error.message);
-      throw { status: error.response?.status || 500, message: "OpenAI request failed" };
+    } catch (error) {
+      const err = error as { response?: { data?: unknown; status?: number }; message: string };
+      logger.error("OpenAI Chat Error:", err.response?.data || err.message);
+      throw { status: err.response?.status || 500, message: "OpenAI request failed" };
     }
   }
 }

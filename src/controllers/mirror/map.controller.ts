@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import { mapService } from "../../services/shared/map.service";
 import { PrismaClient } from "@prisma/client";
 import axios from "axios";
 import { MAPBOX_SECRET_TOKEN, ORS_API_KEY } from "../../config";
+import logger from "../../utils/logger";
 
 const prisma = new PrismaClient();
 
@@ -23,7 +25,7 @@ function isRateLimited(userId: string): boolean {
 }
 
 interface DirectionsResponse {
-  geojson: any;
+  geojson: Record<string, unknown>;
   steps: {
     instruction: string;
     maneuver: {
@@ -45,13 +47,16 @@ const ORS_PROFILES: Record<string, string> = {
   walking: "foot-walking",
 };
 
-const ORS_EXCLUSIONS: Record<string, any> = {
+const ORS_EXCLUSIONS: Record<string, Record<string, unknown>> = {
   motorcycle: { avoid_features: ["highways", "tollways"] },
-  bicycle: {}, 
+  bicycle: {},
   walking: {},
 };
 
-async function getMapboxDirections(origin: [number, number], destination: [number, number]): Promise<DirectionsResponse> {
+async function getMapboxDirections(
+  origin: [number, number],
+  destination: [number, number]
+): Promise<DirectionsResponse> {
   const baseUrl = `https://api.mapbox.com/directions/v5/mapbox`;
   const coords = `${origin[0]},${origin[1]};${destination[0]},${destination[1]}`;
   const params = `?access_token=${MAPBOX_SECRET_TOKEN}&geometries=geojson&steps=true&overview=full&annotations=duration,distance`;
@@ -59,10 +64,10 @@ async function getMapboxDirections(origin: [number, number], destination: [numbe
   try {
     const response = await axios.get(`${baseUrl}/driving-traffic/${coords}${params}`);
     return normalizeMapboxResponse(response.data);
-  } catch (err: any) {
+  } catch (err) {
     // If driving-traffic is forbidden (403), fallback to standard driving
-    if (err.response?.status === 403) {
-      console.warn("Mapbox driving-traffic forbidden, falling back to standard driving");
+    if ((err as { response?: { status?: number } }).response?.status === 403) {
+      logger.warn("Mapbox driving-traffic forbidden, falling back to standard driving");
       const response = await axios.get(`${baseUrl}/driving/${coords}${params}`);
       return normalizeMapboxResponse(response.data);
     }
@@ -107,18 +112,20 @@ async function getORSDirections(
   return normalizeORSResponse(data, profile);
 }
 
-function normalizeMapboxResponse(data: any): DirectionsResponse {
-  const route = data.routes[0];
-  const steps = route.legs[0].steps.map((step: any) => ({
-    instruction: step.maneuver.instruction,
-    maneuver: {
-      type: step.maneuver.type,
-      modifier: step.maneuver.modifier ?? "straight",
-    },
-    distance: step.distance,
-    duration: step.duration,
-    name: step.name ?? "",
-  }));
+function normalizeMapboxResponse(data: Record<string, unknown>): DirectionsResponse {
+  const route = (data.routes as any[])[0];
+  const steps = (route as { legs: Array<{ steps: Array<any> }> }).legs[0].steps.map(
+    (step: any) => ({
+      instruction: step.maneuver.instruction as string,
+      maneuver: {
+        type: step.maneuver.type as string,
+        modifier: (step.maneuver.modifier as string) ?? "straight",
+      },
+      distance: step.distance as number,
+      duration: step.duration as number,
+      name: (step.name as string) ?? "",
+    })
+  );
   return {
     geojson: {
       type: "FeatureCollection",
@@ -131,11 +138,11 @@ function normalizeMapboxResponse(data: any): DirectionsResponse {
   };
 }
 
-function normalizeORSResponse(data: any, profile: string): DirectionsResponse {
-  const feature = data.features[0];
+function normalizeORSResponse(data: Record<string, unknown>, profile: string): DirectionsResponse {
+  const feature = (data.features as any[])[0];
   const segments = feature.properties.segments[0];
 
-  const steps = segments.steps.map((step: any) => {
+  const steps = (segments as { steps: Array<any> }).steps.map((step: any) => {
     const modifierMap: Record<number, { type: string; modifier: string }> = {
       0: { type: "turn", modifier: "left" },
       1: { type: "turn", modifier: "right" },
@@ -149,14 +156,13 @@ function normalizeORSResponse(data: any, profile: string): DirectionsResponse {
       10: { type: "roundabout", modifier: "right" },
       11: { type: "uturn", modifier: "uturn" },
     };
-    const maneuver = modifierMap[step.type] ?? { type: "continue", modifier: "straight" };
 
     return {
-      instruction: step.instruction,
-      maneuver,
-      distance: step.distance,
-      duration: step.duration,
-      name: step.name ?? "",
+      instruction: step.instruction as string,
+      maneuver: modifierMap[step.type as number] ?? { type: "continue", modifier: "straight" },
+      distance: step.distance as number,
+      duration: step.duration as number,
+      name: (step.name as string) ?? "",
     };
   });
 
@@ -180,7 +186,7 @@ async function getDirections(
   if (profile === "car") {
     return getMapboxDirections(origin, destination);
   } else {
-    return getORSDirections(origin, destination, profile as any);
+    return getORSDirections(origin, destination, profile as "motorcycle" | "bicycle" | "walking");
   }
 }
 
@@ -219,7 +225,11 @@ export default class MapController {
     if (error) return res.status(400).json({ success: false, message: error.message });
 
     try {
-      const directions = await mapService.getDirections(value.origin, value.destination, value.profile);
+      const directions = await mapService.getDirections(
+        value.origin,
+        value.destination,
+        value.profile
+      );
       res.status(200).json({ success: true, data: directions });
     } catch (err) {
       next(err);
@@ -243,12 +253,12 @@ export default class MapController {
     try {
       const results = await mapService.geocodeAddress(
         value.query,
-        value.lng ?? 120.5960,
+        value.lng ?? 120.596,
         value.lat ?? 16.3971
       );
       res.status(200).json({ results });
-    } catch (err: any) {
-      if (err.message === "Geocoding service unavailable") {
+    } catch (err) {
+      if ((err as Error).message === "Geocoding service unavailable") {
         return res.status(502).json({ error: "Geocoding service unavailable" });
       }
       next(err);
@@ -258,17 +268,14 @@ export default class MapController {
   /**
    * POST /mirror/map/directions  — auth optional, rate limited
    */
-  static async directions(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id || "anonymous";
+  static async directions(req: Request, res: Response) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id || "anonymous";
 
     if (isRateLimited(userId)) {
       return res.status(429).json({ error: "Too many requests. Wait 5 seconds." });
     }
 
-    const coordSchema = Joi.array()
-      .items(Joi.number().required())
-      .length(2)
-      .required();
+    const coordSchema = Joi.array().items(Joi.number().required()).length(2).required();
 
     const schema = Joi.object({
       origin: coordSchema,
@@ -277,7 +284,10 @@ export default class MapController {
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.message || "Invalid profile. Must be car, motorcycle, bicycle, or walking" });
+    if (error)
+      return res.status(400).json({
+        error: error.message || "Invalid profile. Must be car, motorcycle, bicycle, or walking",
+      });
 
     const [oLng, oLat] = value.origin;
     const [dLng, dLat] = value.destination;
@@ -292,18 +302,31 @@ export default class MapController {
     try {
       const result = await getDirections(value.origin, value.destination, value.profile);
       res.status(200).json(result);
-    } catch (err: any) {
-      const details = err.response?.data?.error?.message || err.response?.data?.message || err.message;
-      console.error("Routing error details:", details);
-      
-      if (err.message === "NO_ROUTE") {
-        return res.status(404).json({ error: "No route found for this profile between these points" });
+    } catch (err) {
+      const errorObj = err as {
+        response?: { data?: { error?: { message?: string }; message?: string }; status?: number };
+        message?: string;
+      };
+      const details =
+        errorObj.response?.data?.error?.message ||
+        errorObj.response?.data?.message ||
+        errorObj.message;
+      logger.error("Routing error details:", details);
+
+      if (errorObj.message === "NO_ROUTE") {
+        return res
+          .status(404)
+          .json({ error: "No route found for this profile between these points" });
       }
-      if (err.message === "ORS_KEY_MISSING") {
-        return res.status(502).json({ error: "OpenRouteService key not set in .env. Get a free key at openrouteservice.org" });
+      if (errorObj.message === "ORS_KEY_MISSING") {
+        return res.status(502).json({
+          error: "OpenRouteService key not set in .env. Get a free key at openrouteservice.org",
+        });
       }
-      if (err.message === "ORS_ERROR" || err.response?.status === 401) {
-        return res.status(502).json({ error: `Routing service auth/availability error: ${details}` });
+      if (errorObj.message === "ORS_ERROR" || errorObj.response?.status === 401) {
+        return res
+          .status(502)
+          .json({ error: `Routing service auth/availability error: ${details}` });
       }
       res.status(502).json({ error: `Directions service unavailable: ${details}` });
     }
@@ -311,7 +334,7 @@ export default class MapController {
 
   static async getHomeLocation(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: { homeLocationLat: true, homeLocationLng: true },
@@ -328,7 +351,7 @@ export default class MapController {
 
   static async updateHomeLocation(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
       const { lat, lng } = req.body as { lat: number; lng: number };
       if (typeof lat !== "number" || typeof lng !== "number") {
         return res.status(400).json({ message: "lat and lng are required numbers" });

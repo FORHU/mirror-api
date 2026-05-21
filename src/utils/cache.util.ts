@@ -3,7 +3,7 @@ import logger from "./logger";
 import RedisUtil from "./redis.util";
 
 export default class CacheUtil {
-  static async get<T = any>(key: string): Promise<T | null> {
+  static async get<T = unknown>(key: string): Promise<T | null> {
     try {
       const data = await RedisUtil.client.get(key);
       if (!data) return null;
@@ -14,11 +14,7 @@ export default class CacheUtil {
     }
   }
 
-  static async set(
-    key: string,
-    value: any,
-    ttlSeconds?: number,
-  ): Promise<void> {
+  static async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
     try {
       const serialized = JSON.stringify(value);
       const ttl = ttlSeconds || REDIS_TTL_SECONDS;
@@ -81,11 +77,7 @@ export default class CacheUtil {
    *     () => GarmentRepo.findById(id),
    *   );
    */
-  static async remember<T>(
-    key: string,
-    ttlSeconds: number,
-    fn: () => Promise<T>,
-  ): Promise<T> {
+  static async remember<T>(key: string, ttlSeconds: number, fn: () => Promise<T>): Promise<T> {
     const hit = await this.get<T>(key);
     if (hit !== null && hit !== undefined) return hit;
 

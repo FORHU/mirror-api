@@ -34,13 +34,16 @@ export default class OutlineRepo {
     });
   }
 
-  static async update(id: string, data: {
-    userPrompt?: string[];
-    location?: string;
-    latitude?: number;
-    longitude?: number;
-    startTime?: Date;
-  }) {
+  static async update(
+    id: string,
+    data: {
+      userPrompt?: string[];
+      location?: string;
+      latitude?: number;
+      longitude?: number;
+      startTime?: Date;
+    }
+  ) {
     return prisma.userOutline.update({
       where: { id },
       data,

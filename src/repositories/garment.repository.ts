@@ -2,9 +2,9 @@ import { prisma } from "../utils/prisma";
 import { Prisma } from "@prisma/client";
 
 export default class GarmentRepo {
-  static async findAll(filters: any, page: number = 1, limit: number = 20) {
+  static async findAll(filters: Prisma.GarmentWhereInput, page: number = 1, limit: number = 20) {
     const skip = (page - 1) * limit;
-    
+
     const where: Prisma.GarmentWhereInput = {
       ...filters,
     };

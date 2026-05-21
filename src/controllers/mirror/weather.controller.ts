@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { weatherService, WeatherData } from "../../services/shared/weather.service";
 
 interface CacheEntry {
@@ -10,7 +10,7 @@ const weatherCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 export default class WeatherController {
-  static async getWeather(req: Request, res: Response, next: NextFunction) {
+  static async getWeather(req: Request, res: Response) {
     const { lat, lng } = req.query;
 
     if (!lat || !lng) {
@@ -39,8 +39,8 @@ export default class WeatherController {
         expiry: now + CACHE_TTL_MS,
       });
       res.status(200).json(data);
-    } catch (err: any) {
-      res.status(502).json({ error: err.message || "Weather service unavailable" });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message || "Weather service unavailable" });
     }
   }
 }

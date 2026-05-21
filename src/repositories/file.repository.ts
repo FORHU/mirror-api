@@ -1,4 +1,5 @@
 import { prisma } from "../utils/prisma";
+import { Prisma } from "@prisma/client";
 
 export default class FileRepo {
   static async create(data: {
@@ -12,7 +13,7 @@ export default class FileRepo {
     provider?: string;
     bucket?: string;
     path?: string;
-    metaData?: any;
+    metaData?: Prisma.InputJsonValue;
   }) {
     return prisma.file.create({
       data,

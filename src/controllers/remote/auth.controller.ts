@@ -86,8 +86,8 @@ export default class AuthController {
     if (error) return next(validationError(error.message));
 
     try {
-      const userId = (req as any).user?.id;
-      const data = await AuthSvc.logout(userId, value.refreshToken);
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
+      const data = await AuthSvc.logout(userId as string, value.refreshToken);
       return responseSuccess(res, 200, data, "Logged out successfully");
     } catch (err) {
       next(err);
@@ -95,7 +95,6 @@ export default class AuthController {
   }
 
   static async updateProfile(req: Request, res: Response, next: NextFunction) {
-
     const schema = Joi.object({
       data: Joi.object().required(),
       kioskId: Joi.string().required(),
@@ -105,8 +104,8 @@ export default class AuthController {
     if (error) return next(validationError(error.message));
 
     try {
-      const userId = (req as any).user?.id;
-      const data = await AuthSvc.updateProfile(userId, value.data);
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
+      const data = await AuthSvc.updateProfile(userId as string, value.data);
 
       if (value.kioskId) {
         emitToKiosk(value.kioskId, "kiosk_login", data);
@@ -117,5 +116,4 @@ export default class AuthController {
       next(err);
     }
   }
-
 }

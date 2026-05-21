@@ -103,12 +103,22 @@ function sanitizeEvaluation(evalData: GarmentEvaluation): GarmentEvaluation {
 
   return {
     ...evalData,
-    garmentType: (evalData.garmentType || []).filter((t) => garmentTypes.includes(t)) as GARMENT_TYPES[],
-    fittingSlot: (evalData.fittingSlot || []).filter((t) => fittingSlots.includes(t)) as FITTING_SLOT[],
+    garmentType: (evalData.garmentType || []).filter((t) =>
+      garmentTypes.includes(t)
+    ) as GARMENT_TYPES[],
+    fittingSlot: (evalData.fittingSlot || []).filter((t) =>
+      fittingSlots.includes(t)
+    ) as FITTING_SLOT[],
     category: (evalData.category || []).filter((t) => categories.includes(t)) as CATEGORY[],
-    gender: (genders.includes(evalData.gender) ? evalData.gender : GARMENT_GENDER.UNISEX) as GARMENT_GENDER,
-    layerLevel: (layerLevels.includes(evalData.layerLevel) ? evalData.layerLevel : LAYER_LEVEL.BASE) as LAYER_LEVEL,
-    silhouette: (silhouettes.includes(evalData.silhouette) ? evalData.silhouette : SILHOUETTE.Regular) as SILHOUETTE,
+    gender: (genders.includes(evalData.gender)
+      ? evalData.gender
+      : GARMENT_GENDER.UNISEX) as GARMENT_GENDER,
+    layerLevel: (layerLevels.includes(evalData.layerLevel)
+      ? evalData.layerLevel
+      : LAYER_LEVEL.BASE) as LAYER_LEVEL,
+    silhouette: (silhouettes.includes(evalData.silhouette)
+      ? evalData.silhouette
+      : SILHOUETTE.Regular) as SILHOUETTE,
     tags: Array.isArray(evalData.tags) ? evalData.tags : [],
   };
 }

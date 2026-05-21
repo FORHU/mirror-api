@@ -20,17 +20,20 @@ export const registerCompanionEvents = (socket: Socket) => {
   /**
    * Companion sends an action to a paired kiosk (e.g. outfit selection, try-on trigger).
    */
-  socket.on("companion_action", async (payload: { kioskId: string; data: any }) => {
-    const { kioskId, data } = payload;
-    if (!kioskId) {
-      logger.warn(`companion_action received without kioskId from socket ${socket.id}`);
-      return;
+  socket.on(
+    "companion_action",
+    async (payload: { kioskId: string; data: Record<string, unknown> }) => {
+      const { kioskId, data } = payload;
+      if (!kioskId) {
+        logger.warn(`companion_action received without kioskId from socket ${socket.id}`);
+        return;
+      }
+      try {
+        emitToKiosk(kioskId, "kiosk_notification", data);
+        logger.info(`Companion action forwarded to kiosk ${kioskId}`);
+      } catch (err) {
+        logger.error(`Failed to forward companion action to kiosk ${kioskId}:`, err);
+      }
     }
-    try {
-      emitToKiosk(kioskId, "kiosk_notification", data);
-      logger.info(`Companion action forwarded to kiosk ${kioskId}`);
-    } catch (err) {
-      logger.error(`Failed to forward companion action to kiosk ${kioskId}:`, err);
-    }
-  });
+  );
 };
