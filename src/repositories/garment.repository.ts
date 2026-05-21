@@ -71,8 +71,9 @@ export default class GarmentRepo {
   }
 
   static async delete(id: string) {
-    return prisma.garment.delete({
-      where: { id },
-    });
+    return prisma.$transaction([
+      prisma.garmentInOutfit.deleteMany({ where: { garmentId: id } }),
+      prisma.garment.delete({ where: { id } }),
+    ]);
   }
 }
