@@ -12,7 +12,7 @@ export default class TryOnModelService {
    * If the user already had an avatar, the old File row and S3 object are
    * deleted so model photos don't accumulate.
    */
-  static async uploadModel(userId: string, file: any) {
+  static async uploadModel(userId: string, file: Express.Multer.File) {
     if (!file) throw { status: 400, message: "file is required" };
 
     const existing = await prisma.user.findFirst({
@@ -23,7 +23,17 @@ export default class TryOnModelService {
 
     const oldFile = existing.avatar;
 
-    const fileRecord = await FileService.uploadFile(file, { purpose: "tryon-model" });
+    const fileRecord = await FileService.uploadFile(
+      file as unknown as {
+        originalname?: string;
+        mimetype?: string;
+        size?: number;
+        location?: string;
+        key?: string;
+        bucket?: string;
+      },
+      { purpose: "tryon-model" }
+    );
 
     await prisma.user.update({
       where: { id: userId },
@@ -35,19 +45,23 @@ export default class TryOnModelService {
       try {
         if (oldFile.provider === "S3" && oldFile.path && oldFile.bucket) {
           await s3Client.send(
-            new DeleteObjectCommand({ Bucket: oldFile.bucket, Key: oldFile.path }),
+            new DeleteObjectCommand({ Bucket: oldFile.bucket, Key: oldFile.path })
           );
         }
         await FileRepo.softDelete(oldFile.id);
-        logger.info(`[TryOnModel] Replaced model for user ${userId}, deleted old fileId=${oldFile.id}`);
-      } catch (err: any) {
-        logger.error(`[TryOnModel] Failed to delete old model file ${oldFile.id}: ${err.message}`);
+        logger.info(
+          `[TryOnModel] Replaced model for user ${userId}, deleted old fileId=${oldFile.id}`
+        );
+      } catch (err) {
+        logger.error(
+          `[TryOnModel] Failed to delete old model file ${oldFile.id}: ${(err as Error).message}`
+        );
       }
     }
 
     logger.info(`[TryOnModel] Uploaded model for user ${userId}, fileId=${fileRecord.id}`);
 
-    return FileService.uploadFile(fileRecord);
+    return fileRecord;
   }
 
   /**
@@ -62,6 +76,6 @@ export default class TryOnModelService {
     if (!user) throw { status: 404, message: "User not found" };
     if (!user.avatar) throw { status: 404, message: "No model image set for this user" };
 
-    return FileService.uploadFile(user.avatar);
+    return user.avatar;
   }
 }

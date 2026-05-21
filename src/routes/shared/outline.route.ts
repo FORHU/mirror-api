@@ -4,9 +4,9 @@ import OutlineController from "../../controllers/shared/outline.controller";
 
 const router = Router();
 
-router.post(  "/",        authenticate, OutlineController.create);
-router.get(   "/active",  authenticate, OutlineController.getActive);
-router.get(   "/",        authenticate, OutlineController.list);
-router.get(   "/:id",     authenticate, OutlineController.getById);
+router.post("/", authenticate, OutlineController.create);
+router.get("/active", authenticate, OutlineController.getActive);
+router.get("/", authenticate, OutlineController.list);
+router.get("/:id", authenticate, OutlineController.getById);
 
 export default router;

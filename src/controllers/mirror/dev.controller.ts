@@ -19,8 +19,8 @@ export default async function devTokenHandler(req: Request, res: Response) {
       return res.status(404).json({ error: "Test user not found. Please run seed." });
     }
 
-    const token = jwt.sign({ userId: user.id }, ACCESS_TOKEN_SECRET, {
-      expiresIn: ACCESS_TOKEN_EXPIRY as any,
+    const token = jwt.sign({ userId: user.id }, ACCESS_TOKEN_SECRET as string, {
+      expiresIn: ACCESS_TOKEN_EXPIRY as unknown as number,
     });
 
     res.status(200).json({ token, user });

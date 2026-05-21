@@ -4,12 +4,7 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { Request } from "express";
 import crypto from "crypto";
 import path from "path";
-import {
-  AWS_REGION,
-  AWS_ACCESS_KEY_ID,
-  AWS_SECRET_ACCESS_KEY,
-  S3_BUCKET_NAME,
-} from "../config";
+import { AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME } from "../config";
 
 const s3 = new S3Client({
   region: AWS_REGION,
@@ -28,9 +23,13 @@ const storageS3 = multerS3({
   // Returning undefined from the acl callback makes multer-s3 pass
   // `ACL: undefined`, which the AWS SDK then drops from the request entirely.
   // Public read access is granted via bucket policy instead.
-  acl: function (_req: any, _file: any, cb: any) {
+  acl: function (
+    _req: Request,
+    _file: Express.Multer.File,
+    cb: (error: Error | null, acl?: string) => void
+  ) {
     cb(null, undefined);
-  } as any,
+  } as unknown as string,
   contentType: multerS3.AUTO_CONTENT_TYPE,
   metadata: function (req, file, cb) {
     cb(null, { fieldName: file.fieldname });
@@ -44,18 +43,14 @@ const storageS3 = multerS3({
 
 if (!S3_BUCKET_NAME || !AWS_ACCESS_KEY_ID) {
   throw new Error(
-    "S3 upload requires S3_BUCKET_NAME and AWS_ACCESS_KEY_ID — local disk storage has been removed.",
+    "S3 upload requires S3_BUCKET_NAME and AWS_ACCESS_KEY_ID — local disk storage has been removed."
   );
 }
 
 const storage = storageS3;
 
 // File filter
-const fileFilter = (
-  req: Request,
-  file: Express.Multer.File,
-  cb: multer.FileFilterCallback,
-) => {
+const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   // Allow common file types
   const allowedMimeTypes = [
     "image/jpeg",

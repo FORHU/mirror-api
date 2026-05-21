@@ -1,4 +1,5 @@
 import { prisma } from "../utils/prisma";
+import { Prisma } from "@prisma/client";
 
 export default class AuthRepo {
   static async findUserByEmailOrUsername(email: string, username: string) {
@@ -10,11 +11,7 @@ export default class AuthRepo {
     });
   }
 
-  static async createUser(data: {
-    email: string;
-    username: string;
-    gender?: "MALE" | "FEMALE";
-  }) {
+  static async createUser(data: { email: string; username: string; gender?: "MALE" | "FEMALE" }) {
     return prisma.user.create({
       data: {
         email: data.email,
@@ -116,7 +113,7 @@ export default class AuthRepo {
     });
   }
 
-  static async updateUser(userId: string, data: any) {
+  static async updateUser(userId: string, data: Prisma.UserUpdateInput) {
     return prisma.user.update({
       where: {
         id: userId,
@@ -181,13 +178,13 @@ export default class AuthRepo {
       avatarId = avatarFile.id;
     }
 
-    const createData: any = {
+    const createData: Prisma.UserCreateInput = {
       email: data.email,
       username: data.username,
       gender: "MALE",
     };
     if (avatarId) {
-      createData.avatarId = avatarId;
+      createData.avatar = { connect: { id: avatarId } };
     }
     return prisma.user.create({
       data: createData,

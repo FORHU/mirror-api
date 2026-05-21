@@ -11,7 +11,8 @@
     "lint": "eslint src/**/*.ts --fix",
     "db:setup": "npx prisma generate && npx prisma migrate dev",
     "db:seed": "ts-node prisma/seed.ts",
-    "outfits:generate": "ts-node src/scripts/generate-outfits.ts"
+    "outfits:generate": "ts-node src/scripts/generate-outfits.ts",
+    "format": "npm run lint && prettier --write \"src/**/*.ts\""
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

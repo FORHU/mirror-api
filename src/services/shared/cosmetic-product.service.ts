@@ -5,7 +5,7 @@ import { COSMETIC_TYPE, Prisma } from "@prisma/client";
 const fileNotFound = () => ({ status: 400, message: "Referenced file (fileUrlId) does not exist" });
 
 export default class CosmeticProductService {
-  static async getProducts(query: any) {
+  static async getProducts(query: Record<string, string | undefined>) {
     const { page, limit, type, brand } = query;
 
     const filters: { type?: COSMETIC_TYPE; brand?: string } = {};
@@ -17,7 +17,7 @@ export default class CosmeticProductService {
     return CosmeticProductRepo.findAll(
       filters,
       page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 20,
+      limit ? parseInt(limit, 10) : 20
     );
   }
 
@@ -34,7 +34,7 @@ export default class CosmeticProductService {
     fileUrlId?: string;
     hexColor?: string;
     type?: COSMETIC_TYPE;
-    metaData?: any;
+    metaData?: Prisma.InputJsonValue;
   }) {
     if (data.fileUrlId) {
       const file = await FileRepo.findById(data.fileUrlId);
@@ -42,11 +42,11 @@ export default class CosmeticProductService {
     }
 
     const createInput: Prisma.CosmeticProductCreateInput = {
-      name:     data.name,
-      brand:    data.brand,
-      details:  data.details,
+      name: data.name,
+      brand: data.brand,
+      details: data.details,
       hexColor: data.hexColor,
-      type:     data.type,
+      type: data.type,
       metaData: data.metaData,
       ...(data.fileUrlId && { fileUrl: { connect: { id: data.fileUrlId } } }),
     };
@@ -63,8 +63,8 @@ export default class CosmeticProductService {
       fileUrlId?: string | null;
       hexColor?: string;
       type?: COSMETIC_TYPE;
-      metaData?: any;
-    },
+      metaData?: Prisma.InputJsonValue;
+    }
   ) {
     await this.getProductById(id);
 
@@ -74,11 +74,11 @@ export default class CosmeticProductService {
     }
 
     const updateInput: Prisma.CosmeticProductUpdateInput = {
-      name:     data.name,
-      brand:    data.brand,
-      details:  data.details,
+      name: data.name,
+      brand: data.brand,
+      details: data.details,
       hexColor: data.hexColor,
-      type:     data.type,
+      type: data.type,
       metaData: data.metaData,
       // Explicit null clears the image link; undefined leaves it alone.
       ...(data.fileUrlId === null

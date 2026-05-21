@@ -9,11 +9,20 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sd
 import crypto from "crypto";
 
 export default class FileService {
-
   /**
    * Process an uploaded file and save its metadata
    */
-  static async uploadFile(file: any, manualMetaData: any = {}) {
+  static async uploadFile(
+    file: {
+      originalname?: string;
+      mimetype?: string;
+      size?: number;
+      location?: string;
+      key?: string;
+      bucket?: string;
+    },
+    manualMetaData: Record<string, unknown> = {}
+  ) {
     try {
       const { originalname, mimetype, size, location, key, bucket } = file;
 
@@ -24,7 +33,8 @@ export default class FileService {
       const command = new GetObjectCommand({ Bucket: bucket, Key: key });
       const response = await s3Client.send(command);
       const byteArray = await response.Body?.transformToByteArray();
-      const buffer = Buffer.from(byteArray!);
+      if (!byteArray) throw new Error("S3 object has no body");
+      const buffer = Buffer.from(byteArray);
 
       const image = sharp(buffer);
       const metadata = await image.metadata();
@@ -42,7 +52,7 @@ export default class FileService {
         dominantColor: manualMetaData.dominantColor || autoDominantColor,
         isAlpha: manualMetaData.isAlpha !== undefined ? manualMetaData.isAlpha : metadata.hasAlpha,
         format: manualMetaData.format || metadata.format,
-        ...manualMetaData
+        ...manualMetaData,
       };
 
       const s3DirectUrl = location || `https://${bucket}.s3.amazonaws.com/${key}`;
@@ -73,7 +83,10 @@ export default class FileService {
    * Used to capture transient third-party output (e.g. FASHN.AI try-on results)
    * before the source URL expires.
    */
-  static async uploadFromUrl(sourceUrl: string, opts: { keyPrefix?: string; originalName?: string } = {}) {
+  static async uploadFromUrl(
+    sourceUrl: string,
+    opts: { keyPrefix?: string; originalName?: string } = {}
+  ) {
     const response = await axios.get<ArrayBuffer>(sourceUrl, { responseType: "arraybuffer" });
     const buffer = Buffer.from(response.data);
     const rawContentType = response.headers["content-type"];
@@ -90,12 +103,14 @@ export default class FileService {
     );
 
     const key = `${opts.keyPrefix || "uploads"}/${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${extension}`;
-    await s3Client.send(new PutObjectCommand({
-      Bucket: S3_BUCKET_NAME,
-      Key: key,
-      Body: buffer,
-      ContentType: mimeType,
-    }));
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: S3_BUCKET_NAME,
+        Key: key,
+        Body: buffer,
+        ContentType: mimeType,
+      })
+    );
 
     const finalUrl = S3_CDN_URL ? `${S3_CDN_URL}/${key}` : `s3://${S3_BUCKET_NAME}/${key}`;
 
@@ -141,14 +156,14 @@ export default class FileService {
 
     try {
       if (file.provider === "S3" && file.path && file.bucket) {
-        await s3Client.send(
-          new DeleteObjectCommand({ Bucket: file.bucket, Key: file.path }),
-        );
+        await s3Client.send(new DeleteObjectCommand({ Bucket: file.bucket, Key: file.path }));
       }
       await FileRepo.softDelete(file.id);
       return true;
-    } catch (err: any) {
-      logger.warn(`[FileService.discardIfUnreferenced] cleanup failed (fileId=${file.id}): ${err.message}`);
+    } catch (err) {
+      logger.warn(
+        `[FileService.discardIfUnreferenced] cleanup failed (fileId=${file.id}): ${(err as Error).message}`
+      );
       return false;
     }
   }

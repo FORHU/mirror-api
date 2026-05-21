@@ -44,7 +44,7 @@ export function responseSuccess<T>(
   res: Response,
   statusCode: SuccessStatus,
   data: T,
-  message?: string,
+  message?: string
 ) {
   const body: ApiResponse<T> = {
     status: "success",
@@ -59,7 +59,7 @@ export function responseError(
   res: Response,
   statusCode: ErrorStatus,
   message: string,
-  extra?: { code?: string; details?: unknown },
+  extra?: { code?: string; details?: unknown }
 ) {
   const body: ApiError = {
     status: "error",

@@ -1,3 +1,4 @@
+/* eslint-disable no-console, @typescript-eslint/no-explicit-any */
 /**
  * Bulk rule-based outfit generator. No AI.
  *
@@ -39,12 +40,15 @@ function parseArgs(): Args {
       out.category = v as CATEGORY;
     } else if (k === "gender") {
       if (!(Object.values(GARMENT_GENDER) as string[]).includes(v)) {
-        throw new Error(`Unknown gender "${v}". Allowed: ${Object.values(GARMENT_GENDER).join(", ")}`);
+        throw new Error(
+          `Unknown gender "${v}". Allowed: ${Object.values(GARMENT_GENDER).join(", ")}`
+        );
       }
       out.gender = v as GARMENT_GENDER;
     } else if (k === "count") {
       const n = parseInt(v, 10);
-      if (!Number.isFinite(n) || n < 1) throw new Error(`--count must be a positive integer, got "${v}"`);
+      if (!Number.isFinite(n) || n < 1)
+        throw new Error(`--count must be a positive integer, got "${v}"`);
       out.count = n;
     } else if (k === "user") {
       out.userId = v;
@@ -58,10 +62,7 @@ function parseArgs(): Args {
  * Counted via metaData.category so it tracks rows the script itself made;
  * manually-created outfits without that key don't count toward the quota.
  */
-async function existingIdsFor(
-  category: CATEGORY,
-  userId: string | null,
-): Promise<Set<string>> {
+async function existingIdsFor(category: CATEGORY, userId: string | null): Promise<Set<string>> {
   const rows = await prisma.outfit.findMany({
     where: {
       userId,
@@ -80,8 +81,8 @@ async function main() {
 
   console.log(
     `🪡  Top-up generate — categories=${categories.length}, targetPerCategory=${args.count}` +
-    `${args.gender ? `, gender=${args.gender}` : ""}` +
-    `${args.userId ? `, userId=${args.userId}` : " (system)"}`,
+      `${args.gender ? `, gender=${args.gender}` : ""}` +
+      `${args.userId ? `, userId=${args.userId}` : " (system)"}`
   );
 
   let created = 0;
@@ -125,7 +126,7 @@ async function main() {
         sessionNew.add(outfit.id);
         created++;
         console.log(
-          `  ✓ ${category} → ${outfit.id} (${existing.size + sessionNew.size}/${args.count})`,
+          `  ✓ ${category} → ${outfit.id} (${existing.size + sessionNew.size}/${args.count})`
         );
       } catch (err: any) {
         if (err?.status === 404) {
@@ -143,13 +144,13 @@ async function main() {
     if (!categoryHas404 && finalCount < args.count) {
       exhausted++;
       console.log(
-        `  ⚠ ${category}: stopped at ${finalCount}/${args.count} after ${attempts} attempts — wardrobe variety limit`,
+        `  ⚠ ${category}: stopped at ${finalCount}/${args.count} after ${attempts} attempts — wardrobe variety limit`
       );
     }
   }
 
   console.log(
-    `\nDone. created=${created}, reused=${reused}, skipped=${skipped}, exhausted=${exhausted}, failed=${failed}`,
+    `\nDone. created=${created}, reused=${reused}, skipped=${skipped}, exhausted=${exhausted}, failed=${failed}`
   );
 }
 

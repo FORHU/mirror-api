@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { OPENAI_API_KEY } from "../../config";
+import logger from "../logger";
 
 const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
@@ -12,7 +13,7 @@ export async function defaultOpenAIRequest(
     temperature?: number;
     maxTokens?: number;
     model?: string;
-  } = {},
+  } = {}
 ) {
   const {
     role = "user",
@@ -30,8 +31,8 @@ export async function defaultOpenAIRequest(
     });
 
     return response.choices[0]?.message?.content;
-  } catch (error: any) {
-    console.error("[OpenAI-Request] Error:", error.message);
+  } catch (error) {
+    logger.error(`[OpenAI-Request] Error: ${(error as Error).message}`);
     return null;
   }
 }

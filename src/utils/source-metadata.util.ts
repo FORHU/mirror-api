@@ -14,7 +14,7 @@ export function stripSourcesPrefix(raw: string): {
 
   // Find the end of the [Sources] block (the first newline or the end of the JSON array)
   const afterLabel = trimmed.slice("[Sources]".length).trimStart();
-  
+
   // Basic implementation to find the end of the first JSON array
   if (afterLabel.startsWith("[")) {
     let depth = 0;

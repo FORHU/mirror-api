@@ -12,23 +12,23 @@ export default class ChatWonderService {
     try {
       const cachedKey = `chat:sessionId:${userId}`;
       let sessionId = await CacheUtil.get(cachedKey);
-      
+
       if (!sessionId) {
         if (!CHAT_WONDER_API_URL) {
           logger.warn("[ChatWonderService] CHAT_WONDER_API_URL not defined");
           return "";
         }
-        
+
         const response = await axios.get(`${CHAT_WONDER_API_URL}/session-id`);
         sessionId = response.data?.session_id || "";
-        
+
         if (sessionId) {
           await CacheUtil.set(cachedKey, sessionId, 24 * 60 * 60); // 24 hours
         }
       }
       return sessionId;
-    } catch (error: any) {
-      logger.error(`[ChatWonderService] generateChatSessionId Error: ${error.message}`);
+    } catch (error) {
+      logger.error(`[ChatWonderService] generateChatSessionId Error: ${(error as Error).message}`);
       return "";
     }
   }

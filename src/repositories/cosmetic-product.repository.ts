@@ -5,7 +5,7 @@ export default class CosmeticProductRepo {
   static async findAll(
     filters: { type?: COSMETIC_TYPE; brand?: string } = {},
     page: number = 1,
-    limit: number = 20,
+    limit: number = 20
   ) {
     const skip = (page - 1) * limit;
 

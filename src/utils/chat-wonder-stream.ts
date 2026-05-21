@@ -12,7 +12,7 @@ export async function streamChat(
   userInput: string,
   sessionId: string,
   persona: string | undefined,
-  callbacks: StreamCallbacks,
+  callbacks: StreamCallbacks
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!CHAT_WONDER_API_URL) {
@@ -21,10 +21,7 @@ export async function streamChat(
       return reject(error);
     }
 
-    const wsUrl = CHAT_WONDER_API_URL.replace("http://", "ws://").replace(
-      "https://",
-      "wss://",
-    );
+    const wsUrl = CHAT_WONDER_API_URL.replace("http://", "ws://").replace("https://", "wss://");
     const wsEndpoint = `${wsUrl}/chat-stream`;
 
     logger.info(`[CHAT-WONDER-STREAM] Connecting to ${wsEndpoint}`);
@@ -68,9 +65,7 @@ export async function streamChat(
       }
 
       // Send chunk to frontend
-      logger.info(
-        `[CHAT-WONDER-STREAM] Received chunk (${message.length} chars)`,
-      );
+      logger.info(`[CHAT-WONDER-STREAM] Received chunk (${message.length} chars)`);
       callbacks.onChunk(message);
     });
 

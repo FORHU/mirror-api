@@ -17,7 +17,7 @@ export default class UserController {
    */
   static async getMe(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as Request & { user: { id: string } }).user.id;
       const user = await UserService.getUser(userId);
       return responseSuccess(res, 200, user);
     } catch (error) {
@@ -36,7 +36,7 @@ export default class UserController {
       return responseSuccess(
         res,
         200,
-        buildPage(result.users, result.total, { page: result.page, limit: result.limit }),
+        buildPage(result.users, result.total, { page: result.page, limit: result.limit })
       );
     } catch (error) {
       next(error);
@@ -48,7 +48,7 @@ export default class UserController {
    */
   static async update(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as Request & { user: { id: string } }).user.id;
       const { error, value } = updateSchema.validate(req.body);
       if (error) {
         throw { status: 400, message: error.message };

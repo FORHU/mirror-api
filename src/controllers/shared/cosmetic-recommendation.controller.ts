@@ -5,20 +5,20 @@ import { responseSuccess, responseError } from "../../helpers/response.helper";
 import { pageFromRepo } from "../../helpers/pagination.helper";
 
 const createSchema = Joi.object({
-  userOutlineId:     Joi.string().required(),
+  userOutlineId: Joi.string().required(),
   cosmeticProductId: Joi.string().required(),
-  score:             Joi.number().optional(),
-  rank:              Joi.number().integer().min(0).optional(),
-  reason:            Joi.string().optional().allow(null, ""),
-  signals:           Joi.object().optional().allow(null),
+  score: Joi.number().optional(),
+  rank: Joi.number().integer().min(0).optional(),
+  reason: Joi.string().optional().allow(null, ""),
+  signals: Joi.object().optional().allow(null),
 });
 
 const updateSchema = Joi.object({
   cosmeticProductId: Joi.string().optional(),
-  score:             Joi.number().optional(),
-  rank:              Joi.number().integer().min(0).optional(),
-  reason:            Joi.string().optional().allow(null, ""),
-  signals:           Joi.object().optional().allow(null),
+  score: Joi.number().optional(),
+  rank: Joi.number().integer().min(0).optional(),
+  reason: Joi.string().optional().allow(null, ""),
+  signals: Joi.object().optional().allow(null),
 });
 
 export default class CosmeticRecommendationController {
@@ -27,7 +27,7 @@ export default class CosmeticRecommendationController {
    * Lists recommendations scoped to a specific outline (must belong to caller).
    */
   static async index(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     const outlineId = typeof req.query.outlineId === "string" ? req.query.outlineId : null;
@@ -35,9 +35,9 @@ export default class CosmeticRecommendationController {
 
     try {
       const result = await CosmeticRecommendationService.listForOutline(
-        outlineId,
+        outlineId as string,
         userId,
-        req.query,
+        req.query as unknown as Record<string, string | undefined>
       );
       return responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
@@ -46,7 +46,7 @@ export default class CosmeticRecommendationController {
   }
 
   static async show(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {
@@ -58,7 +58,7 @@ export default class CosmeticRecommendationController {
   }
 
   static async create(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     const { error, value } = createSchema.validate(req.body, { abortEarly: false });
@@ -73,7 +73,7 @@ export default class CosmeticRecommendationController {
   }
 
   static async update(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     const { error, value } = updateSchema.validate(req.body, { abortEarly: false });
@@ -88,7 +88,7 @@ export default class CosmeticRecommendationController {
   }
 
   static async destroy(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as any).user?.id;
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {

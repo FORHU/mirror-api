@@ -14,10 +14,7 @@ export default class WeatherSnapshotService {
   // outline (its own upstream failed, or the conversation didn't surface it).
   // We still write a row so the decision pipeline isn't blocked — tagged
   // SENTINEL so cosmetics/monitoring can branch.
-  static async ingestObservation(
-    outlineId: string,
-    observation: WeatherObservation | null,
-  ) {
+  static async ingestObservation(outlineId: string, observation: WeatherObservation | null) {
     const outline = await OutlineRepo.findById(outlineId);
     if (!outline) throwResponse(404, "Outline not found");
 

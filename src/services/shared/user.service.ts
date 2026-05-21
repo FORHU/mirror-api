@@ -1,5 +1,5 @@
 import UserRepository from "../../repositories/user.repository";
-import logger from "../../utils/logger";
+import { Prisma } from "@prisma/client";
 
 export default class UserService {
   /**
@@ -23,7 +23,7 @@ export default class UserService {
   /**
    * Update user
    */
-  static async updateUser(id: string, data: any) {
+  static async updateUser(id: string, data: Prisma.UserUpdateInput) {
     const user = await this.getUser(id);
     return UserRepository.update(user.id, data);
   }

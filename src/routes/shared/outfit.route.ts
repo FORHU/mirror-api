@@ -15,7 +15,12 @@ router.post("/", upload.single("file"), OutfitController.create);
 // Personalized / AI routes require a real user so req.user.id is set
 router.post("/evaluate", authenticate, upload.single("file"), OutfitController.evaluate); // has AI evaluation but no generation
 router.post("/compose", authenticate, OutfitController.compose); // composes outfits from the user's wardrobe via AI
-router.post("/evaluate-hybrid", authenticate, upload.single("file"), OutfitController.evaluateHybrid); // AI evaluation + wardrobe matching
+router.post(
+  "/evaluate-hybrid",
+  authenticate,
+  upload.single("file"),
+  OutfitController.evaluateHybrid
+); // AI evaluation + wardrobe matching
 router.post("/recommend", authenticate, OutfitController.recommend); // rule-based composer by CATEGORY (no AI, no file) — still needs userId for ownership
 router.patch("/:id", upload.single("file"), OutfitController.update); // update can also handle file uploads for updating the outfit image
 router.delete("/:id", OutfitController.destroy);

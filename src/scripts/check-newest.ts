@@ -1,13 +1,14 @@
+/* eslint-disable no-console */
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("Checking database for newly created outfits...");
-  
+
   // Total count
   const count = await prisma.outfit.count({
-    where: { isDeleted: false }
+    where: { isDeleted: false },
   });
   console.log(`Total active outfits in DB: ${count}\n`);
 
@@ -20,10 +21,10 @@ async function main() {
       file: true,
       items: {
         include: {
-          garment: true
-        }
-      }
-    }
+          garment: true,
+        },
+      },
+    },
   });
 
   if (newest.length === 0) {
@@ -39,14 +40,14 @@ async function main() {
     console.log(`    Design Type: ${outfit.designType}`);
     console.log(`    File URL: ${outfit.file?.fileUrl}`);
     console.log(`    Garments (${outfit.items.length}):`);
-    outfit.items.forEach(item => {
+    outfit.items.forEach((item) => {
       console.log(`      - [${item.slot}] ${item.garment?.name} (ID: ${item.garmentId})`);
     });
   });
 }
 
 main()
-  .catch(err => {
+  .catch((err) => {
     console.error("Error executing script:", err);
   })
   .finally(async () => {

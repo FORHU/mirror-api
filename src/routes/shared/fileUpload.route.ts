@@ -1,7 +1,7 @@
 import express from "express";
 import FileUploadController from "../../controllers/shared/fileUpload.controller";
 import FileController from "../../controllers/shared/file.controller";
-import { authenticate } from "../../middleware/auth.middleware";
+
 import { upload } from "../../middleware/upload.middleware";
 
 const router = express.Router();

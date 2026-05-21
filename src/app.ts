@@ -33,7 +33,6 @@ const corsOptions: cors.CorsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions)); // preflight for all routes
 
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

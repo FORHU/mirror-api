@@ -1,7 +1,7 @@
 import InteractionRepo from "../../repositories/interaction.repository";
 
 export default class InteractionService {
-  static async getOutfitInteractions(outfitId: string, query: any) {
+  static async getOutfitInteractions(outfitId: string, query: Record<string, string | undefined>) {
     const { page, limit } = query;
     return InteractionRepo.findByOutfitId(
       outfitId,
@@ -10,7 +10,7 @@ export default class InteractionService {
     );
   }
 
-  static async logInteraction(data: any) {
+  static async logInteraction(data: { type: string; garmentId: string; outfitId?: string }) {
     return InteractionRepo.create({
       type: data.type,
       garmentId: data.garmentId,

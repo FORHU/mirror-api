@@ -32,7 +32,6 @@ export default class TryOnController {
       responseSuccess(res, 202, { predictionId: result.id }, "Try-on process started");
 
       TryOnService.pollStatus(result.id, value.kioskId);
-      
     } catch (err) {
       next(err);
     }
@@ -52,7 +51,7 @@ export default class TryOnController {
     if (error) return next(validationError(error.message));
 
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as Request & { user: { id: string } }).user.id;
       const result = await TryOnService.runByGarment(
         userId,
         value.garmentId,
@@ -80,7 +79,7 @@ export default class TryOnController {
     if (error) return next(validationError(error.message));
 
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as Request & { user: { id: string } }).user.id;
       const result = await TryOnService.runByOutfit(
         userId,
         value.outfitId,
@@ -109,7 +108,7 @@ export default class TryOnController {
     if (error) return next(validationError(error.message));
 
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as Request & { user: { id: string } }).user.id;
       const result = await TryOnService.runVideoByGarment(
         userId,
         value.garmentId,
@@ -137,7 +136,7 @@ export default class TryOnController {
     if (error) return next(validationError(error.message));
 
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as Request & { user: { id: string } }).user.id;
       const result = await TryOnService.runVideoByOutfit(
         userId,
         value.outfitId,

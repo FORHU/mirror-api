@@ -5,7 +5,18 @@ import FileService from "./file.service";
 import logger from "../../utils/logger";
 import { s3Client } from "../../utils/s3";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { CATEGORY, FITTING_SLOT, GARMENT_GENDER, SILHOUETTE } from "@prisma/client";
+import {
+  CATEGORY,
+  FITTING_SLOT,
+  GARMENT_GENDER,
+  SILHOUETTE,
+  Prisma,
+  File,
+  Garment,
+  Outfit,
+  DESIGN_TYPE,
+  LAYER_LEVEL,
+} from "@prisma/client";
 import { findExistingComposition } from "../../validations/outfit.validation";
 import {
   OutfitEvaluation,
@@ -15,13 +26,9 @@ import {
 } from "../../utils/openai/evaluate-outfit.util";
 
 export default class OutfitService {
-  static async getUserOutfits(userId?: string, query: any = {}) {
+  static async getUserOutfits(userId?: string, query: Record<string, string | undefined> = {}) {
     const { page, limit } = query;
-    return OutfitRepo.findByUserId(
-      userId,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20
-    );
+    return OutfitRepo.findByUserId(userId, page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
   }
 
   /**
@@ -29,13 +36,16 @@ export default class OutfitService {
    * `createOutfit`'s garment-URL fallback — i.e. rows that haven't had a real
    * image uploaded yet. Powers the "needs-image" admin/dev list.
    */
-  static async getOutfitsNeedingImage(userId?: string, query: any = {}) {
+  static async getOutfitsNeedingImage(
+    userId?: string,
+    query: Record<string, string | undefined> = {}
+  ) {
     const { page, limit } = query;
     return OutfitRepo.findByUserId(
       userId,
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20,
-      { fileProvider: "EXTERNAL" },
+      { fileProvider: "EXTERNAL" }
     );
   }
 
@@ -43,13 +53,16 @@ export default class OutfitService {
    * Outfits whose display file is a real upload (non-EXTERNAL provider).
    * Powers the "complete" list — outfits considered ready to surface.
    */
-  static async getOutfitsWithUploadedImage(userId?: string, query: any = {}) {
+  static async getOutfitsWithUploadedImage(
+    userId?: string,
+    query: Record<string, string | undefined> = {}
+  ) {
     const { page, limit } = query;
     return OutfitRepo.findByUserId(
       userId,
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20,
-      { fileProviderNot: "EXTERNAL" },
+      { fileProviderNot: "EXTERNAL" }
     );
   }
 
@@ -60,7 +73,18 @@ export default class OutfitService {
     return outfit;
   }
 
-  static async createOutfit(userId?: string, data: any = {}) {
+  static async createOutfit(
+    userId?: string,
+    data: {
+      fileId?: string;
+      items?: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[];
+      name?: string;
+      description?: string;
+      isPublic?: boolean;
+      designType?: DESIGN_TYPE;
+      metaData?: Prisma.InputJsonValue;
+    } = {}
+  ) {
     // Idempotent: if this user already has an outfit with the same garment set,
     // return it instead of creating a duplicate (and avoid wasting a File row).
     const existing = await findExistingComposition(userId, data.items);
@@ -90,25 +114,40 @@ export default class OutfitService {
     }
 
     if (!fileId) {
-      throw { status: 400, message: "Outfit requires a display image (upload a file, pass fileId, or include at least one garment with an image)" };
+      throw {
+        status: 400,
+        message:
+          "Outfit requires a display image (upload a file, pass fileId, or include at least one garment with an image)",
+      };
     }
 
     return OutfitRepo.create({
       userId,
-      name: data.name,
+      name: data.name || "Untitled Outfit",
       description: data.description,
       isPublic: data.isPublic,
       designType: data.designType,
-      fileId: fileId,
+      fileId: fileId || "",
       items: data.items || [],
       metaData: data.metaData,
     });
   }
 
-  static async updateOutfit(id: string, userId?: string, data: any = {}) {
+  static async updateOutfit(
+    id: string,
+    userId?: string,
+    data: {
+      name?: string;
+      description?: string;
+      isPublic?: boolean;
+      designType?: DESIGN_TYPE;
+      fileId?: string;
+      items?: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[];
+    } = {}
+  ) {
     const existing = await this.getOutfitById(id, userId); // Ensure it exists and belongs to user
     const oldFileId = existing.fileId;
-    const oldFileProvider = (existing as any).file?.provider;
+    const oldFileProvider = (existing as Outfit & { file?: { provider?: string } }).file?.provider;
 
     const updated = await OutfitRepo.update(id, {
       name: data.name,
@@ -128,8 +167,10 @@ export default class OutfitService {
     if (data.fileId && oldFileId && data.fileId !== oldFileId && oldFileProvider === "EXTERNAL") {
       try {
         await FileRepo.softDelete(oldFileId);
-      } catch (err: any) {
-        logger.warn(`[OutfitService.updateOutfit] placeholder File cleanup failed (fileId=${oldFileId}): ${err.message}`);
+      } catch (err) {
+        logger.warn(
+          `[OutfitService.updateOutfit] placeholder File cleanup failed (fileId=${oldFileId}): ${(err as Error).message}`
+        );
       }
     }
 
@@ -139,7 +180,7 @@ export default class OutfitService {
   static async deleteOutfit(id: string, userId?: string) {
     const existing = await this.getOutfitById(id, userId); // Ensure it exists and belongs to user
     const fileId = existing.fileId;
-    const fileProvider = (existing as any).file?.provider;
+    const fileProvider = (existing as Outfit & { file?: { provider?: string } }).file?.provider;
 
     await OutfitRepo.delete(id);
 
@@ -151,8 +192,10 @@ export default class OutfitService {
     if (fileId && fileProvider === "EXTERNAL") {
       try {
         await FileRepo.softDelete(fileId);
-      } catch (err: any) {
-        logger.warn(`[OutfitService.deleteOutfit] placeholder File cleanup failed (fileId=${fileId}): ${err.message}`);
+      } catch (err) {
+        logger.warn(
+          `[OutfitService.deleteOutfit] placeholder File cleanup failed (fileId=${fileId}): ${(err as Error).message}`
+        );
       }
     }
 
@@ -166,10 +209,10 @@ export default class OutfitService {
    * the CDN-fronted public URL that OpenAI can fetch directly.
    */
   static async uploadOutfitFile(
-    file: any,
-    fallbackImageUrl?: string,
-  ): Promise<{ file: any | null; imageUrl: string }> {
-    let fileRecord: any = null;
+    file: Express.Multer.File,
+    fallbackImageUrl?: string
+  ): Promise<{ file: File | null; imageUrl: string }> {
+    let fileRecord: File | null = null;
     let urlForAI = fallbackImageUrl;
 
     if (file) {
@@ -189,19 +232,24 @@ export default class OutfitService {
    * that failed before persisting an Outfit. Deletes the S3 object and
    * the File row; swallows + logs errors so the original failure surfaces.
    */
-  static async discardOrphanedFile(fileRecord: any) {
+  static async discardOrphanedFile(fileRecord: Record<string, unknown>) {
     if (!fileRecord?.id) return;
     try {
       if (fileRecord.provider === "S3" && fileRecord.path && fileRecord.bucket) {
         await s3Client.send(
-          new DeleteObjectCommand({ Bucket: fileRecord.bucket, Key: fileRecord.path }),
+          new DeleteObjectCommand({
+            Bucket: fileRecord.bucket as string,
+            Key: fileRecord.path as string,
+          })
         );
       }
-      await FileRepo.softDelete(fileRecord.id);
-    } catch (err: any) {
+      await FileRepo.softDelete(fileRecord.id as string);
+    } catch (err) {
       // Intentional: don't mask the original error path.
       // Caller has already logged the real failure.
-      logger.error(`[OutfitService.discardOrphanedFile] fileId=${fileRecord.id} cleanup failed: ${err.message}`);
+      logger.error(
+        `[OutfitService.discardOrphanedFile] fileId=${fileRecord.id} cleanup failed: ${(err as Error).message}`
+      );
     }
   }
 
@@ -212,7 +260,7 @@ export default class OutfitService {
   static async loadGarmentsForAI(ids: string[]): Promise<WardrobeGarment[]> {
     if (!ids.length) return [];
     const rows = await GarmentRepo.findByIds(ids);
-    return rows.map((g: any) => ({
+    return rows.map((g: Garment & { tags?: { name: string }[]; metaData?: Prisma.JsonValue }) => ({
       id: g.id,
       name: g.name,
       description: g.description,
@@ -222,8 +270,8 @@ export default class OutfitService {
       gender: g.gender,
       layerLevel: g.layerLevel,
       silhouette: g.silhouette,
-      tags: Array.isArray(g.tags) ? g.tags.map((t: any) => t.name) : [],
-      dominantColor: g.metaData?.dominantColor,
+      tags: Array.isArray(g.tags) ? g.tags.map((t: { name: string }) => t.name) : [],
+      dominantColor: (g.metaData as Prisma.JsonObject)?.dominantColor as string | undefined,
     }));
   }
 
@@ -232,12 +280,8 @@ export default class OutfitService {
    * Includes the user's own garments plus system garments (userId = null).
    */
   static async loadWardrobeForAI(userId: string, limit = 80): Promise<WardrobeGarment[]> {
-    const { data } = await GarmentRepo.findAll(
-      { OR: [{ userId }, { userId: null }] },
-      1,
-      limit,
-    );
-    return data.map((g: any) => ({
+    const { data } = await GarmentRepo.findAll({ OR: [{ userId }, { userId: null }] }, 1, limit);
+    return data.map((g: Garment & { tags?: { name: string }[]; metaData?: Prisma.JsonValue }) => ({
       id: g.id,
       name: g.name,
       description: g.description,
@@ -247,8 +291,8 @@ export default class OutfitService {
       gender: g.gender,
       layerLevel: g.layerLevel,
       silhouette: g.silhouette,
-      tags: Array.isArray(g.tags) ? g.tags.map((t: any) => t.name) : [],
-      dominantColor: g.metaData?.dominantColor,
+      tags: Array.isArray(g.tags) ? g.tags.map((t: { name: string }) => t.name) : [],
+      dominantColor: (g.metaData as Prisma.JsonObject)?.dominantColor as string | undefined,
     }));
   }
 
@@ -258,9 +302,9 @@ export default class OutfitService {
    */
   static async persistEvaluatedOutfit(
     evaluation: OutfitEvaluation,
-    fileRecord: any,
+    fileRecord: File | null,
     userId: string,
-    items: { garmentId: string; slot?: FITTING_SLOT | null }[],
+    items: { garmentId: string; slot?: FITTING_SLOT | null }[]
   ) {
     const garmentMap = await this.garmentMapFor(items.map((i) => i.garmentId));
     const stats = this.computeOutfitStats(items, garmentMap);
@@ -269,7 +313,7 @@ export default class OutfitService {
       description: evaluation.description,
       designType: evaluation.designType,
       fileId: fileRecord?.id,
-      items,
+      items: items.map((i) => ({ garmentId: i.garmentId, slot: i.slot ?? undefined })),
       metaData: {
         tags: evaluation.tags,
         dominantColor: evaluation.dominantColor,
@@ -284,10 +328,7 @@ export default class OutfitService {
    * No image is uploaded — `createOutfit`'s garment-image fallback supplies
    * the display File.
    */
-  static async persistComposedOutfit(
-    composition: OutfitComposition,
-    userId: string,
-  ) {
+  static async persistComposedOutfit(composition: OutfitComposition, userId: string) {
     const garmentMap = await this.garmentMapFor(composition.items.map((i) => i.garmentId));
     const stats = this.computeOutfitStats(composition.items, garmentMap);
     return this.createOutfit(userId, {
@@ -306,11 +347,7 @@ export default class OutfitService {
   /**
    * Persists an outfit produced by the hybrid (image -> wardrobe match) flow.
    */
-  static async persistMatchedOutfit(
-    match: OutfitMatch,
-    fileRecord: any,
-    userId: string,
-  ) {
+  static async persistMatchedOutfit(match: OutfitMatch, fileRecord: File | null, userId: string) {
     const garmentMap = await this.garmentMapFor(match.items.map((i) => i.garmentId));
     const stats = this.computeOutfitStats(match.items, garmentMap);
     return this.createOutfit(userId, {
@@ -345,11 +382,16 @@ export default class OutfitService {
    */
   static computeOutfitStats(
     items: { garmentId: string; slot?: FITTING_SLOT | null }[],
-    garmentMap: Map<string, any>,
+    garmentMap: Map<
+      string,
+      Garment & { category?: CATEGORY[]; silhouette?: SILHOUETTE; fittingSlot?: FITTING_SLOT[] }
+    >
   ) {
     const picked = items
       .map((it) => ({ item: it, garment: garmentMap.get(it.garmentId) }))
-      .filter((p) => p.garment);
+      .filter(
+        (p): p is { item: typeof p.item; garment: NonNullable<typeof p.garment> } => !!p.garment
+      );
 
     const catTotals: Record<string, number> = {};
     for (const { garment } of picked) {
@@ -396,10 +438,27 @@ export default class OutfitService {
    * Loads garments by id and returns a Map keyed by id, for stat computation.
    * Returns an empty Map if `ids` is empty.
    */
-  private static async garmentMapFor(ids: string[]): Promise<Map<string, any>> {
+  private static async garmentMapFor(
+    ids: string[]
+  ): Promise<
+    Map<
+      string,
+      Garment & { category?: CATEGORY[]; silhouette?: SILHOUETTE; fittingSlot?: FITTING_SLOT[] }
+    >
+  > {
     if (!ids.length) return new Map();
     const rows = await GarmentRepo.findByIds(ids);
-    return new Map(rows.map((g: any) => [g.id, g]));
+    return new Map(
+      rows.map(
+        (
+          g: Garment & {
+            category?: CATEGORY[];
+            silhouette?: SILHOUETTE;
+            fittingSlot?: FITTING_SLOT[];
+          }
+        ) => [g.id, g]
+      )
+    );
   }
 
   /**
@@ -430,10 +489,10 @@ export default class OutfitService {
         ...genderFilter,
       },
       1,
-      200,
+      200
     );
 
-    const bySlot = new Map<FITTING_SLOT, any[]>();
+    const bySlot = new Map<FITTING_SLOT, (Garment & { fittingSlot?: FITTING_SLOT[] })[]>();
     for (const g of garments) {
       for (const slot of g.fittingSlot ?? []) {
         const bucket = bySlot.get(slot) ?? [];
@@ -469,10 +528,15 @@ export default class OutfitService {
     const items: { garmentId: string; slot: FITTING_SLOT }[] = [];
     const path = paths[Math.floor(Math.random() * paths.length)];
     if (path === "full") {
-      items.push({ garmentId: pickRandom(fulls)!.id, slot: FITTING_SLOT.FullGarment });
+      const fullGarmentId = pickRandom(fulls)?.id;
+      if (fullGarmentId) items.push({ garmentId: fullGarmentId, slot: FITTING_SLOT.FullGarment });
     } else {
-      items.push({ garmentId: pickRandom(uppers)!.id, slot: FITTING_SLOT.UpperGarment });
-      items.push({ garmentId: pickRandom(lowers)!.id, slot: FITTING_SLOT.LowerGarment });
+      const upperGarmentId = pickRandom(uppers)?.id;
+      if (upperGarmentId)
+        items.push({ garmentId: upperGarmentId, slot: FITTING_SLOT.UpperGarment });
+      const lowerGarmentId = pickRandom(lowers)?.id;
+      if (lowerGarmentId)
+        items.push({ garmentId: lowerGarmentId, slot: FITTING_SLOT.LowerGarment });
     }
     items.push({ garmentId: foot.id, slot: FITTING_SLOT.FootGarment });
 
@@ -496,7 +560,20 @@ export default class OutfitService {
     const accessory = pickRandom(accessoryPool);
     if (accessory) items.push(accessory);
 
-    const garmentMap = new Map<string, any>(garments.map((g: any) => [g.id, g]));
+    const garmentMap = new Map<
+      string,
+      Garment & { category?: CATEGORY[]; silhouette?: SILHOUETTE; fittingSlot?: FITTING_SLOT[] }
+    >(
+      garments.map(
+        (
+          g: Garment & {
+            category?: CATEGORY[];
+            silhouette?: SILHOUETTE;
+            fittingSlot?: FITTING_SLOT[];
+          }
+        ) => [g.id, g]
+      )
+    );
     const stats = this.computeOutfitStats(items, garmentMap);
 
     return this.createOutfit(opts.userId, {

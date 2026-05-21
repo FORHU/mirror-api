@@ -9,16 +9,17 @@ export default class ChatWonderService {
   static async ask(query: string, userId?: string) {
     try {
       logger.info(`Sending query to Chat Wonder: ${query}`);
-      
+
       const response = await axios.post(`${CHAT_WONDER_API_URL}/chat`, {
         query,
         userId: userId || "anonymous",
       });
 
       return response.data;
-    } catch (error: any) {
-      logger.error("Chat Wonder Error:", error.response?.data || error.message);
-      throw { status: error.response?.status || 500, message: "Chat Wonder request failed" };
+    } catch (error) {
+      const err = error as { response?: { data?: unknown; status?: number }; message: string };
+      logger.error("Chat Wonder Error:", err.response?.data || err.message);
+      throw { status: err.response?.status || 500, message: "Chat Wonder request failed" };
     }
   }
 

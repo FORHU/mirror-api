@@ -64,18 +64,16 @@ const DEFAULTS = { page: 1, limit: 20, maxLimit: 100 };
  * `{ page, limit, skip }` ready to hand to Prisma.
  */
 export function parsePagination(
-  query: any,
-  opts: Partial<typeof DEFAULTS> = {},
+  query: { page?: string | number; limit?: string | number } | undefined | null,
+  opts: Partial<typeof DEFAULTS> = {}
 ): PaginationParams {
   const { page: defPage, limit: defLimit, maxLimit } = { ...DEFAULTS, ...opts };
 
-  const rawPage = parseInt(query?.page, 10);
-  const rawLimit = parseInt(query?.limit, 10);
+  const rawPage = parseInt(String(query?.page), 10);
+  const rawLimit = parseInt(String(query?.limit), 10);
 
   const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : defPage;
-  const limit = Number.isFinite(rawLimit) && rawLimit > 0
-    ? Math.min(rawLimit, maxLimit)
-    : defLimit;
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, maxLimit) : defLimit;
 
   return { page, limit, skip: (page - 1) * limit };
 }
@@ -93,7 +91,7 @@ export function parsePagination(
 export function buildPage<T>(
   items: T[],
   total: number,
-  { page, limit }: { page: number; limit: number },
+  { page, limit }: { page: number; limit: number }
 ): PageResult<T> {
   return {
     items,

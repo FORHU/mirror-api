@@ -18,7 +18,10 @@ export default class InteractionController {
       if (!outfitId) {
         return responseError(res, 400, "outfitId query param is required");
       }
-      const data = await InteractionService.getOutfitInteractions(outfitId as string, req.query);
+      const data = await InteractionService.getOutfitInteractions(
+        outfitId as string,
+        req.query as unknown as Record<string, string | undefined>
+      );
       responseSuccess(res, 200, data);
     } catch (err) {
       next(err);

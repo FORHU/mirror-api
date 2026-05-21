@@ -6,9 +6,9 @@ import RedisUtil from "./utils/redis.util";
  */
 export default async function setup() {
   logger.info("Running initial application setup...");
-  
+
   // Initialize Redis
   await RedisUtil.initialize();
-  
+
   logger.info("Setup completed.");
 }

@@ -24,7 +24,7 @@ export interface ChatWonderResponse {
  */
 export function parseChatWonderResponse(rawResponse: string): ChatWonderResponse {
   try {
-    let trimmed = rawResponse.trim();
+    const trimmed = rawResponse.trim();
 
     // 1. Try to find and parse JSON
     const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
@@ -63,8 +63,8 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderResponse
       images: [],
       raw: rawResponse,
     };
-  } catch (error: any) {
-    logger.error(`[Parser] Failed to parse response: ${error.message}`);
+  } catch (error) {
+    logger.error(`[Parser] Failed to parse response: ${(error as Error).message}`);
     return {
       message: "I'm here to help you.",
       emotion_data: { emotion: "neutral", confidence: 0.5, wasMapped: false },

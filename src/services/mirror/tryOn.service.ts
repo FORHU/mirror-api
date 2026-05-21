@@ -23,14 +23,23 @@ export default class TryOnService {
   /**
    * Triggers a try-on for a specific garment
    */
-  static async runByGarment(userId: string, garmentId: string, modelImage?: string, kioskId?: string) {
+  static async runByGarment(
+    userId: string,
+    garmentId: string,
+    modelImage?: string,
+    kioskId?: string
+  ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
-    const garment: any = await GarmentService.getGarmentById(garmentId);
-    const garmentImageUrl = garment.imageUrl || garment.file?.fileUrl;
+    const garment = await GarmentService.getGarmentById(garmentId);
+    const garmentImageUrl = garment?.imageUrl || garment?.file?.fileUrl;
 
     if (!garmentImageUrl) throw new Error("Garment has no usable image URL");
 
-    const result = await FashnService.runTryOn(modelImageUrl, garmentImageUrl, COMPOSED_OUTFIT_CATEGORY);
+    const result = await FashnService.runTryOn(
+      modelImageUrl,
+      garmentImageUrl,
+      COMPOSED_OUTFIT_CATEGORY
+    );
 
     if (kioskId) {
       this.pollStatus(result.id, kioskId);
@@ -42,14 +51,23 @@ export default class TryOnService {
   /**
    * Triggers a try-on for a specific outfit
    */
-  static async runByOutfit(userId: string, outfitId: string, modelImage?: string, kioskId?: string) {
+  static async runByOutfit(
+    userId: string,
+    outfitId: string,
+    modelImage?: string,
+    kioskId?: string
+  ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
-    const outfit: any = await OutfitService.getOutfitById(outfitId, userId);
-    const outfitImageUrl = outfit.file?.fileUrl;
+    const outfit = await OutfitService.getOutfitById(outfitId, userId);
+    const outfitImageUrl = outfit?.file?.fileUrl;
 
     if (!outfitImageUrl) throw new Error("Outfit has no display image");
 
-    const result = await FashnService.runTryOn(modelImageUrl, outfitImageUrl, COMPOSED_OUTFIT_CATEGORY);
+    const result = await FashnService.runTryOn(
+      modelImageUrl,
+      outfitImageUrl,
+      COMPOSED_OUTFIT_CATEGORY
+    );
 
     if (kioskId) {
       this.pollStatus(result.id, kioskId);
@@ -61,14 +79,23 @@ export default class TryOnService {
   /**
    * Video variant: try-on for a specific garment
    */
-  static async runVideoByGarment(userId: string, garmentId: string, modelImage?: string, kioskId?: string) {
+  static async runVideoByGarment(
+    userId: string,
+    garmentId: string,
+    modelImage?: string,
+    kioskId?: string
+  ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
-    const garment: any = await GarmentService.getGarmentById(garmentId);
-    const garmentImageUrl = garment.imageUrl || garment.file?.fileUrl;
+    const garment = await GarmentService.getGarmentById(garmentId);
+    const garmentImageUrl = garment?.imageUrl || garment?.file?.fileUrl;
 
     if (!garmentImageUrl) throw new Error("Garment has no usable image URL");
 
-    const result = await FashnService.runVideoTryOn(modelImageUrl, garmentImageUrl, COMPOSED_OUTFIT_CATEGORY);
+    const result = await FashnService.runVideoTryOn(
+      modelImageUrl,
+      garmentImageUrl,
+      COMPOSED_OUTFIT_CATEGORY
+    );
 
     if (kioskId) {
       this.pollStatus(result.id, kioskId, { media: "video" });
@@ -80,14 +107,23 @@ export default class TryOnService {
   /**
    * Video variant: try-on for a specific outfit
    */
-  static async runVideoByOutfit(userId: string, outfitId: string, modelImage?: string, kioskId?: string) {
+  static async runVideoByOutfit(
+    userId: string,
+    outfitId: string,
+    modelImage?: string,
+    kioskId?: string
+  ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
-    const outfit: any = await OutfitService.getOutfitById(outfitId, userId);
-    const outfitImageUrl = outfit.file?.fileUrl;
+    const outfit = await OutfitService.getOutfitById(outfitId, userId);
+    const outfitImageUrl = outfit?.file?.fileUrl;
 
     if (!outfitImageUrl) throw new Error("Outfit has no display image");
 
-    const result = await FashnService.runVideoTryOn(modelImageUrl, outfitImageUrl, COMPOSED_OUTFIT_CATEGORY);
+    const result = await FashnService.runVideoTryOn(
+      modelImageUrl,
+      outfitImageUrl,
+      COMPOSED_OUTFIT_CATEGORY
+    );
 
     if (kioskId) {
       this.pollStatus(result.id, kioskId, { media: "video" });
@@ -104,7 +140,7 @@ export default class TryOnService {
   static async pollStatus(
     predictionId: string,
     kioskId: string,
-    options: { media?: "image" | "video" } = {},
+    options: { media?: "image" | "video" } = {}
   ) {
     const isVideo = options.media === "video";
     let attempts = 0;
@@ -132,7 +168,9 @@ export default class TryOnService {
           });
         } else if (statusData.status === "failed") {
           clearInterval(interval);
-          logger.error(`FASHN.AI failed [${predictionId}] full response: ${JSON.stringify(statusData)}`);
+          logger.error(
+            `FASHN.AI failed [${predictionId}] full response: ${JSON.stringify(statusData)}`
+          );
           emitToKiosk(kioskId, "tryon_failed", {
             predictionId,
             media: isVideo ? "video" : "image",
@@ -154,9 +192,8 @@ export default class TryOnService {
             error: "Generation timed out",
           });
         }
-
       } catch (err) {
-        logger.error(`Polling error for ${predictionId}:`, err);
+        logger.error(`Polling error for ${predictionId}:`, (err as Error).message);
         clearInterval(interval);
       }
     }, 2000);

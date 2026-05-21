@@ -1,4 +1,5 @@
 import openai from "./ai-request.util";
+import logger from "../logger";
 
 export async function getTextEmbedding(text: string): Promise<number[]> {
   try {
@@ -8,8 +9,8 @@ export async function getTextEmbedding(text: string): Promise<number[]> {
     });
 
     return response.data[0].embedding;
-  } catch (error: any) {
-    console.error("[OpenAI-Embedding] Error:", error.message);
+  } catch (error) {
+    logger.error(`[OpenAI-Embedding] Error: ${(error as Error).message}`);
     throw error;
   }
 }

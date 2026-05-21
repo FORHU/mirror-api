@@ -1,16 +1,16 @@
 import { prisma } from "../utils/prisma";
-import { DESIGN_TYPE, FITTING_SLOT, LAYER_LEVEL } from "@prisma/client";
+import { Prisma, DESIGN_TYPE, FITTING_SLOT, LAYER_LEVEL } from "@prisma/client";
 
 export default class OutfitRepo {
   static async findByUserId(
     userId?: string,
     page: number = 1,
     limit: number = 20,
-    filters: { fileProvider?: string; fileProviderNot?: string } = {},
+    filters: { fileProvider?: string; fileProviderNot?: string } = {}
   ) {
     const skip = (page - 1) * limit;
 
-    const where: any = { userId };
+    const where: Prisma.OutfitWhereInput = { userId };
     if (filters.fileProvider) {
       where.file = { provider: filters.fileProvider };
     } else if (filters.fileProviderNot) {
@@ -27,7 +27,7 @@ export default class OutfitRepo {
           items: {
             include: {
               garment: {
-                include: { file: true }
+                include: { file: true },
               },
             },
           },
@@ -79,7 +79,7 @@ export default class OutfitRepo {
         items: {
           include: {
             garment: {
-              include: { file: true }
+              include: { file: true },
             },
           },
         },
@@ -96,7 +96,7 @@ export default class OutfitRepo {
     fileId: string;
     userOutlineId?: string;
     items: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[];
-    metaData?: any;
+    metaData?: Prisma.InputJsonValue;
   }) {
     return prisma.outfit.create({
       data: {
@@ -119,24 +119,27 @@ export default class OutfitRepo {
       include: {
         file: true,
         items: {
-          include: { 
+          include: {
             garment: {
-              include: { file: true }
-            }
+              include: { file: true },
+            },
           },
         },
       },
     });
   }
 
-  static async update(id: string, data: {
-    name?: string;
-    description?: string;
-    isPublic?: boolean;
-    designType?: DESIGN_TYPE;
-    fileId?: string;
-    items?: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[];
-  }) {
+  static async update(
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      isPublic?: boolean;
+      designType?: DESIGN_TYPE;
+      fileId?: string;
+      items?: { garmentId: string; slot?: FITTING_SLOT; layerLevel?: LAYER_LEVEL }[];
+    }
+  ) {
     // If items are provided, replace them
     if (data.items) {
       await prisma.garmentInOutfit.deleteMany({
@@ -167,8 +170,8 @@ export default class OutfitRepo {
         items: {
           include: {
             garment: {
-              include: { file: true }
-            }
+              include: { file: true },
+            },
           },
         },
       },

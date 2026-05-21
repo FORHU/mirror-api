@@ -31,9 +31,13 @@ export default class GenerationService {
     const items: { garmentId: string; slot: FITTING_SLOT }[] = [];
 
     for (let i = 0; i < slots.length; i++) {
-      const { data: garments } = await GarmentRepo.findAll({
-        fittingSlot: { has: slots[i] }
-      }, 1, 1);
+      const { data: garments } = await GarmentRepo.findAll(
+        {
+          fittingSlot: { has: slots[i] },
+        },
+        1,
+        1
+      );
 
       if (garments.length > 0) {
         items.push({
@@ -52,13 +56,17 @@ export default class GenerationService {
     // or a placeholder if we had one. In production, this might be an AI-generated preview image.
     const firstGarment = await GarmentRepo.findById(items[0].garmentId);
 
+    if (!firstGarment?.fileId) {
+      throw { status: 500, message: "Garment missing file image." };
+    }
+
     const outfit = await OutfitRepo.create({
       userId: data.userId,
       name: `Generated Outfit for: ${data.userPrompt[0]?.substring(0, 20) || "Today"}`,
       description: `Automatically generated based on prompt: ${data.userPrompt.join(", ")}`,
       designType: DESIGN_TYPE.systemDesign,
       isPublic: false,
-      fileId: firstGarment!.fileId, // Use first garment's image as placeholder
+      fileId: firstGarment.fileId, // Use first garment's image as placeholder
       userOutlineId: outline.id,
       items: items,
     });

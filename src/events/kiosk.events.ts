@@ -15,12 +15,16 @@ export const registerKioskEvents = (socket: Socket) => {
 
     // Reject unverified devices — prevents arbitrary sockets from claiming kiosk rooms.
     if (!KIOSK_DEVICE_SECRET) {
-      logger.error(`[register_kiosk] KIOSK_DEVICE_SECRET not configured — rejecting ${data.kioskId}`);
+      logger.error(
+        `[register_kiosk] KIOSK_DEVICE_SECRET not configured — rejecting ${data.kioskId}`
+      );
       socket.emit("kiosk_registered", { status: "error", message: "Server misconfigured" });
       return;
     }
     if (data.secret !== KIOSK_DEVICE_SECRET) {
-      logger.warn(`[register_kiosk] Rejected unauthorized registration for ${data.kioskId} (socket ${socket.id})`);
+      logger.warn(
+        `[register_kiosk] Rejected unauthorized registration for ${data.kioskId} (socket ${socket.id})`
+      );
       socket.emit("kiosk_registered", { status: "error", message: "Invalid kiosk secret" });
       socket.disconnect(true);
       return;
@@ -30,25 +34,33 @@ export const registerKioskEvents = (socket: Socket) => {
     logger.info(`Kiosk ${data.kioskId} registered with socket ${socket.id}`);
 
     // Check if there is an existing state (to preserve names/data)
-    const existingState = await CacheUtil.get<any>(`kiosk_state:${data.kioskId}`);
+    const existingState = await CacheUtil.get<{
+      status: string;
+      userId: string;
+      kioskName: string;
+    }>(`kiosk_state:${data.kioskId}`);
 
     // Set state in Redis with a bounded TTL — if disconnect ever fails to fire
     // (process crash, network partition), the lock auto-releases instead of leaking.
-    await CacheUtil.set(`kiosk_state:${data.kioskId}`, {
-      status: existingState?.status === "in_use" ? "in_use" : "available",
-      userId: existingState?.userId || null,
-      kioskName: data.name || existingState?.kioskName || data.kioskId,
-      socketId: socket.id,
-      lastRegisteredAt: new Date(),
-    }, KIOSK_STATE_TTL_SECONDS);
+    await CacheUtil.set(
+      `kiosk_state:${data.kioskId}`,
+      {
+        status: existingState?.status === "in_use" ? "in_use" : "available",
+        userId: existingState?.userId || null,
+        kioskName: data.name || existingState?.kioskName || data.kioskId,
+        socketId: socket.id,
+        lastRegisteredAt: new Date(),
+      },
+      KIOSK_STATE_TTL_SECONDS
+    );
 
     // Map socket.id to kioskId so we can clean up on disconnect
     await CacheUtil.set(`socket_to_kiosk:${socket.id}`, data.kioskId, KIOSK_STATE_TTL_SECONDS);
 
-    socket.emit("kiosk_registered", { 
-      status: "success", 
+    socket.emit("kiosk_registered", {
+      status: "success",
       kioskId: data.kioskId,
-      kioskName: data.name || existingState?.kioskName || data.kioskId
+      kioskName: data.name || existingState?.kioskName || data.kioskId,
     });
   });
 
@@ -66,7 +78,9 @@ export const registerKioskEvents = (socket: Socket) => {
       const userId = decoded.userId;
 
       // Verify pairing state in Redis
-      const state = await CacheUtil.get<any>(`kiosk_state:${kioskId}`);
+      const state = await CacheUtil.get<{ status: string; userId: string; kioskName: string }>(
+        `kiosk_state:${kioskId}`
+      );
       if (state && state.userId === userId) {
         socket.join(kioskId);
         logger.info(`Socket ${socket.id} (User ${userId}) joined room ${kioskId}`);
@@ -82,10 +96,10 @@ export const registerKioskEvents = (socket: Socket) => {
   // Handle Kiosk disconnect
   socket.on("disconnect", async () => {
     logger.info(`Socket disconnected: ${socket.id}`);
-    
+
     // Find which kiosk this socket belonged to
     const kioskId = await CacheUtil.get<string>(`socket_to_kiosk:${socket.id}`);
-    
+
     if (kioskId) {
       logger.info(`Cleaning up Redis state for Kiosk ${kioskId}`);
       await CacheUtil.del(`kiosk_state:${kioskId}`);
