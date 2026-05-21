@@ -14,7 +14,6 @@ export default class AuthController {
     const schema = Joi.object({
       email: Joi.string().email().required(),
       username: Joi.string().optional(),
-      kioskId: Joi.string(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -23,10 +22,6 @@ export default class AuthController {
     try {
       const platform = req.headers["x-platform"] as string;
       const data = await AuthSvc.login(value.email, platform, value.username);
-
-      if (value.kioskId) {
-        emitToKiosk(value.kioskId, "kiosk_login", data);
-      }
 
       return responseSuccess(res, 200, data, "Login successful");
     } catch (err) {
@@ -103,6 +98,7 @@ export default class AuthController {
 
     const schema = Joi.object({
       data: Joi.object().required(),
+      kioskId: Joi.string().required(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -111,6 +107,10 @@ export default class AuthController {
     try {
       const userId = (req as any).user?.id;
       const data = await AuthSvc.updateProfile(userId, value.data);
+
+      if (value.kioskId) {
+        emitToKiosk(value.kioskId, "kiosk_login", data);
+      }
 
       return responseSuccess(res, 200, data, "Profile updated successfully");
     } catch (err) {
