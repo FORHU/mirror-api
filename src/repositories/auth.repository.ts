@@ -187,12 +187,15 @@ export default class AuthRepo {
       avatarId = avatarFile.id;
     }
 
+    const createData: any = {
+      email: data.email,
+      username: data.username,
+    };
+    if (avatarId) {
+      createData.avatarId = avatarId;
+    }
     return prisma.user.create({
-      data: {
-        email: data.email,
-        username: data.username,
-        avatarId,
-      },
+      data: createData,
       include: {
         avatar: { select: { fileUrl: true } },
       },
