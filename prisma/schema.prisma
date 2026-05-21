@@ -260,9 +260,6 @@ model Garment {
   silhouette  SILHOUETTE      @default(Regular)
   metaData    Json?
 
-  userId String?
-  user   User?   @relation("UserGarments", fields: [userId], references: [id])
-
   outfits      GarmentInOutfit[]
   tags         Tag[]
   interactions Interaction[]
@@ -292,11 +289,9 @@ model Outfit {
   userOutline   UserOutline? @relation(fields: [userOutlineId], references: [id])
 
   items        GarmentInOutfit[]
+  files        File[]            @relation("OutfitCollection")
   interactions Interaction[]
-  user         User?             @relation(fields: [userId], references: [id])
-  userId       String?
 
-  isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
