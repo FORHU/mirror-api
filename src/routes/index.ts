@@ -20,6 +20,11 @@ import outlineRoute from "./shared/outline.route";
 import cosmeticProductRoute from "./shared/cosmetic-product.route";
 import cosmeticRecommendationRoute from "./shared/cosmetic-recommendation.route";
 
+// External Routes (3rd Party)
+import externalGarmentRoute from "./external/garment.route";
+import externalOutfitRoute from "./external/outfit.route";
+import { authenticateApiKey } from "../middleware/api-key.middleware";
+
 const router = express.Router();
 
 router.get("/mirror/dev/token", devTokenHandler);
@@ -58,5 +63,9 @@ router.use("/mirror/chat-wonder", chatWonderRoute);
 router.use("/mirror/outlines", outlineRoute);
 router.use("/mirror/cosmetic-products", cosmeticProductRoute);
 router.use("/mirror/cosmetic-recommendations", cosmeticRecommendationRoute);
+
+// External endpoints (3rd party access)
+router.use("/external/garments", authenticateApiKey, externalGarmentRoute);
+router.use("/external/outfits", authenticateApiKey, externalOutfitRoute);
 
 export default router;
