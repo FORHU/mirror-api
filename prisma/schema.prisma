@@ -286,6 +286,7 @@ model Outfit {
   description String?
   metaData    Json?
   isPublic    Boolean     @default(false)
+  isDeleted   Boolean     @default(false)
   designType  DESIGN_TYPE @default(systemDesign)
 
   fileId String @unique
