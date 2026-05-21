@@ -242,6 +242,9 @@ model File {
   userAvatar       User?             @relation("UserAvatar")
   outfitDisplay    Outfit?           @relation("OutfitDisplayFile")
   cosmeticProducts CosmeticProduct[] @relation("CosmeticProductImage")
+
+  outfitCollectionId String?
+  outfitCollection   Outfit? @relation("OutfitCollection", fields: [outfitCollectionId], references: [id])
 }
 
 model Garment {
@@ -283,6 +286,7 @@ model Outfit {
   description String?
   metaData    Json?
   isPublic    Boolean     @default(false)
+  isDeleted   Boolean     @default(false)
   designType  DESIGN_TYPE @default(systemDesign)
 
   fileId String @unique
@@ -291,12 +295,13 @@ model Outfit {
   userOutlineId String?
   userOutline   UserOutline? @relation(fields: [userOutlineId], references: [id])
 
-  items        GarmentInOutfit[]
-  interactions Interaction[]
-  user         User?             @relation(fields: [userId], references: [id])
-  userId       String?
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
-  isDeleted Boolean  @default(false)
+  items        GarmentInOutfit[]
+  files        File[]            @relation("OutfitCollection")
+  interactions Interaction[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
