@@ -13,12 +13,20 @@ export default class AuthRepo {
   static async createUser(data: {
     email: string;
     username: string;
+    avatarId?: string;
+    gender?: "MALE" | "FEMALE";
   }) {
+    const { email, username, avatarId, gender } = data;
+    const createData: any = {
+      email,
+      username,
+      gender: gender ?? "MALE",
+    };
+    if (avatarId) {
+      createData.avatarId = avatarId;
+    }
     return prisma.user.create({
-      data: {
-        email: data.email,
-        username: data.username,
-      },
+      data: createData,
       select: {
         id: true,
         email: true,
