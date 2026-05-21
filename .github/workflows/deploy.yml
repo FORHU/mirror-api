@@ -5,11 +5,21 @@ on:
     workflows: ["CI"]
     branches: [main]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag, or SHA to deploy'
+        required: true
+        default: main
+
+concurrency:
+  group: mirror-api-deploy-production
+  cancel-in-progress: true
 
 jobs:
   deploy:
     name: Build, Push & Deploy
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: production
 
@@ -20,6 +30,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.event.workflow_run.head_sha }}
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
