@@ -7,5 +7,6 @@ router.post("/login", AuthController.login);
 router.post("/google", AuthController.googleAuthSSO);
 router.post("/refresh-token", AuthController.refreshToken);
 router.post("/logout", authenticate, AuthController.logout);
+router.patch("/update", authenticate, AuthController.updateProfile);
 
 export default router;

@@ -8,10 +8,10 @@ datasource db {
 }
 
 model User {
-  id       String       @id @default(cuid())
-  email    String       @unique
-  username String       @unique
-  gender   USER_GENDER? @default(MALE)
+  id       String      @id @default(cuid())
+  email    String      @unique
+  username String      @unique
+  gender   USER_GENDER
 
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -176,14 +176,14 @@ model UserMap {
 }
 
 model CosmeticProduct {
-  id         String  @id @default(cuid())
-  name       String
-  brand      String?
-  details    String?
+  id        String  @id @default(cuid())
+  name      String
+  brand     String?
+  details   String?
   fileUrl   File?   @relation("CosmeticProductImage", fields: [fileUrlId], references: [id])
   fileUrlId String? // Foreign key to File
-  hexColor   String? // For UI color swatches
-  metaData   Json?
+  hexColor  String? // For UI color swatches
+  metaData  Json?
 
   type      COSMETIC_TYPE?
   createdAt DateTime       @default(now())

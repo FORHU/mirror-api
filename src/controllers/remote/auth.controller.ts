@@ -23,7 +23,7 @@ export default class AuthController {
     try {
       const platform = req.headers["x-platform"] as string;
       const data = await AuthSvc.login(value.email, platform, value.username);
- 
+
       if (value.kioskId) {
         emitToKiosk(value.kioskId, "kiosk_login", data);
       }
@@ -98,4 +98,24 @@ export default class AuthController {
       next(err);
     }
   }
+
+  static async updateProfile(req: Request, res: Response, next: NextFunction) {
+
+    const schema = Joi.object({
+      data: Joi.object().required(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return next(validationError(error.message));
+
+    try {
+      const userId = (req as any).user?.id;
+      const data = await AuthSvc.updateProfile(userId, value.data);
+
+      return responseSuccess(res, 200, data, "Profile updated successfully");
+    } catch (err) {
+      next(err);
+    }
+  }
+
 }

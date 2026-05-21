@@ -15,7 +15,7 @@ export default class AuthSvc {
 
     if (!user) {
       let username = providedUsername;
-      
+
       if (!username) {
         // Auto-generate username
         const baseUsername = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "");
@@ -33,7 +33,7 @@ export default class AuthSvc {
         email,
         username,
       }) as any;
-      
+
       logger.info(`New user registered via simple login: ${email}`);
     }
 
@@ -85,7 +85,7 @@ export default class AuthSvc {
     try {
       const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as { userId: string };
       const session = await AuthRepo.findValidSession(refreshToken);
-      
+
       if (!session) throw { status: 401, message: "Invalid refresh token" };
 
       const user = await AuthRepo.findUserById(decoded.userId);
@@ -124,9 +124,9 @@ export default class AuthSvc {
    * Internal helper to generate tokens and session
    */
   private static async generateAuthResponse(
-    user: any, 
-    platform: string, 
-    providerUserId?: string, 
+    user: any,
+    platform: string,
+    providerUserId?: string,
     providerAvatarUrl?: string
   ) {
     const accessToken = jwt.sign({ userId: user.id }, ACCESS_TOKEN_SECRET, {
@@ -163,4 +163,15 @@ export default class AuthSvc {
       },
     };
   }
+
+  static async updateProfile(userId: string, data: any) {
+    try {
+      const user = await AuthRepo.updateUser(userId, data);
+      return user;
+    } catch (error: any) {
+      throw { status: 500, message: "Failed to update profile: " + (error.message || error) };
+    }
+  }
+
 }
+
