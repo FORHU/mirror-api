@@ -242,6 +242,9 @@ model File {
   userAvatar       User?             @relation("UserAvatar")
   outfitDisplay    Outfit?           @relation("OutfitDisplayFile")
   cosmeticProducts CosmeticProduct[] @relation("CosmeticProductImage")
+
+  outfitCollectionId String?
+  outfitCollection   Outfit? @relation("OutfitCollection", fields: [outfitCollectionId], references: [id])
 }
 
 model Garment {
@@ -259,6 +262,9 @@ model Garment {
   layerLevel  LAYER_LEVEL     @default(BASE)
   silhouette  SILHOUETTE      @default(Regular)
   metaData    Json?
+
+  userId String?
+  user   User?   @relation("UserGarments", fields: [userId], references: [id])
 
   outfits      GarmentInOutfit[]
   tags         Tag[]
@@ -287,6 +293,9 @@ model Outfit {
 
   userOutlineId String?
   userOutline   UserOutline? @relation(fields: [userOutlineId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
   items        GarmentInOutfit[]
   files        File[]            @relation("OutfitCollection")
