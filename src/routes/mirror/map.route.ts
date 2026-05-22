@@ -12,6 +12,10 @@ router.get("/directions", MapController.getDirections);
 router.post("/geocode", MapController.geocode);
 router.post("/directions", MapController.directions);
 
+// Foursquare nearby POIs + venue photos — no auth required
+router.get("/nearby-pois",            MapController.nearbyPOIs);
+router.get("/venue-photos/:fsqId",    MapController.venuePhotos);
+
 // Home Location — auth required
 router.get("/home-location", authenticate, MapController.getHomeLocation);
 router.patch("/home-location", authenticate, MapController.updateHomeLocation);

@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import { mapService } from "../../services/shared/map.service";
+import { foursquareService } from "../../services/shared/foursquare.service";
 import { PrismaClient } from "@prisma/client";
 import axios from "axios";
 import { MAPBOX_SECRET_TOKEN, ORS_API_KEY } from "../../config";
@@ -332,6 +333,50 @@ export default class MapController {
     }
   }
 
+  /**
+   * GET /mirror/map/nearby-pois?lat=&lng=&radius=
+   * Returns nearby Foursquare places around a destination.
+   */
+  static async nearbyPOIs(req: Request, res: Response, next: NextFunction) {
+    const schema = Joi.object({
+      lat:    Joi.number().min(-90).max(90).required(),
+      lng:    Joi.number().min(-180).max(180).required(),
+      radius: Joi.number().min(100).max(5000).default(1000),
+    });
+
+    const { error, value } = schema.validate(req.query);
+    if (error) return res.status(400).json({ error: error.message });
+
+    try {
+      const pois = await foursquareService.nearbyPOIs(value.lat, value.lng, value.radius);
+      return res.json({ pois });
+    } catch (err: any) {
+      if (err.message === "FOURSQUARE_KEY_MISSING") {
+        return res.status(502).json({ error: "Foursquare API key not configured. Set FOURSQUARE_API_KEY in .env" });
+      }
+      next(err);
+    }
+  }
+
+  /**
+   * GET /mirror/map/venue-photos/:fsqId
+   * Returns Foursquare photos for a specific venue.
+   */
+  static async venuePhotos(req: Request, res: Response, next: NextFunction) {
+    const { fsqId } = req.params;
+    if (!fsqId) return res.status(400).json({ error: "fsqId is required" });
+
+    try {
+      const photos = await foursquareService.venuePhotos(fsqId);
+      return res.json({ photos });
+    } catch (err: any) {
+      if (err.message === "FOURSQUARE_KEY_MISSING") {
+        return res.status(502).json({ error: "Foursquare API key not configured." });
+      }
+      next(err);
+    }
+  }
+
   static async getHomeLocation(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as Request & { user?: { id: string } }).user?.id;
@@ -365,4 +410,5 @@ export default class MapController {
       next(err);
     }
   }
+
 }
