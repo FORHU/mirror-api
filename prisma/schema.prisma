@@ -28,7 +28,6 @@ model User {
 
   conversations   Conversation[]
   sessions        Session[]
-  emotionMemories EmotionMemory[]
   skinAnalyses    SkinAnalysis[]
 
   userGarments Garment[] @relation("UserGarments")
@@ -137,7 +136,6 @@ model ChatMessage {
   role           ChatMessageRole @default(USER)
   conversation   Conversation?   @relation(fields: [conversationId], references: [id])
   embedding      Embedding?
-  emotionMemory  EmotionMemory?
 
   @@index([conversationId, createdAt])
 }
@@ -151,16 +149,6 @@ model Embedding {
   chatMessage   ChatMessage @relation(fields: [chatMessageId], references: [id])
 }
 
-model EmotionMemory {
-  id            String      @id @default(cuid())
-  chatMessageId String      @unique
-  userId        String
-  emotion       String
-  confidence    Float
-  createdAt     DateTime    @default(now())
-  chatMessage   ChatMessage @relation(fields: [chatMessageId], references: [id])
-  user          User        @relation(fields: [userId], references: [id])
-}
 
 enum ChatMessageRole {
   USER
