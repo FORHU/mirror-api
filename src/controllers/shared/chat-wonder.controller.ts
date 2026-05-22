@@ -4,6 +4,7 @@ import ChatWonderService from "../../services/shared/chat-wonder.service";
 import { streamChat } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
 import { parseChatWonderResponse } from "../../utils/parse-response.util";
+import { detectChatRoute } from "../../utils/detect-chat-route.util";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
 
@@ -52,6 +53,15 @@ export default class ChatWonderController {
       res.setHeader("Cache-Control", "no-cache, no-transform");
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
+
+      // 5a. Emit route event immediately — frontend can navigate before AI responds
+      const chatRoute = detectChatRoute(input);
+      if (chatRoute) {
+        res.write(`data: ${JSON.stringify({ type: "route", ...chatRoute })}\n\n`);
+        if ((res as Response & { flush?: () => void }).flush)
+          (res as Response & { flush?: () => void }).flush?.();
+        logger.info(`[ChatWonderController] Route detected: ${chatRoute.route}`);
+      }
 
       let fullResponse = "";
 
