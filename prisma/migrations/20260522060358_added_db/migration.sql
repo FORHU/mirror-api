@@ -1,5 +1,4 @@
--- AlterTable
-ALTER TABLE "File" ADD COLUMN     "outfitCollectionId" TEXT;
+-- outfitCollectionId was already added in 20260522052357_migration_changes.
+-- This migration is intentionally a no-op.
+SELECT 1;
 
--- AddForeignKey
-ALTER TABLE "File" ADD CONSTRAINT "File_outfitCollectionId_fkey" FOREIGN KEY ("outfitCollectionId") REFERENCES "Outfit"("id") ON DELETE SET NULL ON UPDATE CASCADE;
