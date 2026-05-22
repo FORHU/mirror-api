@@ -43,10 +43,6 @@ const limiter = rateLimit({
 
 if (!isDev) app.use(limiter);
 
-app.get("/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok" });
-});
-
 app.use("/api", router);
 
 app.use((_req: Request, res: Response) => {
