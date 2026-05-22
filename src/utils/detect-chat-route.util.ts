@@ -43,8 +43,10 @@ const rules: Array<(t: string) => ChatRoute | null> = [
       /\b(videos?|music|songs?|tracks?|playlists?)\b.{0,20}\b(of|by|from|about)\b/i.test(t)
     ) {
       const query =
-        extract(t, /(?:play|show|find|search|put on|queue|recommend)\s+(.+?)(?:\s+(?:video|music|song|track|playlist))?$/i) ||
-        extract(t, /(.+?)\s+(?:video|music|song|track)s?/i);
+        extract(
+          t,
+          /(?:play|show|find|search|put on|queue|recommend)\s+(.+?)(?:\s+(?:video|music|song|track|playlist))?$/i
+        ) || extract(t, /(.+?)\s+(?:video|music|song|track)s?/i);
       return { route: "video", query };
     }
     return null;
@@ -65,7 +67,9 @@ const rules: Array<(t: string) => ChatRoute | null> = [
   // Outfit builder
   (t) => {
     if (
-      /\b(build|create|make|assemble|suggest|recommend)\s+(an?\s+)?(outfit|look|style|fit)\b/i.test(t) ||
+      /\b(build|create|make|assemble|suggest|recommend)\s+(an?\s+)?(outfit|look|style|fit)\b/i.test(
+        t
+      ) ||
       /\b(pick|choose|select)\s+(clothes|outfit|what to wear)\b/i.test(t) ||
       /\bwhat\s+(should|can)\s+i\s+wear\b/i.test(t)
     ) {
@@ -89,7 +93,9 @@ const rules: Array<(t: string) => ChatRoute | null> = [
   // Event setup
   (t) => {
     if (
-      /\b(plan|set\s+up|create|add|new)\s+(an?\s+)?(event|appointment|meeting|occasion)\b/i.test(t) ||
+      /\b(plan|set\s+up|create|add|new)\s+(an?\s+)?(event|appointment|meeting|occasion)\b/i.test(
+        t
+      ) ||
       /\b(i('m| am)\s+(going|attending|heading))\b/i.test(t)
     ) {
       return { route: "event-setup" };
