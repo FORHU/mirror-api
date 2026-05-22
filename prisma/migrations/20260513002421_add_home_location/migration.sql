@@ -1,3 +1,3 @@
--- AlterTable
-ALTER TABLE "User" ADD COLUMN     "homeLocationLat" DOUBLE PRECISION,
-ADD COLUMN     "homeLocationLng" DOUBLE PRECISION;
+-- homeLocationLat and homeLocationLng were already added in 20260512070936_add_home_location.
+-- This migration is intentionally a no-op.
+SELECT 1;
