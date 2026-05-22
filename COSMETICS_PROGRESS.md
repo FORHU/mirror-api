@@ -1,6 +1,34 @@
 # Cosmetics Module — Implementation Plan
 
-## Status (2026-05-20)
+## Status (2026-05-21) — Per-user skin-analysis flow added
+
+**Done today** (pivot from outline-anchored to per-user, driven by the kiosk Skin Analysis screen):
+- `CosmeticProduct` extended: `category` (FACE/EYES/LIPS), `priceAmount`/`priceUnit`, `tags[]`, `benefits[]`, `spf`, `waterproof`, `transferProof`, `hydrating`, `oilFree`, `finish`.
+- `COSMETIC_TYPE` enum extended with skincare values: `SUNSCREEN, MOISTURIZER, EXFOLIANT, SERUM, CLEANSER, TONER, ESSENCE`.
+- New enums: `COSMETIC_CATEGORY`, `COSMETIC_FINISH`, `SKIN_TYPE`.
+- New model `SkinAnalysis` (per-user, links optional `WeatherSnapshot`, owns recommendations).
+- `CosmeticRecommendation`: `userOutlineId` made nullable, added `skinAnalysisId` (Cascade) so recs anchor on either an outline (legacy) or a skin analysis (new).
+- Rule engine `src/utils/cosmetics.util.ts` (`scoreProduct`, `rankProducts`) — pure function, weather-aware, concern-keyword based.
+- Vision integration: `OpenAIService.analyzeFaceImage(imageUrl)` returns structured `SkinVisionResult` (gpt-4o, JSON response_format).
+- New layers: `skin-analysis.repository.ts`, `skin-analysis.service.ts` (vision → engine → atomic persist), `skin-analysis.controller.ts`, `skin-analysis.route.ts`.
+- Routes mounted at `/api/remote/skin-analyses` and `/api/mirror/skin-analyses`.
+
+**Endpoints now live:**
+- `POST   /api/remote/skin-analyses`        body `{ fileId, weatherSnapshotId? }` — runs the pipeline, returns analysis + recommendations
+- `GET    /api/remote/skin-analyses`        paginated, current user's history
+- `GET    /api/remote/skin-analyses/:id`    full analysis with `file`, `weatherSnapshot`, `recommendations.cosmeticProduct.fileUrl`
+- `DELETE /api/remote/skin-analyses/:id`
+
+**Frontend contract:** two-step upload — UI calls `POST /file-uploads` first, then passes the returned `fileId` (and optional `weatherSnapshotId`) here.
+
+**Still pending:**
+1. Run migration: `npx prisma migrate dev --name add_skin_analysis` (stop dev server first to release Prisma engine DLL on Windows).
+2. Seed catalog data (6–10 skincare products covering the rule matrix; current matcher needs products with `tags`, `spf`, `hydrating`, etc. populated).
+3. Companion-app dashboard adapter (current `companion-app/modules/shared/api/cosmetic.service.ts` predates the new endpoints).
+
+---
+
+## Status (2026-05-20) — Original plan (kept for reference)
 
 **Done:**
 - Plan written; glossary entries in `CONTEXT.md`.
