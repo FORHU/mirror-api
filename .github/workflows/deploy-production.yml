@@ -125,4 +125,20 @@ jobs:
               --env-file /home/ec2-user/mirror-api.env \
               -p 3007:3007 \
               ${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }}
+
+            # Health check — wait up to 30s for the API to respond
+            echo "Waiting for API to be ready..."
+            for i in $(seq 1 10); do
+              if curl -sf http://localhost:3007/health > /dev/null 2>&1; then
+                echo "API is up"
+                break
+              fi
+              if [ "$i" -eq 10 ]; then
+                echo "API did not start in time"
+                docker logs mirror-api --tail 30
+                exit 1
+              fi
+              sleep 3
+            done
+
             docker image prune -f
