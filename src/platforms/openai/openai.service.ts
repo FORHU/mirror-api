@@ -36,4 +36,80 @@ export default class OpenAIService {
       throw { status: err.response?.status || 500, message: "OpenAI request failed" };
     }
   }
+
+  /**
+   * Analyzes a face photo for skin condition. Sends the image to GPT-4o
+   * vision and forces a JSON response matching the SkinVisionResult shape
+   * so the caller can persist it directly.
+   *
+   * `imageUrl` must be a publicly reachable URL (we pass S3-hosted file URLs).
+   */
+  static async analyzeFaceImage(imageUrl: string): Promise<SkinVisionResult> {
+    const systemMessage =
+      "You are a dermatology-aware skin analyst for a smart mirror. " +
+      "Analyze the face in the image and return ONLY valid JSON matching the requested schema. " +
+      "Do not include markdown fences, prose, or commentary.";
+
+    const userPrompt =
+      "Inspect the face. Return JSON with this exact shape:\n" +
+      "{\n" +
+      '  "skinType": "COMBINATION" | "OILY" | "DRY" | "NORMAL" | "SENSITIVE",\n' +
+      '  "skinTone": string,                    // e.g. "Warm Medium", "Cool Light"\n' +
+      '  "hydrationPct": number,                // 0-100 (lower = more dehydrated)\n' +
+      '  "oilinessPct": number,                 // 0-100 (higher = oilier T-zone)\n' +
+      '  "concerns": string[],                  // short labels, e.g. "Mild dehydration", "Enlarged pores"\n' +
+      '  "routineTip": string                   // one sentence, actionable\n' +
+      "}\n" +
+      "Be conservative — if the image is poor quality, return NORMAL skinType and empty concerns.";
+
+    try {
+      const response = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: systemMessage },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: userPrompt },
+                { type: "image_url", image_url: { url: imageUrl } },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+        },
+        { headers: this.headers }
+      );
+
+      const raw = response.data.choices[0].message.content as string;
+      const parsed = JSON.parse(raw) as SkinVisionResult;
+
+      if (!parsed.skinType || typeof parsed.hydrationPct !== "number") {
+        throw { status: 502, message: "Vision response missing required fields" };
+      }
+      return parsed;
+    } catch (error) {
+      const err = error as {
+        response?: { data?: unknown; status?: number };
+        status?: number;
+        message: string;
+      };
+      logger.error("OpenAI Vision Error:", err.response?.data || err.message);
+      throw {
+        status: err.response?.status || err.status || 500,
+        message: err.message || "OpenAI vision request failed",
+      };
+    }
+  }
 }
+
+export type SkinVisionResult = {
+  skinType: "COMBINATION" | "OILY" | "DRY" | "NORMAL" | "SENSITIVE";
+  skinTone?: string;
+  hydrationPct: number;
+  oilinessPct: number;
+  concerns: string[];
+  routineTip: string;
+};

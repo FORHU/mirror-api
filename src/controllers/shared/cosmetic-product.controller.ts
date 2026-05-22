@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
-import { COSMETIC_TYPE } from "@prisma/client";
+import { COSMETIC_CATEGORY, COSMETIC_FINISH, COSMETIC_TYPE } from "@prisma/client";
 import CosmeticProductService from "../../services/shared/cosmetic-product.service";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
 import { pageFromRepo } from "../../helpers/pagination.helper";
@@ -17,6 +17,23 @@ const createSchema = Joi.object({
   type: Joi.string()
     .valid(...Object.values(COSMETIC_TYPE))
     .optional(),
+  category: Joi.string()
+    .valid(...Object.values(COSMETIC_CATEGORY))
+    .optional()
+    .allow(null),
+  priceAmount: Joi.number().min(0).optional().allow(null),
+  priceUnit: Joi.string().optional().allow(null, ""),
+  tags: Joi.array().items(Joi.string().trim().min(1)).optional(),
+  benefits: Joi.array().items(Joi.string().trim().min(1)).optional(),
+  spf: Joi.number().integer().min(0).max(100).optional().allow(null),
+  waterproof: Joi.boolean().optional(),
+  transferProof: Joi.boolean().optional(),
+  hydrating: Joi.boolean().optional(),
+  oilFree: Joi.boolean().optional(),
+  finish: Joi.string()
+    .valid(...Object.values(COSMETIC_FINISH))
+    .optional()
+    .allow(null),
   metaData: Joi.object().optional().allow(null),
 });
 
@@ -34,6 +51,23 @@ const updateSchema = Joi.object({
   type: Joi.string()
     .valid(...Object.values(COSMETIC_TYPE))
     .optional(),
+  category: Joi.string()
+    .valid(...Object.values(COSMETIC_CATEGORY))
+    .optional()
+    .allow(null),
+  priceAmount: Joi.number().min(0).optional().allow(null),
+  priceUnit: Joi.string().optional().allow(null, ""),
+  tags: Joi.array().items(Joi.string().trim().min(1)).optional(),
+  benefits: Joi.array().items(Joi.string().trim().min(1)).optional(),
+  spf: Joi.number().integer().min(0).max(100).optional().allow(null),
+  waterproof: Joi.boolean().optional(),
+  transferProof: Joi.boolean().optional(),
+  hydrating: Joi.boolean().optional(),
+  oilFree: Joi.boolean().optional(),
+  finish: Joi.string()
+    .valid(...Object.values(COSMETIC_FINISH))
+    .optional()
+    .allow(null),
   metaData: Joi.object().optional().allow(null),
 });
 

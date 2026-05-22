@@ -1,16 +1,19 @@
 import CosmeticProductRepo from "../../repositories/cosmetic-product.repository";
 import FileRepo from "../../repositories/file.repository";
-import { COSMETIC_TYPE, Prisma } from "@prisma/client";
+import { COSMETIC_CATEGORY, COSMETIC_FINISH, COSMETIC_TYPE, Prisma } from "@prisma/client";
 
 const fileNotFound = () => ({ status: 400, message: "Referenced file (fileUrlId) does not exist" });
 
 export default class CosmeticProductService {
   static async getProducts(query: Record<string, string | undefined>) {
-    const { page, limit, type, brand } = query;
+    const { page, limit, type, brand, category } = query;
 
-    const filters: { type?: COSMETIC_TYPE; brand?: string } = {};
+    const filters: { type?: COSMETIC_TYPE; brand?: string; category?: COSMETIC_CATEGORY } = {};
     if (type && (Object.values(COSMETIC_TYPE) as string[]).includes(type)) {
       filters.type = type as COSMETIC_TYPE;
+    }
+    if (category && (Object.values(COSMETIC_CATEGORY) as string[]).includes(category)) {
+      filters.category = category as COSMETIC_CATEGORY;
     }
     if (typeof brand === "string" && brand.trim()) filters.brand = brand.trim();
 
@@ -34,6 +37,17 @@ export default class CosmeticProductService {
     fileUrlId?: string;
     hexColor?: string;
     type?: COSMETIC_TYPE;
+    category?: COSMETIC_CATEGORY | null;
+    priceAmount?: number | null;
+    priceUnit?: string | null;
+    tags?: string[];
+    benefits?: string[];
+    spf?: number | null;
+    waterproof?: boolean;
+    transferProof?: boolean;
+    hydrating?: boolean;
+    oilFree?: boolean;
+    finish?: COSMETIC_FINISH | null;
     metaData?: Prisma.InputJsonValue;
   }) {
     if (data.fileUrlId) {
@@ -47,6 +61,17 @@ export default class CosmeticProductService {
       details: data.details,
       hexColor: data.hexColor,
       type: data.type,
+      category: data.category,
+      priceAmount: data.priceAmount,
+      priceUnit: data.priceUnit,
+      tags: data.tags,
+      benefits: data.benefits,
+      spf: data.spf,
+      waterproof: data.waterproof,
+      transferProof: data.transferProof,
+      hydrating: data.hydrating,
+      oilFree: data.oilFree,
+      finish: data.finish,
       metaData: data.metaData,
       ...(data.fileUrlId && { fileUrl: { connect: { id: data.fileUrlId } } }),
     };
@@ -63,6 +88,17 @@ export default class CosmeticProductService {
       fileUrlId?: string | null;
       hexColor?: string;
       type?: COSMETIC_TYPE;
+      category?: COSMETIC_CATEGORY | null;
+      priceAmount?: number | null;
+      priceUnit?: string | null;
+      tags?: string[];
+      benefits?: string[];
+      spf?: number | null;
+      waterproof?: boolean;
+      transferProof?: boolean;
+      hydrating?: boolean;
+      oilFree?: boolean;
+      finish?: COSMETIC_FINISH | null;
       metaData?: Prisma.InputJsonValue;
     }
   ) {
@@ -79,6 +115,17 @@ export default class CosmeticProductService {
       details: data.details,
       hexColor: data.hexColor,
       type: data.type,
+      category: data.category,
+      priceAmount: data.priceAmount,
+      priceUnit: data.priceUnit,
+      tags: data.tags,
+      benefits: data.benefits,
+      spf: data.spf,
+      waterproof: data.waterproof,
+      transferProof: data.transferProof,
+      hydrating: data.hydrating,
+      oilFree: data.oilFree,
+      finish: data.finish,
       metaData: data.metaData,
       // Explicit null clears the image link; undefined leaves it alone.
       ...(data.fileUrlId === null
