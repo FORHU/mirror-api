@@ -120,8 +120,8 @@ export default class SkinAnalysisService {
     const { page, limit } = query;
     return SkinAnalysisRepo.findByUser(
       userId,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 20
+      page ? parseInt(String(page), 10) : 1,
+      limit ? parseInt(String(limit), 10) : 20
     );
   }
 

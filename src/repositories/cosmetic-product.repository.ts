@@ -1,9 +1,9 @@
 import { prisma } from "../utils/prisma";
-import { COSMETIC_TYPE, Prisma } from "@prisma/client";
+import { COSMETIC_CATEGORY, COSMETIC_TYPE, Prisma } from "@prisma/client";
 
 export default class CosmeticProductRepo {
   static async findAll(
-    filters: { type?: COSMETIC_TYPE; brand?: string } = {},
+    filters: { type?: COSMETIC_TYPE; brand?: string; category?: COSMETIC_CATEGORY } = {},
     page: number = 1,
     limit: number = 20
   ) {
@@ -11,6 +11,7 @@ export default class CosmeticProductRepo {
 
     const where: Prisma.CosmeticProductWhereInput = {};
     if (filters.type) where.type = filters.type;
+    if (filters.category) where.category = filters.category;
     if (filters.brand) where.brand = { equals: filters.brand, mode: "insensitive" };
 
     const [data, total] = await Promise.all([

@@ -29,6 +29,7 @@ model User {
   conversations   Conversation[]
   sessions        Session[]
   emotionMemories EmotionMemory[]
+  skinAnalyses    SkinAnalysis[]
 
   userGarments Garment[] @relation("UserGarments")
 }
@@ -105,7 +106,8 @@ model WeatherSnapshot {
   source     WeatherSource
   recordedAt DateTime      @default(now())
 
-  userOutline UserOutline @relation(fields: [userOutlineId], references: [id], onDelete: Cascade)
+  userOutline  UserOutline    @relation(fields: [userOutlineId], references: [id], onDelete: Cascade)
+  skinAnalyses SkinAnalysis[]
 
   @@index([userOutlineId])
 }
@@ -185,8 +187,19 @@ model CosmeticProduct {
   hexColor  String? // For UI color swatches
   metaData  Json?
 
-  type      COSMETIC_TYPE?
-  createdAt DateTime       @default(now())
+  category      COSMETIC_CATEGORY?
+  type          COSMETIC_TYPE?
+  priceAmount   Float?
+  priceUnit     String?
+  tags          String[]           @default([])
+  benefits      String[]           @default([])
+  spf           Int?
+  waterproof    Boolean            @default(false)
+  transferProof Boolean            @default(false)
+  hydrating     Boolean            @default(false)
+  oilFree       Boolean            @default(false)
+  finish        COSMETIC_FINISH?
+  createdAt     DateTime           @default(now())
 
   recommendations CosmeticRecommendation[]
 }
@@ -194,8 +207,11 @@ model CosmeticProduct {
 model CosmeticRecommendation {
   id String @id @default(cuid())
 
-  userOutlineId String
-  userOutline   UserOutline @relation(fields: [userOutlineId], references: [id])
+  userOutlineId String?
+  userOutline   UserOutline? @relation(fields: [userOutlineId], references: [id], onDelete: Cascade)
+
+  skinAnalysisId String?
+  skinAnalysis   SkinAnalysis? @relation(fields: [skinAnalysisId], references: [id], onDelete: Cascade)
 
   cosmeticProductId String
   cosmeticProduct   CosmeticProduct @relation(fields: [cosmeticProductId], references: [id])
@@ -206,6 +222,35 @@ model CosmeticRecommendation {
   signals Json?
 
   createdAt DateTime @default(now())
+
+  @@index([userOutlineId, rank])
+  @@index([skinAnalysisId, rank])
+}
+
+model SkinAnalysis {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fileId String
+  file   File   @relation("SkinAnalysisFile", fields: [fileId], references: [id])
+
+  weatherSnapshotId String?
+  weatherSnapshot   WeatherSnapshot? @relation(fields: [weatherSnapshotId], references: [id], onDelete: SetNull)
+
+  skinType     SKIN_TYPE
+  skinTone     String?
+  hydrationPct Int
+  oilinessPct  Int
+  concerns     String[]  @default([])
+  routineTip   String
+  rawSignals   Json?
+
+  recommendations CosmeticRecommendation[]
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Calendar {
@@ -242,6 +287,7 @@ model File {
   userAvatar       User?             @relation("UserAvatar")
   outfitDisplay    Outfit?           @relation("OutfitDisplayFile")
   cosmeticProducts CosmeticProduct[] @relation("CosmeticProductImage")
+  skinAnalyses     SkinAnalysis[]    @relation("SkinAnalysisFile")
 
   outfitCollectionId String?
   outfitCollection   Outfit? @relation("OutfitCollection", fields: [outfitCollectionId], references: [id])
@@ -548,6 +594,36 @@ enum COSMETIC_TYPE {
   // Base / Prep / Finish
   PRIMER
   SETTING_SPRAY
+
+  // Skincare
+  SUNSCREEN
+  MOISTURIZER
+  EXFOLIANT
+  SERUM
+  CLEANSER
+  TONER
+  ESSENCE
+}
+
+enum COSMETIC_CATEGORY {
+  FACE
+  EYES
+  LIPS
+  SKINCARE
+}
+
+enum COSMETIC_FINISH {
+  MATTE
+  DEWY
+  NATURAL
+}
+
+enum SKIN_TYPE {
+  DRY
+  OILY
+  COMBINATION
+  NORMAL
+  SENSITIVE
 }
 
 enum WeatherType {
