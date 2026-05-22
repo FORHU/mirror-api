@@ -339,8 +339,8 @@ export default class MapController {
    */
   static async nearbyPOIs(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
-      lat:    Joi.number().min(-90).max(90).required(),
-      lng:    Joi.number().min(-180).max(180).required(),
+      lat: Joi.number().min(-90).max(90).required(),
+      lng: Joi.number().min(-180).max(180).required(),
       radius: Joi.number().min(100).max(5000).default(1000),
     });
 
@@ -352,7 +352,9 @@ export default class MapController {
       return res.json({ pois });
     } catch (err: any) {
       if (err.message === "FOURSQUARE_KEY_MISSING") {
-        return res.status(502).json({ error: "Foursquare API key not configured. Set FOURSQUARE_API_KEY in .env" });
+        return res
+          .status(502)
+          .json({ error: "Foursquare API key not configured. Set FOURSQUARE_API_KEY in .env" });
       }
       next(err);
     }
@@ -410,5 +412,4 @@ export default class MapController {
       next(err);
     }
   }
-
 }

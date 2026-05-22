@@ -1,6 +1,5 @@
 import axios from "axios";
 import { FOURSQUARE_API_KEY } from "../../config";
-import logger from "../../utils/logger";
 
 const BASE_URL = "https://api.foursquare.com/v3";
 
@@ -19,7 +18,21 @@ export interface FoursquarePOI {
   photo: string | null;
 }
 
-function buildPhotoUrl(photo: any): string | null {
+interface FsqPhoto {
+  prefix: string;
+  suffix: string;
+}
+interface FsqResult {
+  fsq_id: string;
+  name: string;
+  distance?: number;
+  categories?: Array<{ name: string; icon?: { prefix: string; suffix: string } }>;
+  geocodes?: { main?: { latitude: number; longitude: number } };
+  location?: { address?: string; locality?: string };
+  photos?: FsqPhoto[];
+}
+
+function buildPhotoUrl(photo: FsqPhoto): string | null {
   if (!photo?.prefix || !photo?.suffix) return null;
   return `${photo.prefix}original${photo.suffix}`;
 }
@@ -41,7 +54,7 @@ export const foursquareService = {
       },
     });
 
-    const results: any[] = response.data?.results ?? [];
+    const results: FsqResult[] = response.data?.results ?? [];
 
     return results.map((r) => {
       const cat = r.categories?.[0];
@@ -72,7 +85,7 @@ export const foursquareService = {
       params: { limit: 6 },
     });
 
-    const photos: any[] = response.data ?? [];
+    const photos: FsqPhoto[] = response.data ?? [];
     return photos.map(buildPhotoUrl).filter(Boolean) as string[];
   },
 };
