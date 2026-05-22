@@ -3,14 +3,14 @@ name: Deploy Staging
 on:
   workflow_run:
     workflows: ["CI"]
-    branches: [main]
+    branches: [staging]
     types: [completed]
   workflow_dispatch:
     inputs:
       ref:
         description: "Branch, tag, or SHA to deploy"
         required: true
-        default: main
+        default: staging
 
 concurrency:
   group: style-os-mirror-deploy-staging
@@ -27,7 +27,7 @@ jobs:
     name: Build, Push & Deploy (staging)
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    environment: production #temp only should be moved to staging
+    environment: staging #temp only should be moved to staging
 
     permissions:
       id-token: write
@@ -131,6 +131,13 @@ jobs:
             chmod 600 /home/ec2-user/mirror-api.env
             aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
             docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+            # Run migrations before swapping the container
+            docker run --rm \
+              --env-file /home/ec2-user/mirror-api.env \
+              ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
+              npx prisma migrate deploy
+
             docker stop mirror-api 2>/dev/null || true
             docker rm   mirror-api 2>/dev/null || true
             docker run -d --name mirror-api --restart unless-stopped \
