@@ -113,12 +113,6 @@ jobs:
             aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
             docker pull ${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }}
 
-            # Resolve any migration stuck in "failed" state from a prior deploy attempt.
-            docker run --rm \
-              --env-file /home/ec2-user/mirror-api.env \
-              ${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }} \
-              npx prisma migrate resolve --applied 20260512070936_add_home_location 2>/dev/null || true
-
             # Run migrations before swapping the container
             docker run --rm \
               --env-file /home/ec2-user/mirror-api.env \
