@@ -1,0 +1,49 @@
+name: Resolve Failed Migration (one-time)
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration_name:
+        description: "Exact migration folder name to mark as applied"
+        required: true
+        default: "20260512070936_add_home_location"
+      environment:
+        description: "Target environment"
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  resolve:
+    name: Mark failed migration as applied
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
+
+      - name: Resolve failed migration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "Resolving migration: ${{ github.event.inputs.migration_name }}"
+          npx prisma migrate resolve --applied "${{ github.event.inputs.migration_name }}"
+          echo "Done. Run the deploy workflow next to apply pending migrations."
