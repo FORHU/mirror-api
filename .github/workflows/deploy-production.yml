@@ -114,10 +114,12 @@ jobs:
             docker pull ${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }}
 
             # Run migrations before swapping the container
+            # --entrypoint overrides docker-entrypoint.sh so only the migration runs (not the app)
             docker run --rm \
+              --entrypoint npx \
               --env-file /home/ec2-user/mirror-api.env \
               ${{ steps.login-ecr.outputs.registry }}/mirror-api:${{ github.sha }} \
-              npx prisma migrate deploy
+              prisma migrate deploy
 
             docker stop mirror-api 2>/dev/null || true
             docker rm   mirror-api 2>/dev/null || true
