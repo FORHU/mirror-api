@@ -63,17 +63,17 @@ POST /chat-wonder/stream
         ├─► detectChatRoute(input)
         │         │
         │         ▼
-        │   SSE: { type: "route", route: "video", query: "chill kpop music" }  ← Frontend navigates immediately
+        │   SSE: { type: "route", route: "outfit-builder" }  ← Frontend navigates immediately
         │
         ├─► AI Stream (ChatWonder API)
         │         │
         │         ▼
         │   SSE: { type: "chunk", content: "..." }  (repeated)
         │
-        └─► SSE: { type: "complete", message: "...", videos: [...], communities: [...], ... }
+        └─► SSE: { type: "complete", message: "...", images: [...], ... }
 ```
 
-The `route` event tells the frontend **which experience to activate** (e.g. navigate to the video player, outfit builder, map) while the full AI response is still streaming. `detectChatRoute` should be a fast, local classifier — regex or lightweight model — so there is no added latency before the stream starts.
+The `route` event tells the frontend **which experience to activate** (e.g. navigate to the outfit builder, virtual fitting mirror, cosmetic catalog, map/directions) while the full AI response is still streaming. `detectChatRoute` is a fast, local classifier — regex-based — so there is no added latency before the stream starts.
 
 ---
 
@@ -112,7 +112,7 @@ Content-Type: application/json
 
 ```jsonc
 // [TARGET] Emitted before the AI stream starts — frontend navigates immediately
-{ "type": "route", "route": "video", "query": "chill kpop music" }
+{ "type": "route", "route": "outfit-builder" }
 
 // Emitted for each WebSocket chunk
 { "type": "chunk", "content": "<partial text>" }
@@ -126,8 +126,12 @@ Content-Type: application/json
     "confidence": 0.85,
     "wasMapped": true
   },
-  "videos": [],
-  "communities": [],
+  "images": [
+    {
+      "url": "https://cdn.example.com/uploads/streetwear-jacket.png",
+      "caption": "Suggested Oversized Streetwear Jacket"
+    }
+  ],
   "metadata": {
     "conversationId": "<uuid>",
     "userMessageId": "<uuid>",
@@ -207,7 +211,7 @@ You are a Smart Mirror fashion assistant. Respond with ONLY VALID JSON.
 USER: <user message>
 ```
 
-> **Note:** The `outfit_suggestion` and `mood` fields are requested in the prompt but the current `parseChatWonderResponse` implementation only maps `message`, `emotion`, `confidence`, `videos`, `artist`, and `images`. Extend the parser if you need to surface those fields.
+> **Note:** The `outfit_suggestion` and `mood` fields are requested in the prompt. The `parseChatWonderResponse` implementation successfully maps `message`, `emotion`, `confidence`, and any generated fashion/outfit `images` associated with the recommendation.
 
 ---
 

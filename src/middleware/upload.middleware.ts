@@ -1,7 +1,7 @@
 import multer from "multer";
 import multerS3 from "multer-s3";
 import { S3Client } from "@aws-sdk/client-s3";
-import { Request } from "express";
+import { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import path from "path";
 import { AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME } from "../config";
@@ -87,3 +87,17 @@ export const upload = multer({
     fileSize: 20 * 1024 * 1024, // 20MB max
   },
 });
+
+/**
+ * Flexible middleware that accepts any single file field name (e.g., "file", "image", "avatar")
+ * and extracts it to req.file to support varying client implementations without throwing Multer errors.
+ */
+export const handleSingleUpload = (req: Request, res: Response, next: NextFunction) => {
+  upload.any()(req, res, (err) => {
+    if (err) return next(err);
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      req.file = req.files[0];
+    }
+    next();
+  });
+};
