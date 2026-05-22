@@ -7,7 +7,7 @@ export default class RedisUtil {
 
   static async initialize() {
     this.client = createClient({
-      password: REDIS_PASSWORD,
+      ...(REDIS_PASSWORD ? { password: REDIS_PASSWORD } : {}),
       socket: {
         host: REDIS_HOST,
         port: REDIS_PORT,
@@ -25,7 +25,7 @@ export default class RedisUtil {
    */
   static getAdapterClients() {
     const pubClient = createClient({
-      password: REDIS_PASSWORD,
+      ...(REDIS_PASSWORD ? { password: REDIS_PASSWORD } : {}),
       socket: {
         host: REDIS_HOST,
         port: REDIS_PORT,
