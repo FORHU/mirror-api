@@ -1,309 +1,255 @@
-# Chat Wonder Integration
+# Mirror API — System Pattern & Architecture
 
-Chat Wonder is the external conversational AI backend powering the Smart Mirror's voice and text chat features. It exposes a REST API (for session management) and a WebSocket endpoint (for streamed responses). `mirror-api` acts as a proxy — it enriches the user prompt with context, streams the response back to the client via SSE, and persists the conversation history.
+> Living document. Updated as the system evolves.
+> Last updated: 2026-05-23
 
 ---
 
-## Architecture Overview
+## 1. What Is This System?
 
+The **Mirror API** is the backend brain of a Smart Mirror lifestyle assistant platform. It connects:
+
+- **Mirror Kiosk** (physical smart mirror display)
+- **Companion App** (mobile app for the user)
+- **Third-Party / Outer Applications** (external integrations via API key)
+
+All three clients talk to the Mirror API, which orchestrates:
+- User authentication & sessions
+- Wardrobe management (garments & outfits)
+- Cosmetics catalog & skin analysis
+- Weather snapshot & location context
+- AI-powered lifestyle chat (Chat Wonder)
+- Virtual try-on (Fashn AI)
+- Map & route planning
+- Real-time events via WebSocket (Socket.IO)
+
+---
+
+## 2. Route Namespacing
+
+Routes are split into three namespaces, each with its own auth strategy:
+
+| Namespace | Auth | Purpose |
+|---|---|---|
+| `/api/v1/mirror/*` | JWT (`authenticate`) | Kiosk-side features |
+| `/api/v1/remote/*` | JWT (`authenticate`) | Companion app features |
+| `/api/v1/external/*` | API Key (`x-api-key` header) | Third-party outer app access |
+
+> **API Key** is configured via the `THIRD_PARTY_API_KEY` env variable and validated in [`api-key.middleware.ts`](file:///c:/Users/devrm/Documents/GitHub/mirror/mirror-api/src/middleware/api-key.middleware.ts).
+
+---
+
+## 3. Chat Wonder — The AI Lifestyle Engine
+
+### 3.1 What It Does
+
+Chat Wonder is the AI conversation layer. The user types a message (e.g. _"I have a date tonight"_) and the API:
+
+1. Looks up or creates a **Conversation** in the DB
+2. Fetches a **ChatWonder session ID** (external AI platform, cached 24h in Redis)
+3. Saves the **user message** to chat history
+4. Builds an **enriched AI prompt** (4-persona system + wardrobe context)
+5. **Streams** the AI response back via **Server-Sent Events (SSE)**
+6. On completion: parses the JSON, enriches events with DB cosmetic products, emits kiosk socket events, saves the AI reply
+
+### 3.2 Data Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant Client as Client (Kiosk / Companion)
+    participant API as Mirror API (Controller/Service)
+    participant DB as PostgreSQL DB
+    participant Cache as Redis
+    participant AI as ChatWonder AI (External)
+
+    Client->>API: POST /api/shared/chat-wonder { input, personas, kioskId, conversationId }
+    
+    rect rgb(40, 40, 40)
+    Note over API,DB: 1. Context Gathering
+    API->>DB: ensureConversation()
+    API->>Cache: generateChatSessionId()
+    API->>DB: saveUserMessage(role: USER)
+    API->>DB: buildUserContext() (Garments, Outfits, Weather, Cosmetics)
+    end
+
+    API->>API: getAdditionalPrompt() (Inject 4-Personas + Context)
+    
+    rect rgb(40, 40, 40)
+    Note over API,AI: 2. AI Streaming
+    API->>AI: Connect WebSocket streamChat()
+    loop Stream chunks
+        AI-->>API: onChunk() (partial text)
+        API-->>Client: SSE: { type: "chunk", content: "..." }
+    end
+    end
+
+    rect rgb(40, 40, 40)
+    Note over API,DB: 3. Completion & Real-Time Sync
+    AI-->>API: onComplete() (Full JSON string)
+    API->>API: parseChatWonderResponse()
+    API->>DB: resolveItineraryCosmetics() (Match AI tags to DB products)
+    
+    opt If input contains "save / confirm / finalize" and kioskId is provided
+        API->>DB: update UserOutline (status: FINALIZED)
+        API-->>Client: Socket.IO: emit "itinerary_locked" (to kiosk:<kioskId> room)
+    end
+    
+    API->>DB: saveAIMessage(role: AI)
+    API-->>Client: SSE: { type: "complete", message, events, ... }
+    end
 ```
-mirror-app / mirror-admin
-       │
-       │  POST /api/v1/mirror/chat-wonder/stream   (SSE)
-       │  Socket: chatwonder_input / chatwonder_response
-       ▼
-   mirror-api
-       ├── ChatWonderController  (SSE route)
-       ├── ChatWonderService     (session + conversation persistence)
-       ├── streamChat()          (WebSocket proxy to Chat Wonder)
-       └── parseChatWonderResponse()  (JSON / markdown normaliser)
-       │
-       │  WebSocket  ws(s)://<CHAT_WONDER_API_URL>/chat-stream
-       ▼
-   Chat Wonder API  (external)
-       ├── GET  /session-id
-       ├── POST /chat            (non-streaming, legacy)
-       └── WS   /chat-stream
-```
 
----
+### 3.3 The 4-Persona System
 
-## Environment Variables
+Each chat request can carry a `personas` object to give the AI a distinct personality for each domain:
 
-| Variable | Description |
-|---|---|
-| `CHAT_WONDER_API_URL` | Base URL of the Chat Wonder service (e.g. `https://api.chatwonder.io`) |
-
----
-
-## Key Source Files
-
-| File | Role |
-|---|---|
-| [`src/routes/shared/chat-wonder.route.ts`](../src/routes/shared/chat-wonder.route.ts) | Express route — mounts `POST /stream` under `/mirror/chat-wonder` |
-| [`src/controllers/shared/chat-wonder.controller.ts`](../src/controllers/shared/chat-wonder.controller.ts) | SSE controller — orchestrates the full request lifecycle |
-| [`src/services/shared/chat-wonder.service.ts`](../src/services/shared/chat-wonder.service.ts) | Session management, conversation persistence, prompt wrapping |
-| [`src/platforms/chatWonder/chatWonder.service.ts`](../src/platforms/chatWonder/chatWonder.service.ts) | Low-level REST client (`ask`, `checkStatus`) — used for non-streaming calls |
-| [`src/utils/chat-wonder-stream.ts`](../src/utils/chat-wonder-stream.ts) | WebSocket streaming client with `onChunk / onComplete / onError` callbacks |
-| [`src/utils/detect-chat-route.util.ts`](../src/utils/detect-chat-route.util.ts) | Fast regex classifier — emits `route` SSE event before the AI stream starts |
-| [`src/utils/parse-response.util.ts`](../src/utils/parse-response.util.ts) | Normalises raw Chat Wonder output (JSON or plain text) into `ChatWonderResponse` |
-| [`src/utils/source-metadata.util.ts`](../src/utils/source-metadata.util.ts) | Strips the leading `[Sources] [...]` block from accumulated stream text |
-| [`src/services/shared/voice.service.ts`](../src/services/shared/voice.service.ts) | Voice pipeline — uses Chat Wonder for the conversational reply step |
-
----
-
-## SSE Event Flow
-
-```
-User (voice/text input)
-        │
-        ▼
-POST /chat-wonder/stream
-        │
-        ├─► detectChatRoute(input)
-        │         │
-        │         ▼
-        │   SSE: { type: "route", route: "outfit-builder" }  ← Frontend navigates immediately
-        │
-        ├─► AI Stream (ChatWonder API)
-        │         │
-        │         ▼
-        │   SSE: { type: "chunk", content: "..." }  (repeated)
-        │
-        └─► SSE: { type: "complete", message: "...", images: [...], ... }
-```
-
-The `route` event tells the frontend **which experience to activate** (e.g. navigate to the outfit builder, virtual fitting mirror, cosmetic catalog, map/directions) while the full AI response is still streaming. `detectChatRoute` is a fast, local classifier — regex-based — so there is no added latency before the stream starts.
-
----
-
-## SSE Stream — `POST /api/v1/mirror/chat-wonder/stream`
-
-### Request
-
-```http
-POST /api/v1/mirror/chat-wonder/stream
-Authorization: Bearer <token>
-Content-Type: application/json
-
+```json
 {
-  "input": "What outfit should I wear today?",
-  "conversationId": "<optional — omit to start a new conversation>",
-  "persona": "<optional — e.g. \"mirror\">"
-}
-```
-
-**Validation** (Joi):
-- `input` — string, 1–500 chars, required
-- `conversationId` — string, optional
-- `persona` — string, optional, may be empty
-
-### Controller Lifecycle
-
-1. **Ensure conversation** — looks up or creates a `Conversation` record in the DB (`ChatWonderService.ensureConversation`).
-2. **Session ID** — fetches or retrieves a cached Chat Wonder session (`ChatWonderService.generateChatSessionId`). Cached per `userId` for 24 hours.
-3. **Save user message** — persists the raw input to `ChatMessage` with `role: "USER"`.
-4. **Wrap prompt** — calls `ChatWonderService.getAdditionalPrompt(input)` which injects the Smart Mirror system prompt and instructs Chat Wonder to reply in JSON.
-5. **Set SSE headers** — `Content-Type: text/event-stream`, `Cache-Control: no-cache, no-transform`, `Connection: keep-alive`, `X-Accel-Buffering: no`.
-6. **Stream** — connects to `<CHAT_WONDER_API_URL>/chat-stream` via WebSocket, forwarding chunks as SSE events.
-7. **Complete** — strips sources prefix, parses the accumulated response, saves `role: "AI"` message, emits the `complete` event.
-
-### SSE Event Types
-
-```jsonc
-// [TARGET] Emitted before the AI stream starts — frontend navigates immediately
-{ "type": "route", "route": "outfit-builder" }
-
-// Emitted for each WebSocket chunk
-{ "type": "chunk", "content": "<partial text>" }
-
-// Emitted once the stream ends
-{
-  "type": "complete",
-  "message": "<full cleaned message>",
-  "outfit_suggestion": "<optional outfit suggestion text or null>",
-  "mood": "<vibe text or null>",
-  "cosmetics_suggestion": "<optional cosmetics advice or null>",
-  "route_suggestion": "<optional routing suggestion or null>",
-  "images": [
-    {
-      "url": "https://cdn.example.com/uploads/streetwear-jacket.png",
-      "caption": "Suggested Oversized Streetwear Jacket"
-    }
-  ],
-  "events": [
-    {
-      "type": "jog",
-      "timeBlock": "morning",
-      "context": {
-        "oilRisk": 20,
-        "drynessRisk": 0,
-        "uvRisk": 10,
-        "smudgeRisk": 0,
-        "sweatRisk": 80,
-        "tags": ["warm", "humid"]
-      },
-      "fashion": {
-        "suggestion": "breathable activewear"
-      },
-      "cosmetics": {
-        "suggestion": "sweatproof SPF 50 sunscreen"
-      },
-      "route": {
-        "suggestion": "Central Park running track"
-      }
-    }
-  ],
-  "metadata": {
-    "conversationId": "<uuid>",
-    "userMessageId": "<uuid>",
-    "aiMessageId": "<uuid>"
+  "input": "I have a date tonight",
+  "personas": {
+    "system":    "A warm lifestyle concierge",
+    "fashion":   "A bold avant-garde fashion designer",
+    "cosmetics": "A no-nonsense dermatologist",
+    "maps":      "A chill local who knows the scenic route"
   }
 }
-
-// Emitted on error
-{ "type": "error", "message": "<error description>" }
 ```
 
----
+| Persona | Controls | Default Fallback |
+|---|---|---|
+| `system` | `message` field & general tone | Polite smart mirror assistant |
+| `fashion` | `outfit_suggestion` + `events[].fashion` | Knowledgeable fashion stylist |
+| `cosmetics` | `cosmetics_suggestion` + `events[].cosmetics` | Professional makeup artist & skincare expert |
+| `maps` | `route_suggestion` + `events[].route` | Helpful local guide |
 
-## WebSocket Streaming (`streamChat`)
+All 4 fields are optional — defaults kick in automatically.
 
-`chat-wonder-stream.ts` wraps the external Chat Wonder WebSocket:
+### 3.4 Wardrobe & Weather Context Injection
 
-- Connects to `<CHAT_WONDER_API_URL>/chat-stream` (protocol swapped from `http(s)` → `ws(s)`).
-- Sends:
-  ```json
-  {
-    "user_input": "[mirror-(mirror)] <wrapped prompt>",
-    "session_id": "<session_id>"
-  }
-  ```
-- Persona prefix format: `[mirror-(<persona>)]` — if no persona is supplied it defaults to `[mirror]`.
-- Special message tokens from Chat Wonder:
-  - `__END__` — stream complete, close socket.
-  - `[Error]...` — reject and surface error.
-  - `[Tool]...` — tool execution notification, ignored (no callback).
-  - Any other string — text chunk, forwarded via `onChunk`.
+Before prompting the AI, the API fetches real user data and injects it into the system prompt:
 
----
+| Data | Source | Limit |
+|---|---|---|
+| Garments | `Garment` table filtered by `userId` | Up to 20 |
+| Saved outfits | `Outfit` table filtered by `userId` | Up to 5 |
+| Weather snapshot | `WeatherSnapshot` via `UserOutline.conversationId` | Current outline only |
+| Cosmetics | `CosmeticRecommendation` via `UserOutline` (ranked) | Up to 10 |
 
-## Response Parsing (`parseChatWonderResponse`)
-
-Handles two response formats:
-
-1. **JSON** (preferred) — extracts the first `{…}` block and maps to `ChatWonderResponse`:
-   ```ts
-    interface ChatWonderResponse {
-      message: string;
-      outfit_suggestion: string | null;
-      mood: string | null;
-      cosmetics_suggestion: string | null;
-      route_suggestion: string | null;
-      images: { url: string; caption?: string }[];
-      events: ChatWonderEvent[];
-      raw: string;
-    }
-    ```
-2. **Plain text fallback** — strips any trailing `[Sources]…` block, returns `message` as the raw text with `wasMapped: false`.
-
-The `getAdditionalPrompt` system prompt tells Chat Wonder to **always respond with valid JSON**, so plain-text fallback should only occur on edge cases or model failures.
-
----
-
-## Session Management
-
-- Session IDs are obtained from `GET <CHAT_WONDER_API_URL>/session-id`.
-- They are cached in Redis/memory under `chat:sessionId:<userId>` with a **24-hour TTL**.
-- If the session call fails, an empty string is used and the stream will still be attempted — Chat Wonder may create its own session server-side.
-- The voice pipeline (`voice.service.ts`) manages sessions independently via `getChatWonderSession`, which accepts an optional `sessionId` from the socket context.
-
----
-
-## System Prompt (Smart Mirror)
-
-`ChatWonderService.getAdditionalPrompt` wraps every user message with:
+The AI prompt then looks like:
 
 ```
-You are a Smart Mirror fashion assistant. Respond with ONLY VALID JSON.
+[USER WARDROBE & CONTEXT]
+IMPORTANT: Base fashion suggestions on the garments and outfits listed below.
+
+Garments in wardrobe:
+- Black Oversized Hoodie [Hoodie] | Category: Streetwear | Silhouette: Oversized
+- Blue Slim Jeans [Jeans] | Category: Casual | Silhouette: Slim
+
+Saved outfits:
+- "Date Night": Black Oversized Hoodie + Blue Slim Jeans
+
+Recommended cosmetics for this user:
+- MAC Ruby Woo by MAC [LIPSTICK, MATTE finish, waterproof]
+
+[CURRENT WEATHER]
+Temperature: 32°C | Humidity: 80% | UV Index: 9 | Condition: HOT_HUMID
+```
+
+### 3.5 AI Response JSON Schema
+
+The AI always responds with **ONLY VALID JSON** (no markdown):
+
+```json
 {
-  "message": "Your helpful fashion advice here",
-  "outfit_suggestion": "Describe a recommended outfit if applicable",
-  "mood": "happy/chill/etc",
-  "cosmetics_suggestion": "Describe recommended cosmetics or skincare products if applicable",
-  "route_suggestion": "Describe recommended travel routes or locations if applicable",
+  "message": "Your lifestyle response here",
+  "outfit_suggestion": "...",
+  "mood": "happy | chill | confident | ...",
+  "cosmetics_suggestion": "...",
+  "route_suggestion": "...",
   "events": [
     {
       "type": "jog | meeting | date",
-      "timeBlock": "morning | noon | afternoon",
-      "context": { "oilRisk": 0, "drynessRisk": 0, "uvRisk": 0, "smudgeRisk": 0, "sweatRisk": 0, "tags": [] },
-      "fashion": { "suggestion": "..." },
-      "cosmetics": { "suggestion": "..." },
-      "route": { "suggestion": "..." }
+      "timeBlock": "morning | afternoon | noon",
+      "context": {
+        "oilRisk": 0,
+        "drynessRisk": 0,
+        "uvRisk": 0,
+        "smudgeRisk": 0,
+        "sweatRisk": 0,
+        "tags": ["sunny", "hot"]
+      },
+      "fashion": {
+        "suggestion": "...",
+        "tags": ["streetwear", "casual"]
+      },
+      "cosmetics": {
+        "suggestion": "...",
+        "tags": ["waterproof", "matte"]
+      },
+      "route": {
+        "suggestion": "...",
+        "origin": "...",
+        "destination": "..."
+      }
     }
   ]
 }
-
-USER: <user message>
-```
-
-> **Note:** The `outfit_suggestion` and `mood` fields are requested in the prompt. The `parseChatWonderResponse` implementation successfully maps `message`, `emotion`, `confidence`, and any generated fashion/outfit `images` associated with the recommendation.
-
----
-
-## Voice Pipeline Integration
-
-`voice.service.ts` uses Chat Wonder as the reply step in the voice flow:
-
-```
-PCM audio  →  AWS Transcribe  →  transcript
-                                     │
-                          detectIntent()  (regex-based, local)
-                                     │
-                          buildChatWonderQuery()
-                            - injects date/time, weather, schedule,
-                              current screen, navigation state, staff note
-                                     │
-                          askChatWonder()  →  streamChat()  →  parseChatWonderResponse()
-                                     │
-                          AWS Polly TTS  →  MP3 audio
-                                     │
-                    persist to Conversation / ChatMessage
-```
-
-`buildChatWonderQuery` prepends a context block to every transcript:
-
-```
-[Smart Mirror — Tuesday, 22 May 2026, 12:00 PM]
-Weather: 28°C, Partly Cloudy, wind 14 km/h, humidity 72%
-Schedule: <user schedules if provided>
-Current screen: /outfit-builder
-Navigation: active | destination: SM North | distance: 3.2 km | ETA: 8 mins
-Staff note: <optional clarification>
-
-User: <transcript>
 ```
 
 ---
 
-## Error Handling
+## 4. Real-Time Events (WebSocket / Socket.IO)
 
-| Scenario | Behaviour |
+The API uses Socket.IO for kiosk-side real-time events:
+
+| Event | Trigger | Payload |
+|---|---|---|
+| `itinerary_locked` | User says "save / confirm / finalize" in chat | `{ conversationId }` |
+| Kiosk connects | Socket joins room `kiosk:<kioskId>` | — |
+
+The `kioskId` is passed in the chat request body and used to target the correct mirror screen.
+
+---
+
+## 5. Key Files Reference
+
+| File | Role |
 |---|---|
-| `CHAT_WONDER_API_URL` not set | `streamChat` rejects immediately; controller returns 500 |
-| No session ID returned | Warning logged, empty string used; stream attempted anyway |
-| WebSocket `[Error]...` message | `onError` called, SSE `error` event emitted, connection closed |
-| `parseChatWonderResponse` JSON parse failure | Falls back to raw text, logs warning |
-| DB persistence failure in `onComplete` | SSE `error` event emitted, connection closed |
-| Headers already sent on late error | Error written as SSE `error` event instead of HTTP 500 |
+| [`chat-wonder.controller.ts`](file:///c:/Users/devrm/Documents/GitHub/mirror/mirror-api/src/controllers/shared/chat-wonder.controller.ts) | Internal (JWT) chat endpoint |
+| [`chat-wonder.service.ts`](file:///c:/Users/devrm/Documents/GitHub/mirror/mirror-api/src/services/shared/chat-wonder.service.ts) | Prompt builder, context fetcher, session manager |
+| [`chat-wonder-stream.ts`](file:///c:/Users/devrm/Documents/GitHub/mirror/mirror-api/src/utils/chat-wonder-stream.ts) | WebSocket client to external ChatWonder AI |
+| [`chat-wonder-cosmetics.util.ts`](file:///c:/Users/devrm/Documents/GitHub/mirror/mirror-api/src/utils/chat-wonder-cosmetics.util.ts) | Matches AI cosmetic tags → DB products |
+| [`parse-chatWonder-response.util.ts`](file:///c:/Users/devrm/Documents/GitHub/mirror/mirror-api/src/utils/parse-chatWonder-response.util.ts) | Extracts JSON from raw AI stream output |
+| [`socket.util.ts`](file:///c:/Users/devrm/Documents/GitHub/mirror/mirror-api/src/utils/socket.util.ts) | Socket.IO emit helpers |
+| [`api-key.middleware.ts`](file:///c:/Users/devrm/Documents/GitHub/mirror/mirror-api/src/middleware/api-key.middleware.ts) | Third-party API key validation |
+| [`routes/index.ts`](file:///c:/Users/devrm/Documents/GitHub/mirror/mirror-api/src/routes/index.ts) | Master route registry |
 
 ---
 
-## Health Check
+## 6. Environment Variables
 
-```ts
-// platforms/chatWonder/chatWonder.service.ts
-ChatWonderService.checkStatus()  // GET <CHAT_WONDER_API_URL>/health → boolean
-```
+| Variable | Purpose |
+|---|---|
+| `CHAT_WONDER_API_URL` | Base URL of the external ChatWonder AI platform |
+| `THIRD_PARTY_API_KEY` | Shared secret for external/outer app access |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis for session ID caching |
 
-Returns `true` if the external service responds with 2xx, `false` otherwise. Used internally; not currently exposed as a public endpoint.
+---
+
+## 7. Personas & Fashion — Design Intent
+
+The system is designed for a **cosmetics and fashion** Smart Mirror. The 4-persona split was chosen so that:
+
+- A user standing in front of the mirror gets **fashion advice in the voice of a stylist**
+- **Skincare/makeup** advice from a dermatologist or beauty expert
+- **Route/map** guidance from a local navigator
+- The **system message** from a warm, consistent assistant personality
+
+This gives the mirror a "team of experts" feel rather than a single generic chatbot.
+
+---
+
+> This document is the source of truth for the Chat Wonder flow and API design.
+> Update it whenever the prompt schema, personas, routes, or context injection logic changes.
+

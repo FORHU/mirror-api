@@ -1,7 +1,27 @@
 import { prisma } from "./prisma";
-import { rankProducts, type AnalysisInput, type WeatherContext } from "./cosmetics.util";
+import {
+  rankProducts,
+  type AnalysisInput,
+  type WeatherContext,
+  type ProductForScoring,
+} from "./cosmetics.util";
 import type { SKIN_TYPE } from "@prisma/client";
 import logger from "./logger";
+
+export interface ResolvedProduct {
+  id: string;
+  name: string;
+  brand: string | null;
+  details: string | null;
+  type: string | null;
+  spf: number | null;
+  finish: string | null;
+  hexColor: string | null;
+  imageUrl: string | null;
+  score: number;
+  rank: number;
+  reason: string;
+}
 
 export interface ChatWonderEvent {
   type: "jog" | "meeting" | "date";
@@ -10,19 +30,19 @@ export interface ChatWonderEvent {
   fashion: {
     suggestion: string;
     tags?: string[];
-    [key: string]: any;
+    [key: string]: unknown;
   };
   cosmetics: {
     suggestion: string;
     tags?: string[];
-    resolvedProducts?: any[];
-    [key: string]: any;
+    resolvedProducts?: ResolvedProduct[];
+    [key: string]: unknown;
   };
   route: {
     suggestion: string;
     origin?: string;
     destination?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -143,7 +163,7 @@ export async function resolveItineraryCosmetics(
         weather: weatherContext,
       };
 
-      const ranked = rankProducts(engineInput, catalog as any);
+      const ranked = rankProducts(engineInput, catalog as unknown as ProductForScoring[]);
 
       // A. Create the ItineraryEvent card row in database (if outline exists)
       let createdEventId: string | null = null;

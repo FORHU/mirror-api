@@ -4,20 +4,20 @@ import type { WeatherContext } from "./cosmetics.util";
 export interface OutfitPlan {
   suggestion: string;
   tags?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface CosmeticPlan {
   suggestion: string;
   tags?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface RoutePlan {
   suggestion: string;
   origin?: string;
   destination?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ChatWonderEvent {

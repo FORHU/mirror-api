@@ -26,5 +26,15 @@ module.exports = {
     "no-console": "warn",
     "prettier/prettier": "warn",
   },
+  overrides: [
+    {
+      files: ["src/scripts/**/*.ts"],
+      rules: {
+        "no-console": "off",
+        "@typescript-eslint/no-unused-vars": "off",
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    }
+  ],
   ignorePatterns: ["dist/", "node_modules/", "prisma/"],
 };

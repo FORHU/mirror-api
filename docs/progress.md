@@ -44,8 +44,9 @@ The API follows a **Client-Specific Layered Architecture** to cleanly separate t
 
 ### 5. Conversational & Vision AI (LLMs)
 - **OpenAI GPT-4o (Vision)**: Used to classify garment images against our Prisma enums (`GARMENT_TYPES`, `FITTING_SLOT`, `CATEGORY`, `GARMENT_GENDER`, `LAYER_LEVEL`, `SILHOUETTE`). The endpoint `POST /garments/evaluate` accepts a single image, sends it to GPT-4o with the enum vocabulary baked into the prompt, validates the response with Joi against those same enums, then persists a `Garment` tied to the authenticated user.
-- **OpenAI (ChatGPT)**: Integrated for fashion advice and personal stylist responses.
-- **Chat Wonder**: Custom AI integration for localized or specialized knowledge. Text-only — does not currently accept image inputs.
+- **Chat Wonder (4-Persona System)**: Custom AI lifestyle engine. Utilizes a 4-persona architecture (System, Fashion, Cosmetics, Maps) to provide highly specialized advice across different domains.
+- **Context-Aware Prompt Injection**: Before querying ChatWonder, the backend automatically injects the user's specific real-time context (their saved Garments, Outfits, current WeatherSnapshot, and Cosmetic Recommendations). This grounds the AI in reality so it recommends items the user actually owns.
+- **OpenBeautyFacts Data Ingestion**: A robust ingestion pipeline (`src/scripts/import-openbeautyfacts.ts`) extracts raw crowdsourced product JSON, applies strict taxonomy mapping, parses SPF/finish/ingredients, and upserts thousands of real-world items into our `CosmeticProduct` database.
 
 ---
 

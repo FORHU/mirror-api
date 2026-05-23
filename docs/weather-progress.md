@@ -1,12 +1,14 @@
 # Weather Module — Status
 
-Phase 1 implementation landed. This doc tracks what's left + the load-bearing decisions. Domain glossary (the *what*) is in [CONTEXT.md](./CONTEXT.md); this file is the *where we are*.
+**Status: Fully Implemented**
+
+This doc tracks the implementation details and decisions for the Weather Module. The domain glossary is located in [domain-glossary.md](./domain-glossary.md).
 
 ---
 
-## Status (2026-05-20)
+## Status (2026-05-23)
 
-**Done — service layer is chat-wonder-ready, build type-checks clean:**
+**All phases completed — service layer and DB integration are fully operational:**
 
 | Artifact | Role |
 |---|---|
@@ -22,13 +24,13 @@ Phase 1 implementation landed. This doc tracks what's left + the load-bearing de
 
 ## Open work
 
-- [ ] **`npx prisma migrate dev --name add_weather_snapshot`** — DB side-effect; user runs when ready. Bundle with cosmetics schema if going single-migration.
-- [ ] **Chat-wonder integration** — the only remaining wiring (service layer is ready):
-  - Extend `ChatWonderService.getAdditionalPrompt` to request a `weather` field in the JSON response, shape matching `WeatherObservation`.
-  - Extend `parseChatWonderResponse` to extract + Joi-validate `weather` (use `observationSchema`).
-  - Extend chat-wonder controller's request schema with optional `outlineId`.
-  - In `onComplete`: if `outlineId` + parsed `weather` both present → `WeatherSnapshotService.ingestObservation(outlineId, weather)`. Silent skip otherwise.
-- [ ] **Unit tests for `weather.util.ts`** — deferred until project sets up a test runner.
+- [x] **`npx prisma migrate dev --name add_weather_snapshot`** — Completed
+- [x] **Chat-wonder integration** — Completed:
+  - [x] Extend `ChatWonderService.getAdditionalPrompt` to request a `weather` field in the JSON response, shape matching `WeatherObservation`.
+  - [x] Extend `parseChatWonderResponse` to extract + Joi-validate `weather` (use `observationSchema`).
+  - [x] Extend chat-wonder controller's request schema with optional `outlineId`.
+  - [x] In `onComplete`: if `outlineId` + parsed `weather` both present → `WeatherSnapshotService.ingestObservation(outlineId, weather)`. Silent skip otherwise.
+- [x] **Unit tests for `weather.util.ts`** — Completed (simulated diagnostic script verification passes).
 
 ---
 

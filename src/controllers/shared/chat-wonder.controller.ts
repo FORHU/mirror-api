@@ -4,8 +4,8 @@ import ChatWonderService from "../../services/shared/chat-wonder.service";
 import { streamChat } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
 import { parseChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
-import { detectChatRoute } from "../../utils/detect-chat-route.util";
 import { resolveItineraryCosmetics } from "../../utils/chat-wonder-cosmetics.util";
+import { emitToKiosk } from "../../utils/socket.util";
 import { prisma } from "../../utils/prisma";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
@@ -15,7 +15,7 @@ export default class ChatWonderController {
    * Handles streaming chat requests using Server-Sent Events (SSE).
    */
   static async streamChat(req: Request, res: Response) {
-    const { input, conversationId: inputConversationId, persona } = req.body;
+    const { input, conversationId: inputConversationId, personas, kioskId } = req.body;
     const userId = (req as Request & { user?: { id: string } }).user?.id;
 
     if (!userId) {
@@ -25,7 +25,13 @@ export default class ChatWonderController {
     const schema = Joi.object({
       input: Joi.string().min(1).max(500).required(),
       conversationId: Joi.string().optional(),
-      persona: Joi.string().optional().allow(null, ""),
+      personas: Joi.object({
+        system: Joi.string().optional().allow(null, ""),
+        fashion: Joi.string().optional().allow(null, ""),
+        cosmetics: Joi.string().optional().allow(null, ""),
+        maps: Joi.string().optional().allow(null, ""),
+      }).optional(),
+      kioskId: Joi.string().optional(),
     });
 
     const { error } = schema.validate(req.body);
@@ -47,28 +53,26 @@ export default class ChatWonderController {
       // 3. Save user message
       const userMessage = await ChatWonderService.saveUserMessage(userId, conversationId, input);
 
-      // 4. Prepare prompt for external API
-      const wrappedInput = await ChatWonderService.getAdditionalPrompt(input);
+      // 4. Build user wardrobe & weather context for prompt enrichment
+      const userContext = await ChatWonderService.buildUserContext(userId, conversationId);
 
-      // 5. Set SSE headers
+      // 5. Prepare prompt for external API
+      const wrappedInput = await ChatWonderService.getAdditionalPrompt(
+        input,
+        personas,
+        userContext
+      );
+
+      // 6. Set SSE headers
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache, no-transform");
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
 
-      // 5a. Emit route event immediately — frontend can navigate before AI responds
-      const chatRoute = detectChatRoute(input);
-      if (chatRoute) {
-        res.write(`data: ${JSON.stringify({ type: "route", ...chatRoute })}\n\n`);
-        if ((res as Response & { flush?: () => void }).flush)
-          (res as Response & { flush?: () => void }).flush?.();
-        logger.info(`[ChatWonderController] Route detected: ${chatRoute.route}`);
-      }
-
       let fullResponse = "";
 
-      // 6. Stream from external ChatWonder API
-      await streamChat(wrappedInput, sessionId as string, persona as string, {
+      // 7. Stream from external ChatWonder API
+      await streamChat(wrappedInput, sessionId as string, personas?.system ?? "", {
         onChunk: (chunk: string) => {
           fullResponse += chunk;
           res.write(`data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`);
@@ -101,6 +105,11 @@ export default class ChatWonderController {
               logger.info(
                 `[ChatWonderController] Finalized UserOutline status for conversation: ${conversationId}`
               );
+
+              if (kioskId) {
+                emitToKiosk(kioskId, "itinerary_locked", { conversationId });
+                logger.info(`[ChatWonderController] Emitted itinerary_locked to kiosk: ${kioskId}`);
+              }
             }
 
             // Save AI response to history

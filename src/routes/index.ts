@@ -52,6 +52,7 @@ router.use("/remote/outlines", outlineRoute);
 router.use("/remote/cosmetic-products", cosmeticProductRoute);
 router.use("/remote/cosmetic-recommendations", cosmeticRecommendationRoute);
 router.use("/remote/skin-analyses", skinAnalysisRoute);
+router.use("/remote/chat-wonder", chatWonderRoute);
 
 // Mirror endpoints
 router.use("/mirror/try-on", mirrorTryOnRoute);

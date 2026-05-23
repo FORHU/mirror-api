@@ -1,6 +1,12 @@
 # Cosmetics Module — Implementation Plan
 
-## Status (2026-05-21) — Per-user skin-analysis flow added
+**Status: Fully Implemented**
+
+This document tracks the implementation plan and decisions for the Cosmetics Module.
+
+---
+
+## Status (2026-05-23) — Per-user skin-analysis flow completed
 
 **Done today** (pivot from outline-anchored to per-user, driven by the kiosk Skin Analysis screen):
 - `CosmeticProduct` extended: `category` (FACE/EYES/LIPS), `priceAmount`/`priceUnit`, `tags[]`, `benefits[]`, `spf`, `waterproof`, `transferProof`, `hydrating`, `oilFree`, `finish`.
@@ -21,10 +27,10 @@
 
 **Frontend contract:** two-step upload — UI calls `POST /file-uploads` first, then passes the returned `fileId` (and optional `weatherSnapshotId`) here.
 
-**Still pending:**
-1. Run migration: `npx prisma migrate dev --name add_skin_analysis` (stop dev server first to release Prisma engine DLL on Windows).
-2. Seed catalog data (6–10 skincare products covering the rule matrix; current matcher needs products with `tags`, `spf`, `hydrating`, etc. populated).
-3. Companion-app dashboard adapter (current `companion-app/modules/shared/api/cosmetic.service.ts` predates the new endpoints).
+**Checklist:**
+- [x] Run migration: `npx prisma migrate dev --name add_skin_analysis`
+- [x] Seed catalog data (skincare products covering the rule matrix populated with tags, spf, hydrating, etc.)
+- [x] Companion-app dashboard adapter updated
 
 ---
 
@@ -47,9 +53,9 @@
 
 Mirrors the weather pattern: **catalog** (`CosmeticProduct`) + **decision** (`CosmeticRecommendation`). The engine is a pure function `insight → ranked recommendations`. Cosmetics imports `WeatherInsightService` only — never raw `WeatherCondition`.
 
-> Read [CONTEXT.md](./CONTEXT.md) first — `CosmeticProduct`, `CosmeticRecommendation`, "Cosmetics Engine", and the boundary rules are all defined there.
+> Read [domain-glossary.md](./domain-glossary.md) first — `CosmeticProduct`, `CosmeticRecommendation`, "Cosmetics Engine", and the boundary rules are all defined there.
 
-> Read [WEATHER_PROGRESS.md](./WEATHER_PROGRESS.md) — this plan assumes the weather schema has landed and migrated. Don't start cosmetics work before that.
+> Read [weather-progress.md](./weather-progress.md) — this plan assumes the weather schema has landed and migrated. Don't start cosmetics work before that.
 
 ---
 
