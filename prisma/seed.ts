@@ -466,7 +466,13 @@ async function main() {
 
     // 6. Seed Garment table
     console.log("👕 Seeding Garment table...");
-    const garmentLines = readCSVFile("Garment.csv");
+    let garmentLines = readCSVFile("garment_new.csv");
+    if (garmentLines.length === 0) {
+      garmentLines = readCSVFile("Garment.csv");
+    }
+    if (garmentLines.length === 0) {
+      garmentLines = readCSVFile("Garment_old.csv");
+    }
     let garmentCount = 0;
     for (const line of garmentLines) {
       const fields = parseCSVLine(line);
@@ -682,7 +688,10 @@ async function main() {
 
     // 10. Link Garments to Tags using raw implicit join inserts
     console.log("🔗 Linking Garments to Tags...");
-    let linkLines = readCSVFile("garment_to_tag.csv");
+    let linkLines = readCSVFile("garmenttotag_new.csv");
+    if (linkLines.length === 0) {
+      linkLines = readCSVFile("garment_to_tag.csv");
+    }
     if (linkLines.length === 0) {
       linkLines = readCSVFile("GarmentToTag.csv");
     }
