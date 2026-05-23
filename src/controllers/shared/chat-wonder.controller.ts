@@ -3,7 +3,7 @@ import Joi from "joi";
 import ChatWonderService from "../../services/shared/chat-wonder.service";
 import { streamChat } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
-import { parseChatWonderResponse } from "../../utils/parse-response.util";
+import { parseChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
 import { detectChatRoute } from "../../utils/detect-chat-route.util";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
@@ -90,7 +90,12 @@ export default class ChatWonderController {
               `data: ${JSON.stringify({
                 type: "complete",
                 message: parsed.message,
-                emotion_data: parsed.emotion_data,
+                outfit_suggestion: parsed.outfit_suggestion,
+                mood: parsed.mood,
+                cosmetics_suggestion: parsed.cosmetics_suggestion,
+                route_suggestion: parsed.route_suggestion,
+                images: parsed.images,
+                events: parsed.events,
                 metadata: {
                   conversationId,
                   userMessageId: userMessage.id,

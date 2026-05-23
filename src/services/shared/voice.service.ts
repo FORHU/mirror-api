@@ -20,7 +20,7 @@ import {
 import { weatherService } from "./weather.service";
 import { prisma } from "../../utils/prisma";
 import { streamChat } from "../../utils/chat-wonder-stream";
-import { parseChatWonderResponse } from "../../utils/parse-response.util";
+import { parseChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
 import logger from "../../utils/logger";
 import ChatRepository from "../../repositories/chat.repository";
 import WeatherSnapshotService from "./weather-snapshot.service";

@@ -121,15 +121,37 @@ Content-Type: application/json
 {
   "type": "complete",
   "message": "<full cleaned message>",
-  "emotion_data": {
-    "emotion": "neutral",
-    "confidence": 0.85,
-    "wasMapped": true
-  },
+  "outfit_suggestion": "<optional outfit suggestion text or null>",
+  "mood": "<vibe text or null>",
+  "cosmetics_suggestion": "<optional cosmetics advice or null>",
+  "route_suggestion": "<optional routing suggestion or null>",
   "images": [
     {
       "url": "https://cdn.example.com/uploads/streetwear-jacket.png",
       "caption": "Suggested Oversized Streetwear Jacket"
+    }
+  ],
+  "events": [
+    {
+      "type": "jog",
+      "timeBlock": "morning",
+      "context": {
+        "oilRisk": 20,
+        "drynessRisk": 0,
+        "uvRisk": 10,
+        "smudgeRisk": 0,
+        "sweatRisk": 80,
+        "tags": ["warm", "humid"]
+      },
+      "fashion": {
+        "suggestion": "breathable activewear"
+      },
+      "cosmetics": {
+        "suggestion": "sweatproof SPF 50 sunscreen"
+      },
+      "route": {
+        "suggestion": "Central Park running track"
+      }
     }
   ],
   "metadata": {
@@ -153,11 +175,11 @@ Content-Type: application/json
 - Sends:
   ```json
   {
-    "user_input": "[chumme-(mirror)] <wrapped prompt>",
+    "user_input": "[mirror-(mirror)] <wrapped prompt>",
     "session_id": "<session_id>"
   }
   ```
-- Persona prefix format: `[chumme-(<persona>)]` — if no persona is supplied it defaults to `[mirror]`.
+- Persona prefix format: `[mirror-(<persona>)]` — if no persona is supplied it defaults to `[mirror]`.
 - Special message tokens from Chat Wonder:
   - `__END__` — stream complete, close socket.
   - `[Error]...` — reject and surface error.
@@ -172,15 +194,17 @@ Handles two response formats:
 
 1. **JSON** (preferred) — extracts the first `{…}` block and maps to `ChatWonderResponse`:
    ```ts
-   interface ChatWonderResponse {
-     message: string;
-     emotion_data: { emotion: string; confidence: number; wasMapped: boolean };
-     videos: ParsedVideo[];
-     artist: { name: string; image: string | null }[];
-     images: { url: string; caption?: string }[];
-     raw: string;
-   }
-   ```
+    interface ChatWonderResponse {
+      message: string;
+      outfit_suggestion: string | null;
+      mood: string | null;
+      cosmetics_suggestion: string | null;
+      route_suggestion: string | null;
+      images: { url: string; caption?: string }[];
+      events: ChatWonderEvent[];
+      raw: string;
+    }
+    ```
 2. **Plain text fallback** — strips any trailing `[Sources]…` block, returns `message` as the raw text with `wasMapped: false`.
 
 The `getAdditionalPrompt` system prompt tells Chat Wonder to **always respond with valid JSON**, so plain-text fallback should only occur on edge cases or model failures.
@@ -205,7 +229,19 @@ You are a Smart Mirror fashion assistant. Respond with ONLY VALID JSON.
 {
   "message": "Your helpful fashion advice here",
   "outfit_suggestion": "Describe a recommended outfit if applicable",
-  "mood": "happy/chill/etc"
+  "mood": "happy/chill/etc",
+  "cosmetics_suggestion": "Describe recommended cosmetics or skincare products if applicable",
+  "route_suggestion": "Describe recommended travel routes or locations if applicable",
+  "events": [
+    {
+      "type": "jog | meeting | date",
+      "timeBlock": "morning | noon | afternoon",
+      "context": { "oilRisk": 0, "drynessRisk": 0, "uvRisk": 0, "smudgeRisk": 0, "sweatRisk": 0, "tags": [] },
+      "fashion": { "suggestion": "..." },
+      "cosmetics": { "suggestion": "..." },
+      "route": { "suggestion": "..." }
+    }
+  ]
 }
 
 USER: <user message>

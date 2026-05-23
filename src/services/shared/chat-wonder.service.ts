@@ -80,7 +80,36 @@ export default class ChatWonderService {
 {
   "message": "Your helpful fashion advice here",
   "outfit_suggestion": "Describe a recommended outfit if applicable",
-  "mood": "happy/chill/etc"
+  "mood": "happy/chill/etc",
+  "cosmetics_suggestion": "Describe recommended cosmetics or skincare products if applicable",
+  "route_suggestion": "Describe recommended travel routes or locations if applicable",
+  "events": [
+    {
+      "type": "jog | meeting | date",
+      "timeBlock": "e.g. morning | afternoon | noon",
+      "context": {
+        "oilRisk": 0-100,
+        "drynessRisk": 0-100,
+        "uvRisk": 0-100,
+        "smudgeRisk": 0-100,
+        "sweatRisk": 0-100,
+        "tags": ["sunny", "rainy", "hot", "cold"]
+      },
+      "fashion": {
+        "suggestion": "outfit suggestion text",
+        "tags": ["streetwear", "casual", "formal"]
+      },
+      "cosmetics": {
+        "suggestion": "makeup/skincare advice",
+        "tags": ["waterproof", "matte", "hydrating"]
+      },
+      "route": {
+        "suggestion": "travel or location routing advice",
+        "origin": "starting place",
+        "destination": "target place"
+      }
+    }
+  ]
 }
 
 USER: ${userMessage}`;
