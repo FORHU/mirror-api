@@ -308,7 +308,161 @@ async function main() {
         console.error(`❌ Failed to seed CosmeticProduct id=${id}:`, err);
       }
     }
-    console.log(`✅ Seeded ${cosmeticCount} CosmeticProduct records.`);
+
+    // Append evaluated high-fidelity skincare products to complete the cosmetics rule matrix
+    console.log("💄 Injecting 9 high-fidelity skincare products for the rule matrix...");
+    const skincareSeeds = [
+      {
+        id: "seed_sunscreen_spf50",
+        name: "Ultra Shield Sunscreen SPF 50+",
+        brand: "SolarGuard",
+        details: "High protection waterproof physical sunscreen",
+        category: "SKINCARE" as any,
+        type: "SUNSCREEN" as any,
+        tags: ["zinc oxide", "vitamin c", "broad spectrum", "non-comedogenic"],
+        spf: 50,
+        waterproof: true,
+        transferProof: true,
+        hydrating: false,
+        oilFree: true,
+        finish: "MATTE" as any,
+      },
+      {
+        id: "seed_moisturizer_dry",
+        name: "Deep Moisture Rich Cream",
+        brand: "HydraPure",
+        details: "Deeply hydrating barrier repair cream",
+        category: "SKINCARE" as any,
+        type: "MOISTURIZER" as any,
+        tags: ["ceramide", "hyaluronic acid", "shea butter", "oatmeal"],
+        spf: null,
+        waterproof: false,
+        transferProof: false,
+        hydrating: true,
+        oilFree: false,
+        finish: "DEWY" as any,
+      },
+      {
+        id: "seed_moisturizer_oily",
+        name: "Oil-Free Matte Gel Lotion",
+        brand: "Clarify",
+        details: "Lightweight pore-refining gel hydrator",
+        category: "SKINCARE" as any,
+        type: "MOISTURIZER" as any,
+        tags: ["niacinamide", "silica", "green tea"],
+        spf: 15,
+        waterproof: false,
+        transferProof: false,
+        hydrating: true,
+        oilFree: true,
+        finish: "MATTE" as any,
+      },
+      {
+        id: "seed_serum_retinol",
+        name: "Youth Bounce Retinol Night Serum",
+        brand: "AgeDefy",
+        details: "Accelerated cellular renewal serum",
+        category: "SKINCARE" as any,
+        type: "SERUM" as any,
+        tags: ["retinol", "peptide", "hyaluronic acid"],
+        spf: null,
+        waterproof: false,
+        transferProof: false,
+        hydrating: true,
+        oilFree: true,
+        finish: "NATURAL" as any,
+      },
+      {
+        id: "seed_serum_spots",
+        name: "C-Glow Radiance Serum",
+        brand: "Aura",
+        details: "Brightening antioxidant complex",
+        category: "SKINCARE" as any,
+        type: "SERUM" as any,
+        tags: ["vitamin c", "niacinamide", "licorice extract"],
+        spf: null,
+        waterproof: false,
+        transferProof: false,
+        hydrating: true,
+        oilFree: true,
+        finish: "DEWY" as any,
+      },
+      {
+        id: "seed_exfoliant_bha",
+        name: "2% BHA Pore Clarifying Liquid",
+        brand: "Clarify",
+        details: "Salicylic acid deep pore treatment",
+        category: "SKINCARE" as any,
+        type: "EXFOLIANT" as any,
+        tags: ["salicylic acid", "green tea"],
+        spf: null,
+        waterproof: false,
+        transferProof: false,
+        hydrating: false,
+        oilFree: true,
+        finish: "NATURAL" as any,
+      },
+      {
+        id: "seed_cleanser_sensitive",
+        name: "Centella Soothing Milky Cleanser",
+        brand: "HydraPure",
+        details: "pH-balanced calming cleanser",
+        category: "SKINCARE" as any,
+        type: "CLEANSER" as any,
+        tags: ["centella", "ceramide", "oatmeal"],
+        spf: null,
+        waterproof: false,
+        transferProof: false,
+        hydrating: true,
+        oilFree: true,
+        finish: "NATURAL" as any,
+      },
+      {
+        id: "seed_toner_pore",
+        name: "Pore-Tightening Niacinamide Toner",
+        brand: "Clarify",
+        details: "Sebum balancing clarifying toner",
+        category: "SKINCARE" as any,
+        type: "TONER" as any,
+        tags: ["niacinamide", "witch hazel", "salicylic acid"],
+        spf: null,
+        waterproof: false,
+        transferProof: false,
+        hydrating: false,
+        oilFree: true,
+        finish: "MATTE" as any,
+      },
+      {
+        id: "seed_essence_snail",
+        name: "Snail Mucin Hydrating Essence",
+        brand: "HydraPure",
+        details: "Repairing lightweight facial essence",
+        category: "SKINCARE" as any,
+        type: "ESSENCE" as any,
+        tags: ["snail secretion filtrate", "hyaluronic acid"],
+        spf: null,
+        waterproof: false,
+        transferProof: false,
+        hydrating: true,
+        oilFree: true,
+        finish: "DEWY" as any,
+      },
+    ];
+
+    for (const seed of skincareSeeds) {
+      try {
+        await prisma.cosmeticProduct.upsert({
+          where: { id: seed.id },
+          update: seed,
+          create: seed,
+        });
+        cosmeticCount++;
+      } catch (err) {
+        console.error(`❌ Failed to seed high-fidelity product ${seed.name}:`, err);
+      }
+    }
+
+    console.log(`✅ Seeded ${cosmeticCount} CosmeticProduct records (including 9 high-fidelity seeds).`);
 
     // 6. Seed Garment table
     console.log("👕 Seeding Garment table...");

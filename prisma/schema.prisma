@@ -26,9 +26,8 @@ model User {
   outlines        UserOutline[]
   outfits         Outfit[]
 
-  conversations   Conversation[]
-  sessions        Session[]
-  skinAnalyses    SkinAnalysis[]
+  conversations Conversation[]
+  sessions      Session[]
 
   userGarments Garment[] @relation("UserGarments")
 }
@@ -74,6 +73,12 @@ model UserOutline {
   userMap UserMap?
 
   weather WeatherSnapshot?
+
+  skinAnalysisId String?
+  skinAnalysis   SkinAnalysis? @relation(fields: [skinAnalysisId], references: [id], onDelete: SetNull)
+
+  status OUTLINE_STATUS   @default(DRAFT)
+  events ItineraryEvent[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -149,7 +154,6 @@ model Embedding {
   chatMessage   ChatMessage @relation(fields: [chatMessageId], references: [id])
 }
 
-
 enum ChatMessageRole {
   USER
   AI
@@ -201,6 +205,9 @@ model CosmeticRecommendation {
   skinAnalysisId String?
   skinAnalysis   SkinAnalysis? @relation(fields: [skinAnalysisId], references: [id], onDelete: Cascade)
 
+  itineraryEventId String?
+  itineraryEvent   ItineraryEvent? @relation(fields: [itineraryEventId], references: [id], onDelete: Cascade)
+
   cosmeticProductId String
   cosmeticProduct   CosmeticProduct @relation(fields: [cosmeticProductId], references: [id])
 
@@ -213,12 +220,11 @@ model CosmeticRecommendation {
 
   @@index([userOutlineId, rank])
   @@index([skinAnalysisId, rank])
+  @@index([itineraryEventId, rank])
 }
 
 model SkinAnalysis {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
 
   fileId String
   file   File   @relation("SkinAnalysisFile", fields: [fileId], references: [id])
@@ -235,10 +241,9 @@ model SkinAnalysis {
   rawSignals   Json?
 
   recommendations CosmeticRecommendation[]
+  outlines        UserOutline[]
 
   createdAt DateTime @default(now())
-
-  @@index([userId, createdAt])
 }
 
 model Calendar {
@@ -328,6 +333,9 @@ model Outfit {
 
   userOutlineId String?
   userOutline   UserOutline? @relation(fields: [userOutlineId], references: [id])
+
+  itineraryEventId String?
+  itineraryEvent   ItineraryEvent? @relation(fields: [itineraryEventId], references: [id], onDelete: SetNull)
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
@@ -632,4 +640,36 @@ enum WeatherIntensity {
 enum WeatherSource {
   API
   SENTINEL
+}
+
+enum OUTLINE_STATUS {
+  DRAFT
+  FINALIZED
+}
+
+model ItineraryEvent {
+  id            String      @id @default(cuid())
+  userOutlineId String
+  userOutline   UserOutline @relation(fields: [userOutlineId], references: [id], onDelete: Cascade)
+
+  type      String
+  timeBlock String
+
+  oilRisk     Int?
+  drynessRisk Int?
+  uvRisk      Int?
+  smudgeRisk  Int?
+  sweatRisk   Int?
+  weatherTags String[]
+
+  fashionSuggestion   String?
+  cosmeticsSuggestion String?
+  routeSuggestion     String?
+  routeOrigin         String?
+  routeDestination    String?
+
+  cosmeticRecommendations CosmeticRecommendation[]
+  outfits                 Outfit[]
+
+  createdAt DateTime @default(now())
 }

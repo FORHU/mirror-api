@@ -8,7 +8,6 @@ import { Prisma, SKIN_TYPE } from "@prisma/client";
  */
 
 export type CreateSkinAnalysisInput = {
-  userId: string;
   fileId: string;
   skinType: SKIN_TYPE;
   skinTone?: string | null;
@@ -52,7 +51,6 @@ export default class SkinAnalysisRepo {
     return prisma.$transaction(async (tx) => {
       const created = await tx.skinAnalysis.create({
         data: {
-          user: { connect: { id: analysis.userId } },
           file: { connect: { id: analysis.fileId } },
           skinType: analysis.skinType,
           skinTone: analysis.skinTone ?? null,
@@ -96,7 +94,9 @@ export default class SkinAnalysisRepo {
 
   static async findByUser(userId: string, page: number = 1, limit: number = 20) {
     const skip = (page - 1) * limit;
-    const where: Prisma.SkinAnalysisWhereInput = { userId };
+    const where: Prisma.SkinAnalysisWhereInput = {
+      outlines: { some: { userId } },
+    };
 
     const [data, total] = await Promise.all([
       prisma.skinAnalysis.findMany({

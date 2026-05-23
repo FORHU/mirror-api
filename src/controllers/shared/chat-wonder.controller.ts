@@ -5,6 +5,8 @@ import { streamChat } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
 import { parseChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
 import { detectChatRoute } from "../../utils/detect-chat-route.util";
+import { resolveItineraryCosmetics } from "../../utils/chat-wonder-cosmetics.util";
+import { prisma } from "../../utils/prisma";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
 
@@ -79,6 +81,23 @@ export default class ChatWonderController {
             const { cleaned } = stripSourcesPrefix(fullResponse);
             const parsed = parseChatWonderResponse(cleaned);
 
+            // Enrich the itinerary events with resolved physical database products
+            const enrichedEvents = await resolveItineraryCosmetics(
+              userId,
+              parsed.events,
+              conversationId
+            );
+
+            // Check if user input contains finalization keywords to save/finalize the plan draft
+            const isFinalization = /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(input);
+            if (isFinalization) {
+              await prisma.userOutline.update({
+                where: { conversationId },
+                data: { status: "FINALIZED" }
+              });
+              logger.info(`[ChatWonderController] Finalized UserOutline status for conversation: ${conversationId}`);
+            }
+
             // Save AI response to history
             const aiMessage = await ChatWonderService.saveAIMessage(
               userId,
@@ -95,7 +114,7 @@ export default class ChatWonderController {
                 cosmetics_suggestion: parsed.cosmetics_suggestion,
                 route_suggestion: parsed.route_suggestion,
                 images: parsed.images,
-                events: parsed.events,
+                events: enrichedEvents,
                 metadata: {
                   conversationId,
                   userMessageId: userMessage.id,

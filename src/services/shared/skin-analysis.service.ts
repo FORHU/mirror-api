@@ -87,9 +87,8 @@ export default class SkinAnalysisService {
     const ranked = rankProducts(engineInput, catalog as ProductForScoring[]);
 
     // 5. Persist analysis + recommendations atomically
-    return SkinAnalysisRepo.createWithRecommendations(
+    const created = await SkinAnalysisRepo.createWithRecommendations(
       {
-        userId,
         fileId: file.id,
         skinType: vision.skinType,
         skinTone: vision.skinTone ?? null,
@@ -108,11 +107,44 @@ export default class SkinAnalysisService {
         signals: r.signals,
       }))
     );
+
+    // 6. Link this SkinAnalysis to the user's active/latest UserOutline
+    let outline = await prisma.userOutline.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!outline) {
+      outline = await prisma.userOutline.create({
+        data: {
+          userId,
+          userPrompt: ["Kiosk Scan Session"],
+          location: "Kiosk",
+        },
+      });
+    }
+
+    await prisma.userOutline.update({
+      where: { id: outline.id },
+      data: { skinAnalysisId: created.id },
+    });
+
+    return created;
   }
 
   static async getById(id: string, userId: string) {
     const analysis = await SkinAnalysisRepo.findById(id);
-    if (!analysis || analysis.userId !== userId) throw notFound();
+    if (!analysis) throw notFound();
+
+    // Verify ownership by checking if this skin analysis is linked to any outline belonging to this user
+    const ownsScan = await prisma.userOutline.findFirst({
+      where: {
+        skinAnalysisId: id,
+        userId,
+      },
+    });
+    if (!ownsScan) throw notFound();
+
     return analysis;
   }
 
