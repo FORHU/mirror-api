@@ -89,13 +89,18 @@ export default class ChatWonderController {
             );
 
             // Check if user input contains finalization keywords to save/finalize the plan draft
-            const isFinalization = /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(input);
+            const isFinalization =
+              /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
+                input
+              );
             if (isFinalization) {
               await prisma.userOutline.update({
                 where: { conversationId },
-                data: { status: "FINALIZED" }
+                data: { status: "FINALIZED" },
               });
-              logger.info(`[ChatWonderController] Finalized UserOutline status for conversation: ${conversationId}`);
+              logger.info(
+                `[ChatWonderController] Finalized UserOutline status for conversation: ${conversationId}`
+              );
             }
 
             // Save AI response to history

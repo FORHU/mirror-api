@@ -42,7 +42,11 @@ function classifyCoreTaxonomy(
   if (/shampoo|conditioner|hair\s*dye|hair\s*color|apres-shampooing|cheveux/i.test(text)) {
     return null; // Haircare
   }
-  if (/body\s*wash|shower\s*gel|savon\s*corps|body\s*scrub|deodorant|perfume|parfum|cologne|fragrance/i.test(text)) {
+  if (
+    /body\s*wash|shower\s*gel|savon\s*corps|body\s*scrub|deodorant|perfume|parfum|cologne|fragrance/i.test(
+      text
+    )
+  ) {
     return null; // Body / Hygiene / Fragrance
   }
   if (/nail\s*polish|vernis\s*a\s*ongles|ongle|nail\s*care/i.test(text)) {
@@ -53,7 +57,11 @@ function classifyCoreTaxonomy(
   if (/sunscreen|sun\s*block|protection\s*solaire|spf|uv\s*shield/i.test(text)) {
     return { category: "SKINCARE", type: "SUNSCREEN" };
   }
-  if (/moisturizer|moisturising|hydratant|cream|creme\s*hydratante|lotion\s*hydratante|emulsion/i.test(text)) {
+  if (
+    /moisturizer|moisturising|hydratant|cream|creme\s*hydratante|lotion\s*hydratante|emulsion/i.test(
+      text
+    )
+  ) {
     // If lip balm, map to LIPSTICK or MOISTURIZER? Since LIP_BALM is not in core taxonomy, it maps to MOISTURIZER
     if (/lip\s*balm|baume\s*levres/i.test(text)) {
       return { category: "SKINCARE", type: "MOISTURIZER" };
@@ -72,7 +80,9 @@ function classifyCoreTaxonomy(
   if (/exfoliant|peel|peeling|scrub|gommage/i.test(text)) {
     return { category: "SKINCARE", type: "EXFOLIANT" };
   }
-  if (/cleanser|facial\s*wash|nettoyant\s*visage|cleansing\s*gel|foam|mousse\s*nettoyante/i.test(text)) {
+  if (
+    /cleanser|facial\s*wash|nettoyant\s*visage|cleansing\s*gel|foam|mousse\s*nettoyante/i.test(text)
+  ) {
     return { category: "SKINCARE", type: "CLEANSER" };
   }
 
@@ -190,7 +200,9 @@ function parseProductAttributes(raw: any) {
 async function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("❌ Usage: npx ts-node src/scripts/import-openbeautyfacts.ts <path_to_json_file>");
+    console.error(
+      "❌ Usage: npx ts-node src/scripts/import-openbeautyfacts.ts <path_to_json_file>"
+    );
     process.exit(1);
   }
 
@@ -202,7 +214,7 @@ async function main() {
 
   console.log(`🚀 Reading raw Open Beauty Facts file: ${filePath}`);
   const fileContent = fs.readFileSync(filePath, "utf-8");
-  
+
   let products: any[] = [];
   try {
     const parsed = JSON.parse(fileContent);
@@ -213,7 +225,7 @@ async function main() {
   }
 
   console.log(`📦 Loaded ${products.length} records. Beginning classification & enrichment...`);
-  
+
   let importedCount = 0;
   let skippedCount = 0;
 
@@ -231,7 +243,9 @@ async function main() {
     // 1. Apply Core Taxonomy filtering
     const classification = classifyCoreTaxonomy(categories, name);
     if (!classification) {
-      console.log(`⚠️ Skipping non-core / non-cosmetic product: "${name}" (Categories: "${categories}")`);
+      console.log(
+        `⚠️ Skipping non-core / non-cosmetic product: "${name}" (Categories: "${categories}")`
+      );
       skippedCount++;
       continue;
     }
@@ -310,7 +324,9 @@ async function main() {
         });
       });
 
-      console.log(`✅ Successfully enriched and imported: "${name}" as ${classification.category} -> ${classification.type}`);
+      console.log(
+        `✅ Successfully enriched and imported: "${name}" as ${classification.category} -> ${classification.type}`
+      );
       importedCount++;
     } catch (err) {
       console.error(`❌ Failed to persist product barcode=${rawCode} ("${name}"):`, err);

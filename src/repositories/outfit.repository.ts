@@ -111,7 +111,9 @@ export default class OutfitRepo {
         ...(data.metaData !== undefined && { metaData: data.metaData }),
         ...(data.userId && { user: { connect: { id: data.userId } } }),
         ...(data.userOutlineId && { userOutline: { connect: { id: data.userOutlineId } } }),
-        ...(data.itineraryEventId && { itineraryEvent: { connect: { id: data.itineraryEventId } } }),
+        ...(data.itineraryEventId && {
+          itineraryEvent: { connect: { id: data.itineraryEventId } },
+        }),
         file: { connect: { id: data.fileId } },
         items: {
           create: data.items.map((item) => ({

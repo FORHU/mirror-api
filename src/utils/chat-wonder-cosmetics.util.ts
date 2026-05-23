@@ -80,7 +80,9 @@ export async function resolveItineraryCosmetics(
           where: { userOutlineId: outline.id },
         }),
       ]);
-      logger.info(`[resolveItineraryCosmetics] Wiped previous draft events for UserOutline id=${outline.id}`);
+      logger.info(
+        `[resolveItineraryCosmetics] Wiped previous draft events for UserOutline id=${outline.id}`
+      );
     }
 
     // 5. Query the physical catalog products from the database
@@ -209,7 +211,9 @@ export async function resolveItineraryCosmetics(
 
     return events;
   } catch (error) {
-    logger.error(`[resolveItineraryCosmetics] Error during resolution: ${(error as Error).message}`);
+    logger.error(
+      `[resolveItineraryCosmetics] Error during resolution: ${(error as Error).message}`
+    );
     return events;
   }
 }

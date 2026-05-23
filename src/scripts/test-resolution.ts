@@ -1,6 +1,9 @@
 /* eslint-disable no-console */
 import { PrismaClient, SKIN_TYPE } from "@prisma/client";
-import { resolveItineraryCosmetics, type ChatWonderEvent } from "../utils/chat-wonder-cosmetics.util";
+import {
+  resolveItineraryCosmetics,
+  type ChatWonderEvent,
+} from "../utils/chat-wonder-cosmetics.util";
 
 const prisma = new PrismaClient();
 
@@ -26,7 +29,8 @@ async function main() {
     file = await prisma.file.create({
       data: {
         filename: "test-scan.jpg",
-        fileUrl: "https://images.openbeautyfacts.org/images/products/317/804/135/8996/front_en.6.400.jpg",
+        fileUrl:
+          "https://images.openbeautyfacts.org/images/products/317/804/135/8996/front_en.6.400.jpg",
         mimeType: "image/jpeg",
         provider: "EXTERNAL",
       },
@@ -152,17 +156,26 @@ async function main() {
     console.log(`      - Fashion Suggestion:    "${ev.fashionSuggestion}"`);
     console.log(`      - Cosmetics Suggestion:  "${ev.cosmeticsSuggestion}"`);
     console.log(`      - Route Origin/Dest:     ${ev.routeOrigin} ──► ${ev.routeDestination}`);
-    console.log(`      - Resolved Database Recommendations (${ev.cosmeticRecommendations.length}):`);
+    console.log(
+      `      - Resolved Database Recommendations (${ev.cosmeticRecommendations.length}):`
+    );
     ev.cosmeticRecommendations.slice(0, 2).forEach((rec, idx) => {
-      console.log(`        [${idx + 1}] "${rec.cosmeticProduct.name}" (Score: ${rec.score?.toFixed(0)}/100 | Dual-linked OutlineID: ${rec.userOutlineId !== null})`);
+      console.log(
+        `        [${idx + 1}] "${rec.cosmeticProduct.name}" (Score: ${rec.score?.toFixed(0)}/100 | Dual-linked OutlineID: ${rec.userOutlineId !== null})`
+      );
     });
   });
 
   // 10. Simulate finalization trigger
-  console.log("\n🗣️  Simulating finalization audio command transcript: \"looks perfect, lock it in!\"");
+  console.log(
+    '\n🗣️  Simulating finalization audio command transcript: "looks perfect, lock it in!"'
+  );
   const inputTranscript = "looks perfect, lock it in!";
-  const isFinalization = /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(inputTranscript);
-  
+  const isFinalization =
+    /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
+      inputTranscript
+    );
+
   if (isFinalization) {
     await prisma.userOutline.update({
       where: { conversationId: conversation.id },
@@ -179,7 +192,9 @@ async function main() {
   console.log(`   • Final Outline Status in DB: ${finalizedOutline?.status}`);
 
   if (finalizedOutline?.status === "FINALIZED" && dbEvents.length === 2) {
-    console.log("\n✅ Integration Diagnostics 100% Successful: All multi-level events, drafting status transitions, and dynamic dual-link recommendation logic are fully operational!");
+    console.log(
+      "\n✅ Integration Diagnostics 100% Successful: All multi-level events, drafting status transitions, and dynamic dual-link recommendation logic are fully operational!"
+    );
   } else {
     console.error("❌ Diagnostics Verification Failed.");
   }

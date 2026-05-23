@@ -1,6 +1,11 @@
 /* eslint-disable no-console */
 import { PrismaClient, SKIN_TYPE, COSMETIC_TYPE, COSMETIC_FINISH } from "@prisma/client";
-import { rankProducts, scoreProduct, type ProductForScoring, type AnalysisInput } from "../utils/cosmetics.util";
+import {
+  rankProducts,
+  scoreProduct,
+  type ProductForScoring,
+  type AnalysisInput,
+} from "../utils/cosmetics.util";
 
 const prisma = new PrismaClient();
 
@@ -236,7 +241,9 @@ async function main() {
 
   if (!isDBCatalog) {
     catalog = MOCK_PRODUCTS;
-    console.log(`⚠️  Could not read from DB (or DB is empty). Evaluating using high-fidelity Mock Catalog (${catalog.length} items).\n`);
+    console.log(
+      `⚠️  Could not read from DB (or DB is empty). Evaluating using high-fidelity Mock Catalog (${catalog.length} items).\n`
+    );
   }
 
   // Run each scenario
@@ -253,7 +260,9 @@ async function main() {
       const w = scenario.input.weather;
       console.log(`   • Weather Snapshot:`);
       console.log(`     - Tags:         [${w.tags?.join(", ")}]`);
-      console.log(`     - Risks:        UV(${w.uvRisk ?? 0}) | Oil(${w.oilRisk ?? 0}) | Dry(${w.drynessRisk ?? 0}) | Sweat(${w.sweatRisk ?? 0}) | Smudge(${w.smudgeRisk ?? 0})`);
+      console.log(
+        `     - Risks:        UV(${w.uvRisk ?? 0}) | Oil(${w.oilRisk ?? 0}) | Dry(${w.drynessRisk ?? 0}) | Sweat(${w.sweatRisk ?? 0}) | Smudge(${w.smudgeRisk ?? 0})`
+      );
     } else {
       console.log(`   • Weather Snapshot: NONE (No weather signals)`);
     }
@@ -266,10 +275,10 @@ async function main() {
     } else {
       ranked.forEach((rec, idx) => {
         // Resolve display details
-        const details = isDBCatalog 
-          ? null 
-          : MOCK_PRODUCTS.find(p => p.id === rec.productId);
-        const name = details ? `"${details.name}" (${details.brand})` : `Product ID: ${rec.productId}`;
+        const details = isDBCatalog ? null : MOCK_PRODUCTS.find((p) => p.id === rec.productId);
+        const name = details
+          ? `"${details.name}" (${details.brand})`
+          : `Product ID: ${rec.productId}`;
         const typeStr = details ? `[${details.type}] ` : "";
 
         console.log(`   [Rank ${rec.rank}] Score: ${rec.score.toFixed(0)}/100 | ${typeStr}${name}`);
@@ -288,10 +297,18 @@ async function main() {
   console.log("======================================================================");
   console.log("📊 ENGINE DYNAMICS OBSERVATIONS");
   console.log("======================================================================");
-  console.log(`1. SKIN BASES: Oily skin boosts oil-free products, while Dry skin boosts hydrating and dewy finishes.`);
-  console.log(`2. CONTINUOUS FEEDBACK: A low hydration percent (<50%) awards linear scaling bonus points to hydration products.`);
-  console.log(`3. WEATHER SENSITIVITY: Under high sweat/smudge risk, waterproof/transfer-proof products receive instant premium bonuses.`);
-  console.log(`4. CONCERN INTERSECTION: Free-text skin concerns like "pores" or "dark spots" are matched using substring matching to target specific active ingredients (e.g. Niacinamide, Salicylic Acid, Vitamin C).`);
+  console.log(
+    `1. SKIN BASES: Oily skin boosts oil-free products, while Dry skin boosts hydrating and dewy finishes.`
+  );
+  console.log(
+    `2. CONTINUOUS FEEDBACK: A low hydration percent (<50%) awards linear scaling bonus points to hydration products.`
+  );
+  console.log(
+    `3. WEATHER SENSITIVITY: Under high sweat/smudge risk, waterproof/transfer-proof products receive instant premium bonuses.`
+  );
+  console.log(
+    `4. CONCERN INTERSECTION: Free-text skin concerns like "pores" or "dark spots" are matched using substring matching to target specific active ingredients (e.g. Niacinamide, Salicylic Acid, Vitamin C).`
+  );
   console.log("======================================================================\n");
 }
 
