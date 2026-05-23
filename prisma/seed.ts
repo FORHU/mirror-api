@@ -488,6 +488,22 @@ async function main() {
       const userId = fields[14] ? trimQuotes(fields[14]) : null;
 
       try {
+        // 🛡️ Ensure fileId exists in the File table to prevent P2003 foreign key violation
+        const fileExists = await prisma.file.findUnique({
+          where: { id: fileId }
+        });
+        if (!fileExists) {
+          await prisma.file.create({
+            data: {
+              id: fileId,
+              filename: `${name.replace(/[^a-zA-Z0-9]/g, "_")}_image.jpg`,
+              fileUrl: imageUrl || "https://images.openbeautyfacts.org/images/products/placeholder.jpg",
+              mimeType: "image/jpeg",
+              provider: "EXTERNAL",
+            }
+          });
+        }
+
         await prisma.garment.create({
           data: {
             id,
@@ -535,6 +551,22 @@ async function main() {
       const isDeleted = fields[11] === "t";
 
       try {
+        // 🛡️ Ensure fileId exists in the File table to prevent P2003 foreign key violation
+        const fileExists = await prisma.file.findUnique({
+          where: { id: fileId }
+        });
+        if (!fileExists) {
+          await prisma.file.create({
+            data: {
+              id: fileId,
+              filename: `${name.replace(/[^a-zA-Z0-9]/g, "_")}_outfit.jpg`,
+              fileUrl: "https://images.openbeautyfacts.org/images/products/placeholder.jpg",
+              mimeType: "image/jpeg",
+              provider: "EXTERNAL",
+            }
+          });
+        }
+
         await prisma.outfit.create({
           data: {
             id,
