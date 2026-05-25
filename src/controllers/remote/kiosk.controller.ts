@@ -33,7 +33,7 @@ export default class KioskController {
       }
 
       if (state.status === "in_use" && state.userId !== userId) {
-        return responseError(res, 409, "Kiosk not currently available");
+        return responseError(res, 409, "Kiosk is already in use");
       }
 
       // Lock it for this user

@@ -73,7 +73,12 @@ function formatDuration(seconds?: number): string {
   return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
 }
 
-function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo: string, isCommand: boolean = false): string {
+function buildChatWonderQuery(
+  transcript: string,
+  ctx: VoiceContext,
+  weatherInfo: string,
+  isCommand: boolean = false
+): string {
   const time =
     ctx.currentTime ??
     new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -176,7 +181,7 @@ async function askChatWonder(
 ): Promise<ChatWonderResponse> {
   const query = buildChatWonderQuery(transcript, ctx, weatherInfo, isCommand);
   const sid = await getChatWonderSession(ctx.sessionId);
-    console.log("query ---------", query);
+  console.log("query ---------", query);
   if (!sid) {
     logger.error("[VoiceService] No ChatWonder session ID available — cannot stream chat");
     return parseChatWonderResponse(

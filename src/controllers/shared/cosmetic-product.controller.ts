@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import { COSMETIC_CATEGORY, COSMETIC_FINISH, COSMETIC_TYPE } from "@prisma/client";
 import CosmeticProductService from "../../services/shared/cosmetic-product.service";
+import FileService from "../../services/shared/file.service";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
 import { pageFromRepo } from "../../helpers/pagination.helper";
 
@@ -106,7 +107,15 @@ export default class CosmeticProductController {
     if (error) return responseError(res, 400, error.message);
 
     try {
-      const data = await CosmeticProductService.createProduct(value);
+      const finalValue = { ...value };
+
+      if (req.file) {
+        // If a file was uploaded, process it through FileService
+        const fileRecord = await FileService.uploadFile(req.file as Express.Multer.File);
+        finalValue.fileUrlId = fileRecord.id;
+      }
+
+      const data = await CosmeticProductService.createProduct(finalValue);
       return responseSuccess(res, 201, data, "Cosmetic product created");
     } catch (err) {
       next(err);
@@ -121,7 +130,15 @@ export default class CosmeticProductController {
     if (error) return responseError(res, 400, error.message);
 
     try {
-      const data = await CosmeticProductService.updateProduct(req.params.id, value);
+      const finalValue = { ...value };
+
+      if (req.file) {
+        // If a new file was uploaded, process it through FileService
+        const fileRecord = await FileService.uploadFile(req.file as Express.Multer.File);
+        finalValue.fileUrlId = fileRecord.id;
+      }
+
+      const data = await CosmeticProductService.updateProduct(req.params.id, finalValue);
       return responseSuccess(res, 200, data);
     } catch (err) {
       next(err);

@@ -24,10 +24,6 @@ export default class AuthController {
       const platform = req.headers["x-platform"] as string;
       const data = await AuthSvc.login(value.email, platform, value.username);
 
-      if (value.kioskId) {
-        emitToKiosk(value.kioskId, "kiosk_login", data);
-      }
-
       return responseSuccess(res, 200, data, "Login successful");
     } catch (err) {
       next(err);
@@ -111,11 +107,6 @@ export default class AuthController {
     try {
       const userId = (req as Request & { user?: { id: string } }).user?.id;
       const data = await AuthSvc.updateProfile(userId as string, value.data);
-
-      if (value.kioskId) {
-        emitToKiosk(value.kioskId, "kiosk_login", data);
-      }
-
       return responseSuccess(res, 200, data, "Profile updated successfully");
     } catch (err) {
       next(err);

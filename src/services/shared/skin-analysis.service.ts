@@ -1,7 +1,6 @@
 import { prisma } from "../../utils/prisma";
 import SkinAnalysisRepo from "../../repositories/skin-analysis.repository";
 import FileRepo from "../../repositories/file.repository";
-import OpenAIService from "../../platforms/openai/openai.service";
 import {
   rankProducts,
   type AnalysisInput,
@@ -29,7 +28,7 @@ type PaginationQuery = {
 export default class SkinAnalysisService {
   static async create(
     input: { fileId: string; weatherSnapshotId?: string | null },
-    userId: string
+    userId?: string
   ) {
     // 1. Validate referenced file
     const file = await FileRepo.findById(input.fileId);
@@ -58,8 +57,17 @@ export default class SkinAnalysisService {
       }
     }
 
-    // 3. Vision analysis (the slow step)
-    const vision = await OpenAIService.analyzeFaceImage(file.fileUrl);
+    // 3. Vision analysis (Mocked since OpenAI is disabled for now)
+    // const vision = await OpenAIService.analyzeFaceImage(file.fileUrl);
+    const vision = {
+      skinType: "COMBINATION" as const,
+      skinTone: "Warm Medium",
+      hydrationPct: 65,
+      oilinessPct: 70,
+      concerns: ["Mild dehydration", "Slight redness"],
+      routineTip:
+        "Use a hydrating serum and a lightweight gel moisturizer to balance your combination skin.",
+    };
 
     // 4. Load catalog and run rule engine
     const catalog = await prisma.cosmeticProduct.findMany({
@@ -108,26 +116,28 @@ export default class SkinAnalysisService {
       }))
     );
 
-    // 6. Link this SkinAnalysis to the user's active/latest UserOutline
-    let outline = await prisma.userOutline.findFirst({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-    });
+    // 6. Link this SkinAnalysis to the user's active/latest UserOutline (if user is logged in)
+    if (userId) {
+      let outline = await prisma.userOutline.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+      });
 
-    if (!outline) {
-      outline = await prisma.userOutline.create({
-        data: {
-          userId,
-          userPrompt: ["Kiosk Scan Session"],
-          location: "Kiosk",
-        },
+      if (!outline) {
+        outline = await prisma.userOutline.create({
+          data: {
+            userId,
+            userPrompt: ["Kiosk Scan Session"],
+            location: "Kiosk",
+          },
+        });
+      }
+
+      await prisma.userOutline.update({
+        where: { id: outline.id },
+        data: { skinAnalysisId: created.id },
       });
     }
-
-    await prisma.userOutline.update({
-      where: { id: outline.id },
-      data: { skinAnalysisId: created.id },
-    });
 
     return created;
   }

@@ -97,9 +97,20 @@ export default class OpenAIService {
         message: string;
       };
       logger.error("OpenAI Vision Error:", err.response?.data || err.message);
+
+      let finalStatus = err.response?.status || err.status || 500;
+      let finalMessage = err.message || "OpenAI vision request failed";
+
+      // If OpenAI returns 401, don't pass it back as a generic 401 because it
+      // looks like a client authentication error to the frontend.
+      if (finalStatus === 401) {
+        finalStatus = 500;
+        finalMessage = "Server Configuration Error: Invalid OpenAI API Key (401)";
+      }
+
       throw {
-        status: err.response?.status || err.status || 500,
-        message: err.message || "OpenAI vision request failed",
+        status: finalStatus,
+        message: finalMessage,
       };
     }
   }
