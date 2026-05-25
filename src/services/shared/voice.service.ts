@@ -20,11 +20,16 @@ import {
 import { weatherService } from "./weather.service";
 import { prisma } from "../../utils/prisma";
 import { streamChat } from "../../utils/chat-wonder-stream";
-import { parseChatWonderResponse, type ChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
+import {
+  parseChatWonderResponse,
+  type ChatWonderResponse,
+} from "../../utils/parse-chatWonder-response.util";
 import { resolveItineraryCosmetics } from "../../utils/chat-wonder-cosmetics.util";
 import logger from "../../utils/logger";
 import ChatRepository from "../../repositories/chat.repository";
 import WeatherSnapshotService from "./weather-snapshot.service";
+import fs from "fs";
+import path from "path";
 
 export interface VoiceContext {
   lat?: number;
@@ -166,7 +171,9 @@ async function askChatWonder(
 
   if (!sid) {
     logger.error("[VoiceService] No ChatWonder session ID available — cannot stream chat");
-    return parseChatWonderResponse("I'm here to help — could you say that again?");
+    return parseChatWonderResponse(
+      "I'm having trouble connecting to the network right now. Please check the connection and try again."
+    );
   }
 
   logger.info(`[VoiceService] Using ChatWonder session: ${sid}`);
@@ -185,7 +192,9 @@ async function askChatWonder(
     });
   } catch (err) {
     logger.error(`[VoiceService] ChatWonder failed: ${(err as Error).message}`);
-    return parseChatWonderResponse("I'm here to help — could you say that again?");
+    return parseChatWonderResponse(
+      "I'm having trouble connecting to the network right now. Please check the connection and try again."
+    );
   }
 
   return parseChatWonderResponse(raw);
@@ -235,26 +244,60 @@ async function transcribe(pcmBuffer: Buffer): Promise<string> {
 }
 
 async function synthesize(text: string): Promise<Buffer> {
+  const isFallbackText = text.includes("having trouble connecting");
+
+  if (isFallbackText) {
+    try {
+      const fallbackPath = path.join(__dirname, "../../assets/error-fallback.mp3");
+      return fs.readFileSync(fallbackPath);
+    } catch (e) {
+      logger.error(`[VoiceService] Failed to read local fallback MP3: ${(e as Error).message}`);
+      // Continue to Polly as a last resort
+    }
+  }
+
   const cmd = new SynthesizeSpeechCommand({
-    Engine: Engine.NEURAL,
-    VoiceId: VoiceId.Joanna,
+    // Available Generative Voices: Matthew (Male), Ruth (Female), Stephen (Male)
+    // Available Neural Voices (requires Engine.NEURAL): Joanna, Salli, Kendra, Kimberly, Justin, Joey
+    Engine: Engine.GENERATIVE,
+    LanguageCode: "en-US",
+    VoiceId: VoiceId.Matthew,
     OutputFormat: OutputFormat.MP3,
     Text: text,
   });
 
-  const response = await pollyClient.send(cmd);
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of response.AudioStream as AsyncIterable<Uint8Array>) {
-    chunks.push(chunk);
+  try {
+    const res = await pollyClient.send(cmd);
+    if (!res.AudioStream) throw new Error("No audio stream returned");
+    const chunks: Uint8Array[] = [];
+    // @ts-expect-error
+    for await (const chunk of res.AudioStream) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+  } catch (err) {
+    logger.error(`[VoiceService] AWS Polly failed: ${(err as Error).message}`);
+    // If Polly itself fails, try reading the local fallback file
+    try {
+      const fallbackPath = path.join(__dirname, "../../assets/error-fallback.mp3");
+      return fs.readFileSync(fallbackPath);
+    } catch (e) {
+      throw new Error(`TTS synthesis failed, and fallback audio not found`);
+    }
   }
-  return Buffer.concat(chunks);
 }
 
 export const voiceService = {
   process: async (
     pcmBuffer: Buffer,
     ctx: VoiceContext = {}
-  ): Promise<{ transcript: string; speech: string; action: VoiceAction; audio: Buffer; events: any[] }> => {
+  ): Promise<{
+    transcript: string;
+    speech: string;
+    action: VoiceAction;
+    audio: Buffer;
+    events: any[];
+  }> => {
     const transcript = await transcribe(pcmBuffer);
     if (!transcript) throw new Error("EMPTY_TRANSCRIPT");
 
@@ -280,7 +323,7 @@ export const voiceService = {
     let action = detectIntent(transcript);
     const aiResponse = await askChatWonder(transcript, ctx, weatherInfo);
     const speech = aiResponse.message || "I'm here to help with your style and more.";
-    
+
     // AI-Driven Routing
     if (aiResponse.route_suggestion) {
       action = { type: "maps_navigate", destination: aiResponse.route_suggestion };
@@ -326,7 +369,10 @@ export const voiceService = {
           }
 
           // Check if user is finalizing the outline based on transcript
-          const isFinalization = /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(transcript);
+          const isFinalization =
+            /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
+              transcript
+            );
           if (isFinalization) {
             await prisma.userOutline.update({
               where: { id: ctx.userOutlineId },

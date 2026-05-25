@@ -63,7 +63,10 @@ export default class VoiceController {
     };
 
     try {
-      const { transcript, speech, action, audio, events } = await voiceService.process(pcmBuffer, ctx);
+      const { transcript, speech, action, audio, events } = await voiceService.process(
+        pcmBuffer,
+        ctx
+      );
 
       res.set({
         "Content-Type": "audio/mpeg",
