@@ -73,7 +73,7 @@ function formatDuration(seconds?: number): string {
   return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
 }
 
-function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo: string): string {
+function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo: string, isCommand: boolean = false): string {
   const time =
     ctx.currentTime ??
     new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -87,6 +87,7 @@ function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo
     });
 
   const contextLines = [
+    "SYSTEM: You are a Smart Mirror assistant. Keep all responses highly conversational, natural, and EXTREMELY concise (maximum 2-3 short sentences). Do not output markdown, lists, or long explanations.",
     `[Smart Mirror — ${date}, ${time}]`,
     `Weather: ${weatherInfo}`,
     ctx.schedules ? `Schedule: ${ctx.schedules}` : null,
@@ -95,11 +96,17 @@ function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo
       ? `Navigation: active | destination: ${ctx.destinationName ?? "unknown"} | distance: ${formatDistance(ctx.remainingDistance)} | ETA: ${formatDuration(ctx.remainingDuration)}`
       : null,
     ctx.staffClarification?.trim() ? `Staff note: ${ctx.staffClarification.trim()}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ];
 
-  return `${contextLines}\n\nUser: ${transcript}`;
+  if (isCommand) {
+    contextLines.push(
+      "CRITICAL SYSTEM INSTRUCTION: The user is issuing a navigation or system command (like changing the screen or route). Acknowledge this command EXTREMELY briefly in 1 short sentence (e.g., 'Sure, navigating to fashion now' or 'Opening that up'). Do NOT provide a long response or advice. ALWAYS RESPOND IN ENGLISH."
+    );
+  }
+
+  const contextStr = contextLines.filter(Boolean).join("\n");
+
+  return `${contextStr}\n\nUser: ${transcript}`;
 }
 
 function detectIntent(transcript: string): VoiceAction {
@@ -164,11 +171,12 @@ async function getChatWonderSession(sessionId?: string): Promise<string> {
 async function askChatWonder(
   transcript: string,
   ctx: VoiceContext,
-  weatherInfo: string
+  weatherInfo: string,
+  isCommand: boolean = false
 ): Promise<ChatWonderResponse> {
-  const query = buildChatWonderQuery(transcript, ctx, weatherInfo);
+  const query = buildChatWonderQuery(transcript, ctx, weatherInfo, isCommand);
   const sid = await getChatWonderSession(ctx.sessionId);
-
+    console.log("query ---------", query);
   if (!sid) {
     logger.error("[VoiceService] No ChatWonder session ID available — cannot stream chat");
     return parseChatWonderResponse(
@@ -244,6 +252,8 @@ async function transcribe(pcmBuffer: Buffer): Promise<string> {
 }
 
 async function synthesize(text: string): Promise<Buffer> {
+  logger.info(`[VoiceService] Synthesizing speech of length: ${text.length}`);
+  logger.info(`[VoiceService] Speech text: ${text.substring(0, 100)}...`);
   const isFallbackText = text.includes("having trouble connecting");
 
   if (isFallbackText) {
@@ -256,25 +266,45 @@ async function synthesize(text: string): Promise<Buffer> {
     }
   }
 
-  const cmd = new SynthesizeSpeechCommand({
-    // Available Generative Voices: Matthew (Male), Ruth (Female), Stephen (Male)
-    // Available Neural Voices (requires Engine.NEURAL): Joanna, Salli, Kendra, Kimberly, Justin, Joey
-    Engine: Engine.GENERATIVE,
-    LanguageCode: "en-US",
-    VoiceId: VoiceId.Matthew,
-    OutputFormat: OutputFormat.MP3,
-    Text: text,
-  });
+  const maxChunkLength = 2000;
+  const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
+  const textChunks: string[] = [];
+  let currentChunk = "";
+
+  for (const sentence of sentences) {
+    if (currentChunk.length + sentence.length <= maxChunkLength) {
+      currentChunk += sentence;
+    } else {
+      if (currentChunk.trim()) textChunks.push(currentChunk.trim());
+      currentChunk = sentence;
+    }
+  }
+  if (currentChunk.trim()) textChunks.push(currentChunk.trim());
+
+  const audioBuffers: Buffer[] = [];
 
   try {
-    const res = await pollyClient.send(cmd);
-    if (!res.AudioStream) throw new Error("No audio stream returned");
-    const chunks: Uint8Array[] = [];
-    // @ts-expect-error - AsyncIterable typing is incomplete in AWS SDK for AudioStream
-    for await (const chunk of res.AudioStream) {
-      chunks.push(chunk);
+    for (const chunkText of textChunks) {
+      const cmd = new SynthesizeSpeechCommand({
+        // Available Generative Voices: Matthew (Male), Ruth (Female), Stephen (Male)
+        // Available Neural Voices (requires Engine.NEURAL): Joanna, Salli, Kendra, Kimberly, Justin, Joey
+        Engine: Engine.GENERATIVE,
+        LanguageCode: "en-US",
+        VoiceId: VoiceId.Matthew,
+        OutputFormat: OutputFormat.MP3,
+        Text: chunkText,
+      });
+
+      const res = await pollyClient.send(cmd);
+      if (!res.AudioStream) throw new Error("No audio stream returned");
+      const chunks: Uint8Array[] = [];
+      // @ts-expect-error - AsyncIterable typing is incomplete in AWS SDK for AudioStream
+      for await (const streamChunk of res.AudioStream) {
+        chunks.push(streamChunk);
+      }
+      audioBuffers.push(Buffer.concat(chunks));
     }
-    return Buffer.concat(chunks);
+    return Buffer.concat(audioBuffers);
   } catch (err) {
     logger.error(`[VoiceService] AWS Polly failed: ${(err as Error).message}`);
     // If Polly itself fails, try reading the local fallback file
@@ -321,7 +351,8 @@ export const voiceService = {
     }
 
     let action = detectIntent(transcript);
-    const aiResponse = await askChatWonder(transcript, ctx, weatherInfo);
+    const isCommand = action.type !== "speak";
+    const aiResponse = await askChatWonder(transcript, ctx, weatherInfo, isCommand);
     const speech = aiResponse.message || "I'm here to help with your style and more.";
 
     // AI-Driven Routing

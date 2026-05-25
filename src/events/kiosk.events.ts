@@ -93,6 +93,13 @@ export const registerKioskEvents = (socket: Socket) => {
     }
   });
 
+  // Relay generic notifications (like route changes, state syncs) from the mirror to the companion app
+  socket.on("send_companion_notification", (data: { kioskId: string; [key: string]: any }) => {
+    if (!data.kioskId) return;
+    // Broadcast to the companion app (anyone else in the kiosk room)
+    socket.to(data.kioskId).emit("companion_notification", data);
+  });
+
   // Handle Kiosk disconnect
   socket.on("disconnect", async () => {
     logger.info(`Socket disconnected: ${socket.id}`);

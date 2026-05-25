@@ -118,7 +118,21 @@ export default class ChatWonderController {
               conversationId,
               parsed.message
             );
-
+            console.log("parsed data -- - - - -- - -",`data: ${JSON.stringify({
+                type: "complete",
+                message: parsed.message,
+                outfit_suggestion: parsed.outfit_suggestion,
+                mood: parsed.mood,
+                cosmetics_suggestion: parsed.cosmetics_suggestion,
+                route_suggestion: parsed.route_suggestion,
+                images: parsed.images,
+                events: enrichedEvents,
+                metadata: {
+                  conversationId,
+                  userMessageId: userMessage.id,
+                  aiMessageId: aiMessage.id,
+                },
+              })}\n\n`);
             res.write(
               `data: ${JSON.stringify({
                 type: "complete",

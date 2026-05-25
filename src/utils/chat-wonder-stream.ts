@@ -37,7 +37,7 @@ export async function streamChat(
         session_id: sessionId,
         document_context: "",
       };
-
+      console.log("user payload------------------: ", payload);
       ws.send(JSON.stringify(payload));
     });
 

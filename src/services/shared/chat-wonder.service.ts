@@ -215,6 +215,7 @@ export default class ChatWonderService {
       cosmetics: string;
     }
   ) {
+    console.log("+++++++++getAdditionalPrompt", userMessage, personas, context);
     const systemPersona =
       personas?.system?.trim() ||
       "A polite and efficient Smart Mirror Lifestyle Assistant who manages daily planning, styling, skincare, and navigation.";
