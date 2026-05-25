@@ -24,6 +24,12 @@ export default class AuthController {
       const platform = req.headers["x-platform"] as string;
       const data = await AuthSvc.login(value.email, platform, value.username);
 
+      if (value.kioskId) {
+        emitToKiosk(value.kioskId, "kiosk_login", data);
+        // Also fire setup_complete so the mirror knows to navigate into the app
+        emitToKiosk(value.kioskId, "kiosk_notification", { action: "setup_complete" });
+      }
+
       return responseSuccess(res, 200, data, "Login successful");
     } catch (err) {
       next(err);
