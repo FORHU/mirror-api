@@ -4,6 +4,7 @@ import CacheUtil from "../../utils/cache.util";
 import { emitToKiosk, disconnectAll } from "../../utils/socket.util";
 import logger from "../../utils/logger";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
+import AuthSvc from "../../services/remote/auth.service";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -43,11 +44,20 @@ export default class KioskController {
         kioskName: value.kioskName || state.kioskName, // Persist the name if provided
       });
 
-      // Notify the Kiosk that it has been paired
-      emitToKiosk(value.kioskId, "kiosk_paired", {
-        userId,
-        kioskName: value.kioskName || state.kioskName,
-      });
+      // Notify the Kiosk with full auth tokens so it can make authenticated API calls
+      try {
+        const authData = await AuthSvc.generateKioskTokens(userId);
+        emitToKiosk(value.kioskId, "kiosk_login", {
+          ...authData,
+          kioskName: value.kioskName || state.kioskName,
+        });
+      } catch (tokenErr) {
+        logger.warn(`Failed to generate kiosk tokens for user ${userId}: ${tokenErr}`);
+        emitToKiosk(value.kioskId, "kiosk_paired", {
+          userId,
+          kioskName: value.kioskName || state.kioskName,
+        });
+      }
 
       logger.info(`User ${userId} paired with Kiosk ${value.kioskId}`);
 

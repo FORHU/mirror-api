@@ -133,7 +133,7 @@ export default class AuthSvc {
   /**
    * Internal helper to generate tokens and session
    */
-  private static async generateAuthResponse(
+  static async generateAuthResponse(
     user: { id: string; email: string; username: string; avatar?: { fileUrl: string } | null },
     platform: string,
     providerUserId?: string,
@@ -172,6 +172,15 @@ export default class AuthSvc {
         avatar: user.avatar?.fileUrl ?? null,
       },
     };
+  }
+
+  static async generateKioskTokens(userId: string) {
+    const user = await AuthRepo.findUserById(userId);
+    if (!user) throw { status: 404, message: "User not found" };
+    return AuthSvc.generateAuthResponse(
+      user as { id: string; email: string; username: string; avatar?: { fileUrl: string } | null },
+      "kiosk"
+    );
   }
 
   static async updateProfile(userId: string, data: Prisma.UserUpdateInput) {
