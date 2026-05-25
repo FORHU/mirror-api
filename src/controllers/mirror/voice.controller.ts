@@ -63,13 +63,14 @@ export default class VoiceController {
     };
 
     try {
-      const { transcript, speech, action, audio } = await voiceService.process(pcmBuffer, ctx);
+      const { transcript, speech, action, audio, events } = await voiceService.process(pcmBuffer, ctx);
 
       res.set({
         "Content-Type": "audio/mpeg",
         "X-Transcript": encodeURIComponent(transcript),
         "X-Reply": encodeURIComponent(speech),
         "X-Action": encodeURIComponent(JSON.stringify(action)),
+        "X-Events": encodeURIComponent(JSON.stringify(events || [])),
       });
       res.send(audio);
     } catch (err) {

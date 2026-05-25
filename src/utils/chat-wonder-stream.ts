@@ -33,7 +33,9 @@ export async function streamChat(
 
       const payload = {
         user_input: userInput,
+        user_history_select: "",
         session_id: sessionId,
+        document_context: "",
       };
 
       ws.send(JSON.stringify(payload));

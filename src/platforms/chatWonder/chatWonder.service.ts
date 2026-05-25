@@ -11,8 +11,10 @@ export default class ChatWonderService {
       logger.info(`Sending query to Chat Wonder: ${query}`);
 
       const response = await axios.post(`${CHAT_WONDER_API_URL}/chat`, {
-        query,
-        userId: userId || "anonymous",
+        user_input: query,
+        user_history_select: "",
+        session_id: userId || "anonymous",
+        document_context: "",
       });
 
       return response.data;

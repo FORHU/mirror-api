@@ -20,7 +20,8 @@ import {
 import { weatherService } from "./weather.service";
 import { prisma } from "../../utils/prisma";
 import { streamChat } from "../../utils/chat-wonder-stream";
-import { parseChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
+import { parseChatWonderResponse, type ChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
+import { resolveItineraryCosmetics } from "../../utils/chat-wonder-cosmetics.util";
 import logger from "../../utils/logger";
 import ChatRepository from "../../repositories/chat.repository";
 import WeatherSnapshotService from "./weather-snapshot.service";
@@ -159,13 +160,13 @@ async function askChatWonder(
   transcript: string,
   ctx: VoiceContext,
   weatherInfo: string
-): Promise<string> {
+): Promise<ChatWonderResponse> {
   const query = buildChatWonderQuery(transcript, ctx, weatherInfo);
   const sid = await getChatWonderSession(ctx.sessionId);
 
   if (!sid) {
     logger.error("[VoiceService] No ChatWonder session ID available — cannot stream chat");
-    return "I'm here to help — could you say that again?";
+    return parseChatWonderResponse("I'm here to help — could you say that again?");
   }
 
   logger.info(`[VoiceService] Using ChatWonder session: ${sid}`);
@@ -184,10 +185,10 @@ async function askChatWonder(
     });
   } catch (err) {
     logger.error(`[VoiceService] ChatWonder failed: ${(err as Error).message}`);
-    return "I'm here to help — could you say that again?";
+    return parseChatWonderResponse("I'm here to help — could you say that again?");
   }
 
-  return parseChatWonderResponse(raw).message || "I'm here to help with your style and more.";
+  return parseChatWonderResponse(raw);
 }
 
 const awsCredentials = { accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY };
@@ -253,7 +254,7 @@ export const voiceService = {
   process: async (
     pcmBuffer: Buffer,
     ctx: VoiceContext = {}
-  ): Promise<{ transcript: string; speech: string; action: VoiceAction; audio: Buffer }> => {
+  ): Promise<{ transcript: string; speech: string; action: VoiceAction; audio: Buffer; events: any[] }> => {
     const transcript = await transcribe(pcmBuffer);
     if (!transcript) throw new Error("EMPTY_TRANSCRIPT");
 
@@ -276,8 +277,20 @@ export const voiceService = {
       }
     }
 
-    const action = detectIntent(transcript);
-    const speech = await askChatWonder(transcript, ctx, weatherInfo);
+    let action = detectIntent(transcript);
+    const aiResponse = await askChatWonder(transcript, ctx, weatherInfo);
+    const speech = aiResponse.message || "I'm here to help with your style and more.";
+    
+    // AI-Driven Routing
+    if (aiResponse.route_suggestion) {
+      action = { type: "maps_navigate", destination: aiResponse.route_suggestion };
+    } else if (aiResponse.outfit_suggestion) {
+      action = { type: "navigate", route: "/outfit-builder" };
+    } else if (aiResponse.cosmetics_suggestion) {
+      action = { type: "navigate", route: "/ai-recommendation-cosmetic" };
+    }
+
+    let enrichedEvents = aiResponse.events || [];
     const audio = await synthesize(speech);
 
     if (ctx.userOutlineId) {
@@ -290,6 +303,7 @@ export const voiceService = {
         if (outline?.userId) {
           let conversationId = outline.conversationId;
 
+          // Ensure conversation exists BEFORE resolving cosmetics so DB records can be linked
           if (!conversationId) {
             const conv = await ChatRepository.createConversation({
               userId: outline.userId,
@@ -300,6 +314,25 @@ export const voiceService = {
               where: { id: ctx.userOutlineId },
               data: { conversationId },
             });
+          }
+
+          // Process cosmetics recommendations if events exist
+          if (enrichedEvents.length > 0) {
+            enrichedEvents = await resolveItineraryCosmetics(
+              outline.userId,
+              aiResponse.events,
+              conversationId
+            );
+          }
+
+          // Check if user is finalizing the outline based on transcript
+          const isFinalization = /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(transcript);
+          if (isFinalization) {
+            await prisma.userOutline.update({
+              where: { id: ctx.userOutlineId },
+              data: { status: "FINALIZED" },
+            });
+            logger.info(`[VoiceService] Finalized UserOutline: ${ctx.userOutlineId}`);
           }
 
           await ChatRepository.createMessage({
@@ -322,7 +355,7 @@ export const voiceService = {
       }
     }
 
-    return { transcript, speech, action, audio };
+    return { transcript, speech, action, audio, events: enrichedEvents };
   },
 
   tts: async (text: string): Promise<Buffer> => synthesize(text),
