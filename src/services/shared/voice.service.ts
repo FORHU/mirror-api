@@ -270,7 +270,7 @@ async function synthesize(text: string): Promise<Buffer> {
     const res = await pollyClient.send(cmd);
     if (!res.AudioStream) throw new Error("No audio stream returned");
     const chunks: Uint8Array[] = [];
-    // @ts-expect-error
+    // @ts-expect-error - AsyncIterable typing is incomplete in AWS SDK for AudioStream
     for await (const chunk of res.AudioStream) {
       chunks.push(chunk);
     }
@@ -296,7 +296,7 @@ export const voiceService = {
     speech: string;
     action: VoiceAction;
     audio: Buffer;
-    events: any[];
+    events: unknown[];
   }> => {
     const transcript = await transcribe(pcmBuffer);
     if (!transcript) throw new Error("EMPTY_TRANSCRIPT");
