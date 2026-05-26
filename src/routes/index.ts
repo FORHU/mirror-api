@@ -3,7 +3,6 @@ import express from "express";
 // Remote Routes (Mobile Web)
 import remoteAuthRoute from "./remote/auth.route";
 import remoteUserRoute from "./shared/user.route";
-import remoteKioskRoute from "./remote/kiosk.route";
 
 // Mirror Routes (Kiosk Web)
 import mirrorTryOnRoute from "./mirror/tryOn.route";
@@ -36,14 +35,11 @@ router.get("/", (_, res) => {
   });
 });
 
-// TOP PRIORITY: Explicit route for companion app directions
-import MapController from "../controllers/mirror/map.controller";
-router.post("/companion/map/directions", MapController.directions);
+// TOP PRIORITY: Explicit route for companion app directions removed
 
 // Remote endpoints
 router.use("/remote/auth", remoteAuthRoute);
 router.use("/remote/users", remoteUserRoute);
-router.use("/remote/kiosks", remoteKioskRoute);
 router.use("/remote/generation", mirrorGenerationRoute);
 router.use("/remote/file-uploads", mirrorFileUploadRoute);
 router.use("/remote/garments", mirrorGarmentRoute);
