@@ -62,6 +62,7 @@ jobs:
           FASHN_BASE_URL:         ${{ secrets.FASHN_BASE_URL }}
           CHAT_WONDER_API_URL:    ${{ secrets.CHAT_WONDER_API_URL }}
           BASE_URL:               ${{ secrets.BASE_URL }}
+          THIRD_PARTY_API_KEY:    ${{ secrets.THIRD_PARTY_API_KEY }}
           NODE_ENV:               production
           PORT:                   3007
         run: |
@@ -88,6 +89,7 @@ jobs:
           FASHN_BASE_URL=${FASHN_BASE_URL}
           CHAT_WONDER_API_URL=${CHAT_WONDER_API_URL}
           BASE_URL=${BASE_URL}
+          THIRD_PARTY_API_KEY=${THIRD_PARTY_API_KEY}
           NODE_ENV=${NODE_ENV}
           PORT=${PORT}
           EOF
