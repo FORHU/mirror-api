@@ -83,6 +83,7 @@ jobs:
           BASE_URL: ${{ secrets.BASE_URL }}
           PORT: 3007
           THIRD_PARTY_API_KEY: ${{ secrets.THIRD_PARTY_API_KEY }}
+          NODE_ENV: ${{ env.NODE_ENV }}
         run: |
           cat > ${{ github.workspace }}/mirror-api.env << EOF
           DATABASE_URL=${DATABASE_URL}
