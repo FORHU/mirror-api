@@ -26,12 +26,11 @@ export default class VoiceController {
   }
 
   static async ask(req: Request, res: Response, next: NextFunction) {
-    const { transcript, ctx, history } = req.body;
+    const { transcript, ctx } = req.body;
 
     if (!transcript) return res.status(400).json({ error: "transcript is required" });
 
     const voiceCtx: VoiceContext = ctx || {};
-    voiceCtx.history = history || [];
 
     try {
       const { speech, action, audio, events, sessionId } = await voiceService.askAI(

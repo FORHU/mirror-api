@@ -1,5 +1,8 @@
 import axios from "axios";
 import logger from "../../utils/logger";
+import RedisUtil from "../../utils/redis.util";
+
+const WEATHER_CACHE_TTL_SECONDS = 300; // 5 min — outdoor weather rarely shifts faster
 
 export interface WeatherData {
   temperature: number;
@@ -43,8 +46,25 @@ const weatherCodeMap: Record<number, { condition: string; icon: string }> = {
   99: { condition: "Thunderstorm with heavy hail", icon: "CloudLightning" },
 };
 
+function weatherCacheKey(lat: number, lng: number): string {
+  // Round to 3 decimals (~110m precision) so nearby requests share the cache entry
+  return `weather:${lat.toFixed(3)},${lng.toFixed(3)}`;
+}
+
 export const weatherService = {
   getWeather: async (lat: number, lng: number): Promise<WeatherData> => {
+    const cacheKey = weatherCacheKey(lat, lng);
+
+    // Best-effort cache lookup — never let cache errors block the response
+    try {
+      if (RedisUtil.client?.isReady) {
+        const cached = await RedisUtil.client.get(cacheKey);
+        if (cached) return JSON.parse(cached) as WeatherData;
+      }
+    } catch (err) {
+      logger.warn(`[WeatherService] Redis read failed: ${(err as Error).message}`);
+    }
+
     try {
       const response = await axios.get("https://api.open-meteo.com/v1/forecast", {
         params: {
@@ -63,7 +83,7 @@ export const weatherService = {
       const code = current.weathercode;
       const mapped = weatherCodeMap[code] || { condition: "Unknown", icon: "Cloud" };
 
-      return {
+      const data: WeatherData = {
         temperature: current.temperature,
         condition: mapped.condition,
         icon: mapped.icon,
@@ -73,6 +93,17 @@ export const weatherService = {
         precipitationProb,
         unit: "celsius",
       };
+
+      // Best-effort cache write
+      try {
+        if (RedisUtil.client?.isReady) {
+          await RedisUtil.client.setEx(cacheKey, WEATHER_CACHE_TTL_SECONDS, JSON.stringify(data));
+        }
+      } catch (err) {
+        logger.warn(`[WeatherService] Redis write failed: ${(err as Error).message}`);
+      }
+
+      return data;
     } catch (error) {
       logger.error(`Open-Meteo Error: ${(error as Error).message}`);
       throw new Error("Weather service unavailable");

@@ -45,16 +45,16 @@ The voice system exposes four tightly focused endpoints in `voice.controller.ts`
 - Body: Raw binary audio buffer (`Content-Type: application/octet-stream`)
 
 **Processing:**
-1. Validates buffer size (must be > 1,000 bytes)
-2. Pads audio buffer with silence to a minimum of **3 seconds / 96,000 bytes** — required by AWS Transcribe's `IdentifyLanguage` mode to avoid empty transcript errors on short phrases
-3. Sends to **AWS Transcribe Streaming** with:
+1. Validates buffer size (rejects empty buffer with `400`, rejects `< 1,000` bytes as "Audio too short")
+2. Sends to **AWS Transcribe Streaming** with:
    - `IdentifyLanguage: true` — auto-detects English or French
    - `LanguageOptions: "en-US,fr-FR"` — bilingual support
    - `PreferredLanguage: "en-US"` — fallback for short clips
    - `MediaSampleRateHertz: 16000`
    - `MediaEncoding: "pcm"`
-4. Streams audio as async generator to AWS, collects transcript events
-5. Returns most complete transcript result
+3. Streams audio as an async generator in 32 KB chunks, collects non-partial transcript events
+4. **Fallback path:** if `IdentifyLanguage` throws (e.g. `BadRequestException` on very short audio) or returns empty, retries the stream with strict `LanguageCode: "en-US"` (no language identification)
+5. Returns the concatenated transcript
 
 **Response:**
 ```json
@@ -85,12 +85,11 @@ The voice system exposes four tightly focused endpoints in `voice.controller.ts`
     "isNavigating": false,
     "sessionId": "abc123",
     "userOutlineId": "outline_xyz"
-  },
-  "history": [
-    { "user": "previous question", "assistant": "previous reply" }
-  ]
+  }
 }
 ```
+
+> Conversation continuity is handled server-side via ChatWonder's `sessionId`. The frontend keeps a short local history for the chat overlay UI but does not ship it to the backend.
 
 **Processing (in `voice.service.ts`):**
 
@@ -99,6 +98,8 @@ The voice system exposes four tightly focused endpoints in `voice.controller.ts`
 weatherService.getWeather(ctx.lat, ctx.lng)
 → "28°C, Sunny, wind 15 km/h, humidity 62%"
 ```
+Cached in Redis for **5 minutes** keyed by `weather:{lat.toFixed(3)},{lng.toFixed(3)}` (~110m precision), so nearby requests within the window skip the upstream Open-Meteo call. Cache read/write failures are non-fatal — they log and fall through to a live fetch.
+
 Also saves a weather snapshot to `UserOutline` if `userOutlineId` is set (for itinerary planning).
 
 **Step 2 — 4-Layer Prompt Assembly (`buildChatWonderQuery`):**
@@ -115,9 +116,13 @@ Layer 2 — INTENT DECISION RULES
 
 Layer 3 — OUTPUT CONTRACT (strict)
   → Must be valid JSON only
-  → Schema: { intent, message, outfit_suggestion?, cosmetics_suggestion?, route_suggestion? }
-  → Omit null fields
-  → No markdown wrapping
+  → Schema: {
+      intent: "FASHION" | "COSMETIC" | "MAP" | "NONE",
+      message: string,
+      data: { outfit?, cosmetics?, route? }   // always present, may be empty {}
+    }
+  → Only include fields inside `data` relevant to the chosen intent
+  → No markdown wrapping, no backticks, no text outside the JSON
   → "If you fail to follow this JSON format, your response is invalid."
 
 Layer 4 — CONTEXT BLOCK (dynamic)
@@ -128,40 +133,59 @@ Layer 4 — CONTEXT BLOCK (dynamic)
 - Sends assembled prompt + transcript + session ID to external Python LLM backend
 - Receives structured JSON response
 
-**Step 4 — Response parsing (`parseChatWonderResponse`):**
-- Extracts JSON block from raw response string
-- Validates and enforces **strict AIIntent enum**: `"FASHION" | "COSMETIC" | "MAP" | "NONE"`
-- If AI omitted `intent` field, parser infers from presence of suggestion fields (fallback inference)
-- If JSON parsing fails entirely, returns `intent: "NONE"` with fallback message
+**Step 4 — Response parsing (`parseChatWonderResponse`, in `utils/parse-chatWonder-response.util.ts`):**
+- Extracts the first JSON block from the raw streamed response (`/\{[\s\S]*\}/`)
+- **Schema-tolerant:** reads new-style `data: { outfit, cosmetics, route }` AND legacy flat fields (`outfit_suggestion` / `outfitSuggestion`, etc.) — useful while the LLM rollout stabilizes
+- Validates and enforces **strict AIIntent enum**: `"FASHION" | "COSMETIC" | "MAP" | "NONE"` (uppercases and rejects anything else)
+- If AI omitted `intent` field, parser infers it from which suggestion field is populated (outfit → FASHION, cosmetics → COSMETIC, route → MAP)
+- Strips markdown characters (`* _ ~ \` #`) from `message` so Polly doesn't read them aloud
+- If JSON parsing fails entirely, returns `intent: "NONE"` with the markdown-stripped fallback text (or "I'm here to help you.")
 
-**Step 5 — Intent → Action mapping (strict, no inference):**
+**Step 5 — Intent → Action mapping (strict enum lookup via `routeMap`):**
 ```
-intent === "FASHION"  → { type: "navigate", route: "/ai-recommendation-fashion", suggestion: outfit_suggestion }
-intent === "COSMETIC" → { type: "navigate", route: "/ai-recommendation-cosmetic", suggestion: cosmetics_suggestion }
-intent === "MAP"      → { type: "maps_navigate", destination: route_suggestion }
-intent === "NONE"     → { type: "speak" }
+intent === "FASHION"                          → { type: "navigate", route: "/ai-recommendation-fashion", suggestion: outfit_suggestion }
+intent === "COSMETIC"                         → { type: "navigate", route: "/ai-recommendation-cosmetic", suggestion: cosmetics_suggestion }
+intent === "MAP"  && route_suggestion present → { type: "maps_navigate", destination: route_suggestion }
+intent === "NONE" (or "MAP" w/o destination)  → { type: "speak" }
 ```
+The default action is `{ type: "speak" }`; the branches above replace it only when the conditions are met.
 
 **Step 6 — TTS synthesis:**
-- `synthesize(speech)` → sends `message` text to **AWS Polly** (voice: `Joanna`)
-- Returns MP3 audio buffer
-- If Polly fails → reads `assets/error-fallback.mp3` as fallback
+- `synthesize(speech)` sends the `message` text to **AWS Polly**
+  - English → engine `GENERATIVE`, voice `Matthew`, language `en-US`
+  - French (detected via common-word regex) → engine `NEURAL`, voice `Lea`, language `fr-FR`
+- Long text is chunked into ≤ 2,000-char sentences and concatenated
+- If the spoken text contains the fallback phrase "having trouble connecting", reads `assets/error-fallback.mp3` directly instead of calling Polly
+- If Polly throws → also reads `assets/error-fallback.mp3` as a last-resort fallback
 
-**Step 7 — Conversation persistence:**
-- If `userOutlineId` is present: saves user message and AI reply to `ChatRepository` (database)
-- Checks for finalization keywords ("save", "confirm", "finalize") → updates `UserOutline.status` to `FINALIZED`
+**Step 7 — Conversation persistence (only when `userOutlineId` is provided):**
 
-**Response:**
+Persistence is split into a **sync prep phase** (anything the response depends on) and a **fire-and-forget phase** (everything else, so the client doesn't wait on DB round-trips).
+
+*Sync (before TTS, blocks the response):*
+- Loads the `UserOutline` to get `userId` + `conversationId`
+- If `conversationId` is null, **auto-creates a `Conversation`** ("Voice Session") via `ChatRepository.createConversation` and patches it back onto the outline
+- If the AI returned `events`, runs `resolveItineraryCosmetics(userId, events, conversationId)` to attach DB-linked cosmetic recommendations (mutates `enrichedEvents` which is returned in the response)
+
+*Fire-and-forget (kicked off after the audio buffer is ready, not awaited):*
+- Finalization check: regex matches `save`, `confirm`, `finalize`, `looks good`, `looks awesome`, `looks perfect`, `perfect`, or `lock in` → sets `UserOutline.status = FINALIZED`
+- Persists both messages (`USER` then `AI`) via `ChatRepository.createMessage`
+- Bumps `conversation.lastMessageAt`
+
+Errors in the async block are logged but never surface to the client.
+
+**Response (JSON):**
+```json
+{
+  "reply": "Spoken text shown to the user",
+  "action": { "type": "navigate", "route": "/ai-recommendation-fashion", "suggestion": "..." },
+  "events": [],
+  "sessionId": "chat-wonder-session-id",
+  "audioBase64": "<base64-encoded MP3>"
+}
 ```
-Content-Type: audio/mpeg
-X-Reply:      <URL-encoded spoken text>
-X-Action:     <URL-encoded JSON action object>
-X-Events:     <URL-encoded JSON events array>
-X-Session-Id: <URL-encoded ChatWonder session ID>
-Body:         <MP3 audio buffer>
-```
 
-> ⚠️ **Known Risk:** X-Headers can be stripped by HTTP proxies and load balancers. Planned upgrade: migrate to structured JSON body response with `audioBase64` field.
+The frontend decodes `audioBase64` to a buffer and plays it via Web Audio API.
 
 ---
 
@@ -242,13 +266,11 @@ export type AIIntent = "FASHION" | "COSMETIC" | "MAP" | "NONE";
 
 ChatWonder maintains short-term conversation memory via a **Session ID**:
 
-- On first `/ask` request: backend calls `getChatWonderSession()` to obtain a new session ID from the ChatWonder API
-- Session ID is returned via `X-Session-Id` header
-- Frontend stores session ID in a React ref (`sessionIdRef`) and passes it back in `ctx.sessionId` on subsequent requests
+- On first `/ask` request: backend calls `getChatWonderSession()` to obtain a new session ID from `${CHAT_WONDER_API_URL}/session-id`
+- Session ID is returned in the JSON response body as the `sessionId` field
+- Frontend stores it in a React ref (`sessionIdRef`) and passes it back in `ctx.sessionId` on subsequent requests
 - Session ID is scoped to a single user interaction window (not persisted across page reloads)
-
-**Safety Wipe:**
-If a user updates their profile (e.g., changes gender), the backend explicitly clears the ChatWonder session to prevent the AI from persisting stale user data in future recommendations.
+- If session creation fails, the backend returns a graceful fallback message ("having trouble connecting…") and serves a pre-recorded `error-fallback.mp3` so the user still hears audible feedback
 
 ---
 

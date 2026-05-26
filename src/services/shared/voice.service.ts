@@ -36,7 +36,6 @@ export interface VoiceContext {
   trafficEnabled?: boolean;
   isNavigating?: boolean;
   profile?: string;
-  history?: Array<{ user: string; assistant: string }>;
   remainingDistance?: number;
   remainingDuration?: number;
   destinationName?: string;
@@ -397,8 +396,13 @@ export const voiceService = {
     }
 
     let enrichedEvents = aiResponse.events || [];
-    const audio = await synthesize(speech);
 
+    // ── Sync prep: only what the response depends on ──────────────────────────
+    // Resolve conversationId + cosmetics enrichment synchronously because
+    // enrichedEvents is returned in the response payload. Everything else
+    // (message inserts, finalization status, lastMessageAt) runs after the
+    // response is sent (fire-and-forget) — see below.
+    let resolvedConversationId: string | null = null;
     if (ctx.userOutlineId) {
       try {
         const outline = await prisma.userOutline.findUnique({
@@ -407,41 +411,53 @@ export const voiceService = {
         });
 
         if (outline?.userId) {
-          let conversationId = outline.conversationId;
+          resolvedConversationId = outline.conversationId;
 
-          // Ensure conversation exists BEFORE resolving cosmetics so DB records can be linked
-          if (!conversationId) {
+          if (!resolvedConversationId) {
             const conv = await ChatRepository.createConversation({
               userId: outline.userId,
               title: "Voice Session",
             });
-            conversationId = conv.id;
+            resolvedConversationId = conv.id;
             await prisma.userOutline.update({
               where: { id: ctx.userOutlineId },
-              data: { conversationId },
+              data: { conversationId: resolvedConversationId },
             });
           }
 
-          // Process cosmetics recommendations if events exist
           if (enrichedEvents.length > 0) {
             enrichedEvents = await resolveItineraryCosmetics(
               outline.userId,
               aiResponse.events,
-              conversationId
+              resolvedConversationId
             );
           }
+        }
+      } catch (err) {
+        logger.error(
+          `[VoiceService] Conversation/cosmetics prep failed: ${(err as Error).message}`
+        );
+      }
+    }
 
-          // Check if user is finalizing the outline based on transcript
+    const audio = await synthesize(speech);
+
+    // ── Fire-and-forget: write messages + finalization without blocking ───────
+    if (ctx.userOutlineId && resolvedConversationId) {
+      const conversationId = resolvedConversationId;
+      const outlineId = ctx.userOutlineId;
+      void (async () => {
+        try {
           const isFinalization =
             /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
               transcript
             );
           if (isFinalization) {
             await prisma.userOutline.update({
-              where: { id: ctx.userOutlineId },
+              where: { id: outlineId },
               data: { status: "FINALIZED" },
             });
-            logger.info(`[VoiceService] Finalized UserOutline: ${ctx.userOutlineId}`);
+            logger.info(`[VoiceService] Finalized UserOutline: ${outlineId}`);
           }
 
           await ChatRepository.createMessage({
@@ -458,10 +474,12 @@ export const voiceService = {
             where: { id: conversationId },
             data: { lastMessageAt: new Date() },
           });
+        } catch (err) {
+          logger.error(
+            `[VoiceService] Async conversation persistence failed: ${(err as Error).message}`
+          );
         }
-      } catch (err) {
-        logger.error(`[VoiceService] Failed to persist conversation: ${(err as Error).message}`);
-      }
+      })();
     }
 
     return { speech, action, audio, events: enrichedEvents, sessionId };
