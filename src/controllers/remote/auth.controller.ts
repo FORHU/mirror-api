@@ -1,9 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import AuthSvc from "../../services/remote/auth.service";
-import { emitToKiosk } from "../../utils/socket.util";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
-import CacheUtil from "../../utils/cache.util";
 
 const validationError = (message: string) => ({ status: 400, message });
 
@@ -15,7 +13,6 @@ export default class AuthController {
     const schema = Joi.object({
       email: Joi.string().email().required(),
       username: Joi.string().optional(),
-      kioskId: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -24,39 +21,7 @@ export default class AuthController {
     try {
       const platform = req.headers["x-platform"] as string;
 
-      if (value.kioskId) {
-        const state = await CacheUtil.get<{ status: string; userId: string; kioskName: string }>(
-          `kiosk_state:${value.kioskId}`
-        );
-
-        if (!state) {
-          return responseError(res, 404, "Kiosk not found or offline");
-        }
-
-        if (state.status === "in_use") {
-          return responseError(res, 409, "Kiosk is already in use by another person");
-        }
-      }
-
       const data = await AuthSvc.login(value.email, platform, value.username);
-
-      if (value.kioskId) {
-        const state = await CacheUtil.get<{ status: string; userId: string; kioskName: string }>(
-          `kiosk_state:${value.kioskId}`
-        );
-
-        // Lock it
-        if (state) {
-          await CacheUtil.set(`kiosk_state:${value.kioskId}`, {
-            ...state,
-            status: "in_use",
-            userId: data.user?.id || (data as any).id,
-          });
-        }
-
-        emitToKiosk(value.kioskId, "kiosk_login", data);
-        // Also fire setup_complete so the mirror knows to navigate into the app
-      }
 
       return responseSuccess(res, 200, data, "Login successful");
     } catch (err) {
@@ -70,46 +35,13 @@ export default class AuthController {
   static async googleAuthSSO(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
       idToken: Joi.string().required(),
-      kioskId: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
     if (error) return next(validationError(error.message));
 
     try {
-      if (value.kioskId) {
-        const state = await CacheUtil.get<{ status: string; userId: string; kioskName: string }>(
-          `kiosk_state:${value.kioskId}`
-        );
-
-        if (!state) {
-          return responseError(res, 404, "Kiosk not found or offline");
-        }
-
-        if (state.status === "in_use") {
-          return responseError(res, 409, "Kiosk is already in use by another person");
-        }
-      }
-
       const data = await AuthSvc.googleAuthSSO(value.idToken);
-
-      // If a kioskId was provided during Google login, notify that Kiosk
-      if (value.kioskId) {
-        const state = await CacheUtil.get<{ status: string; userId: string; kioskName: string }>(
-          `kiosk_state:${value.kioskId}`
-        );
-
-        // Lock it
-        if (state) {
-          await CacheUtil.set(`kiosk_state:${value.kioskId}`, {
-            ...state,
-            status: "in_use",
-            userId: data.user?.id || (data as any).id,
-          });
-        }
-
-        emitToKiosk(value.kioskId, "kiosk_login", data);
-      }
 
       return responseSuccess(res, 200, data, "Google login successful");
     } catch (err) {
@@ -158,8 +90,10 @@ export default class AuthController {
 
   static async updateProfile(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
-      data: Joi.object().required(),
-      kioskId: Joi.string().required(),
+      data: Joi.object({
+        username: Joi.string().optional(),
+        gender: Joi.string().valid("MALE", "FEMALE").optional(),
+      }).required(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -169,11 +103,22 @@ export default class AuthController {
       const userId = (req as Request & { user?: { id: string } }).user?.id;
       const data = await AuthSvc.updateProfile(userId as string, value.data);
 
-      if (value.kioskId) {
-        emitToKiosk(value.kioskId, "kiosk_notification", { action: "profile_updated" });
-      }
-
       return responseSuccess(res, 200, data, "Profile updated successfully");
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Get current user
+   */
+  static async getCurrentUser(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
+      if (!userId) return responseError(res, 401, "Unauthorized");
+
+      const user = await AuthSvc.getUserById(userId);
+      return responseSuccess(res, 200, user, "User retrieved successfully");
     } catch (err) {
       next(err);
     }

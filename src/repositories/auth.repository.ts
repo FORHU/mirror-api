@@ -54,6 +54,7 @@ export default class AuthRepo {
         id: true,
         email: true,
         username: true,
+        gender: true,
         createdAt: true,
         updatedAt: true,
         avatarId: true,

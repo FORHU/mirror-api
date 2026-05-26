@@ -191,4 +191,16 @@ export default class AuthSvc {
       throw { status: 500, message: "Failed to update profile: " + (error as Error).message };
     }
   }
+
+  static async getUserById(userId: string) {
+    const user = await AuthRepo.findUserById(userId);
+    if (!user) throw { status: 404, message: "User not found" };
+    return {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      gender: user.gender,
+      avatar: user.avatar?.fileUrl ?? null,
+    };
+  }
 }
