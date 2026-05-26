@@ -146,7 +146,7 @@ export default class AuthSvc {
     const refreshToken = jwt.sign(
       { userId: user.id, jti: crypto.randomBytes(16).toString("hex") },
       REFRESH_TOKEN_SECRET as string,
-      { expiresIn: REFRESH_TOKEN_EXPIRY }
+      { expiresIn: REFRESH_TOKEN_EXPIRY as unknown as number }
     );
 
     await AuthRepo.createSession({
