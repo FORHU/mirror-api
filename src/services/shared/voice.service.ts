@@ -9,7 +9,6 @@ import {
 import {
   TranscribeStreamingClient,
   StartStreamTranscriptionCommand,
-  LanguageCode,
 } from "@aws-sdk/client-transcribe-streaming";
 import {
   AWS_VOICE_REGION,
@@ -73,12 +72,48 @@ function formatDuration(seconds?: number): string {
   return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
 }
 
-function buildChatWonderQuery(
-  transcript: string,
-  ctx: VoiceContext,
-  weatherInfo: string,
-  isCommand: boolean = false
-): string {
+// ── Layer 1: SYSTEM BEHAVIOR — tone and style constraints only ──────────────
+const SYSTEM_BEHAVIOR = `You are a Smart Mirror assistant.
+
+Rules:
+- Respond in a natural, confident, conversational tone.
+- Keep responses extremely concise (max 2-3 sentences).
+- Do not use markdown, bullet points, lists, or long explanations.
+- Always be direct and helpful.`;
+
+// ── Layer 2: DECISION / INTENT LOGIC — how to choose intents ────────────────
+const INTENT_RULES = `Intent decision rules:
+- If the user asks for fashion, styling, outfit, or clothing advice:
+  Use FASHION intent. Use weather, time, and location context. If no event is provided, do NOT ask questions — immediately suggest a best-fit outfit.
+- If the user asks for makeup, cosmetics, skincare, or beauty advice:
+  Use COSMETIC intent. Use weather, time, and location context. If no event is provided, immediately suggest a best-fit look.
+- If the user asks for directions, navigation, or how to get somewhere:
+  Use MAP intent and populate route_suggestion with the destination name.
+- If the request is unclear, general conversation, or not related to the above:
+  Use NONE intent and provide a helpful conversational reply.`;
+
+// ── Layer 3: STRICT OUTPUT CONTRACT — schema enforcement ────────────────────
+const OUTPUT_CONTRACT = `OUTPUT CONTRACT — You MUST follow this exactly.
+
+Respond ONLY with valid JSON matching this schema:
+{
+  "intent": "FASHION" | "COSMETIC" | "MAP" | "NONE",
+  "message": "<spoken reply, max 2-3 sentences>",
+  "data": {
+    "outfit"?: "<specific clothing advice if intent is FASHION>",
+    "cosmetics"?: "<specific makeup/skincare advice if intent is COSMETIC>",
+    "route"?: "<destination name if intent is MAP>"
+  }
+}
+
+Strict rules:
+- Output must be valid JSON only. No extra text before or after.
+- Do not wrap in markdown code blocks or backticks.
+- The "data" object must always be present, even if empty: "data": {}
+- Only include fields inside "data" that are relevant to the intent.
+- If you fail to follow this JSON format, your response is invalid.`;
+
+function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo: string): string {
   const time =
     ctx.currentTime ??
     new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -91,73 +126,27 @@ function buildChatWonderQuery(
       day: "numeric",
     });
 
-  const contextLines = [
-    "SYSTEM: You are a Smart Mirror assistant. Keep all responses highly conversational, natural, and EXTREMELY concise (maximum 2-3 short sentences). Do not output markdown, lists, or long explanations. If the user asks for styling or fashion advice (e.g., 'style my fashion', 'what to wear'), act as an expert virtual stylist and give them a confident, specific clothing recommendation based on the current weather and time.",
-    `[Smart Mirror — ${date}, ${time}]`,
-    `Weather: ${weatherInfo}`,
-    ctx.schedules ? `Schedule: ${ctx.schedules}` : null,
-    ctx.currentPage ? `Current screen: ${ctx.currentPage}` : null,
+  // ── Layer 4: CONTEXT BLOCK — dynamic real-time state ──────────────────────
+  const contextParts = [
+    `Smart Mirror Context:`,
+    `- Date: ${date}`,
+    `- Time: ${time}`,
+    `- Weather: ${weatherInfo}`,
+    ctx.currentPage ? `- Screen: ${ctx.currentPage}` : null,
+    ctx.schedules ? `- Schedule: ${ctx.schedules}` : null,
     ctx.isNavigating
-      ? `Navigation: active | destination: ${ctx.destinationName ?? "unknown"} | distance: ${formatDistance(ctx.remainingDistance)} | ETA: ${formatDuration(ctx.remainingDuration)}`
+      ? `- Navigation: active | destination: ${ctx.destinationName ?? "unknown"} | distance: ${formatDistance(ctx.remainingDistance)} | ETA: ${formatDuration(ctx.remainingDuration)}`
       : null,
-    ctx.staffClarification?.trim() ? `Staff note: ${ctx.staffClarification.trim()}` : null,
-  ];
+    ctx.staffClarification?.trim() ? `- Staff note: ${ctx.staffClarification.trim()}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  if (isCommand) {
-    contextLines.push(
-      "CRITICAL SYSTEM INSTRUCTION: The user is issuing a navigation or system command (like changing the screen or route). Acknowledge this command EXTREMELY briefly in 1 short sentence (e.g., 'Sure, navigating to fashion now' or 'Opening that up'). Do NOT provide a long response or advice. ALWAYS RESPOND IN ENGLISH."
-    );
-  }
+  const contextLines = [SYSTEM_BEHAVIOR, INTENT_RULES, OUTPUT_CONTRACT, contextParts];
 
   const contextStr = contextLines.filter(Boolean).join("\n");
 
   return `${contextStr}\n\nUser: ${transcript}`;
-}
-
-function detectIntent(transcript: string): VoiceAction {
-  const t = transcript.toLowerCase().trim();
-
-  // 1. Screen navigation (Check these FIRST so 'go to fashion' doesn't trigger map navigation)
-  if (/\b(open|show|go\s+to)\s+(the\s+)?map\b/i.test(t)) return { type: "navigate", route: "/map" };
-  if (
-    /\b(build|create|make|assemble|style)\s+(an?\s+)?(outfit|look|style|fashion)\b|\b(pick|choose|go\s+to|open)\s+(clothes|outfit|fashion)\b/i.test(
-      t
-    )
-  )
-    return { type: "navigate", route: "/outfit-builder" };
-  if (/\btry\s+it\s+on\b|\bvirtual\s+(fitting|mirror|try)\b/i.test(t))
-    return { type: "navigate", route: "/virtual-mirror" };
-  if (/\b(show|open|go\s+to)\s+(my\s+)?schedule\b/i.test(t))
-    return { type: "navigate", route: "/schedule" };
-  if (/\b(take\s+(a\s+)?photo|capture|camera)\b/i.test(t))
-    return { type: "navigate", route: "/kiosk-logged-in" };
-  if (/\b(scan|qr\s*code|pair)\b/i.test(t)) return { type: "navigate", route: "/qrcode" };
-  if (/\b(plan|set\s+up).{0,10}event\b/i.test(t))
-    return { type: "navigate", route: "/event-setup" };
-  if (/\b(home|main\s+screen|welcome)\b/i.test(t)) return { type: "navigate", route: "/" };
-
-  // 2. Travel mode
-  const modeMatch = t.match(
-    /(?:switch|change|set).{0,10}(?:to|mode).{0,5}(car|motorcycle|bicycle|bike|walking|walk)\b/i
-  );
-  if (modeMatch) {
-    const modeMap: Record<string, string> = { bike: "bicycle", walk: "walking" };
-    const raw = modeMatch[1].toLowerCase();
-    return { type: "set_profile", profile: modeMap[raw] ?? raw };
-  }
-
-  // 3. Map controls
-  if (/\b(best route|avoid traffic|traffic.{0,10}route)\b/i.test(t))
-    return { type: "traffic_route" };
-  if (/\b(turn on|enable|show)\s+traffic\b/i.test(t)) return { type: "traffic_on" };
-  if (/\b(turn off|disable|hide)\s+traffic\b/i.test(t)) return { type: "traffic_off" };
-  if (/\b(stop|cancel|end)\s+navigation\b/i.test(t)) return { type: "stop_navigation" };
-
-  // 4. Navigate to a physical place (Check this LAST)
-  const navMatch = t.match(/(?:take me to|navigate to|directions? to|drive to|go to)\s+(.+)/i);
-  if (navMatch) return { type: "maps_navigate", destination: navMatch[1].trim() };
-
-  return { type: "speak" };
 }
 
 async function getChatWonderSession(sessionId?: string): Promise<string> {
@@ -176,17 +165,19 @@ async function getChatWonderSession(sessionId?: string): Promise<string> {
 async function askChatWonder(
   transcript: string,
   ctx: VoiceContext,
-  weatherInfo: string,
-  isCommand: boolean = false
-): Promise<ChatWonderResponse> {
-  const query = buildChatWonderQuery(transcript, ctx, weatherInfo, isCommand);
+  weatherInfo: string
+): Promise<{ response: ChatWonderResponse; sessionId: string }> {
+  const query = buildChatWonderQuery(transcript, ctx, weatherInfo);
   const sid = await getChatWonderSession(ctx.sessionId);
-  console.log("query ---------", query);
+  logger.debug(`query --------- ${query}`);
   if (!sid) {
     logger.error("[VoiceService] No ChatWonder session ID available — cannot stream chat");
-    return parseChatWonderResponse(
-      "I'm having trouble connecting to the network right now. Please check the connection and try again."
-    );
+    return {
+      response: parseChatWonderResponse(
+        "I'm having trouble connecting to the network right now. Please check the connection and try again."
+      ),
+      sessionId: "",
+    };
   }
 
   logger.info(`[VoiceService] Using ChatWonder session: ${sid}`);
@@ -205,12 +196,15 @@ async function askChatWonder(
     });
   } catch (err) {
     logger.error(`[VoiceService] ChatWonder failed: ${(err as Error).message}`);
-    return parseChatWonderResponse(
-      "I'm having trouble connecting to the network right now. Please check the connection and try again."
-    );
+    return {
+      response: parseChatWonderResponse(
+        "I'm having trouble connecting to the network right now. Please check the connection and try again."
+      ),
+      sessionId: sid,
+    };
   }
 
-  return parseChatWonderResponse(raw);
+  return { response: parseChatWonderResponse(raw), sessionId: sid };
 }
 
 const awsCredentials = { accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY };
@@ -222,38 +216,60 @@ const transcribeClient = new TranscribeStreamingClient({
 
 async function transcribe(pcmBuffer: Buffer): Promise<string> {
   async function* audioStream() {
-    // Transcribe Streaming requires chunks ≤ 32 KB
     const CHUNK = 32000;
     for (let offset = 0; offset < pcmBuffer.length; offset += CHUNK) {
       yield { AudioEvent: { AudioChunk: pcmBuffer.subarray(offset, offset + CHUNK) } };
     }
   }
 
-  const cmd = new StartStreamTranscriptionCommand({
-    LanguageCode: LanguageCode.EN_US,
-    MediaEncoding: "pcm",
-    MediaSampleRateHertz: 16000,
-    AudioStream: audioStream(),
-  });
+  const doTranscribe = async (cmd: StartStreamTranscriptionCommand) => {
+    const response = await transcribeClient.send(cmd);
+    const parts: string[] = [];
 
-  const response = await transcribeClient.send(cmd);
-  const parts: string[] = [];
+    if (!response.TranscriptResultStream) {
+      throw new Error("No TranscriptResultStream received");
+    }
 
-  if (!response.TranscriptResultStream) {
-    throw new Error("No TranscriptResultStream received");
-  }
-
-  for await (const event of response.TranscriptResultStream) {
-    const results = event.TranscriptEvent?.Transcript?.Results ?? [];
-    for (const result of results) {
-      if (!result.IsPartial) {
-        const alt = result.Alternatives?.[0]?.Transcript;
-        if (alt) parts.push(alt);
+    for await (const event of response.TranscriptResultStream) {
+      const results = event.TranscriptEvent?.Transcript?.Results ?? [];
+      for (const result of results) {
+        if (!result.IsPartial) {
+          const alt = result.Alternatives?.[0]?.Transcript;
+          if (alt) parts.push(alt);
+        }
       }
     }
-  }
+    return parts.join(" ").trim();
+  };
 
-  return parts.join(" ").trim();
+  try {
+    const cmd = new StartStreamTranscriptionCommand({
+      LanguageOptions: "en-US,fr-FR",
+      IdentifyLanguage: true,
+      PreferredLanguage: "en-US",
+      MediaEncoding: "pcm",
+      MediaSampleRateHertz: 16000,
+      AudioStream: audioStream(),
+    });
+
+    const result = await doTranscribe(cmd);
+    if (!result) throw new Error("EMPTY_TRANSCRIPT");
+    return result;
+  } catch (err: unknown) {
+    const error = err as Error;
+    // If IdentifyLanguage fails due to short audio, it throws BadRequestException or we throw EMPTY_TRANSCRIPT.
+    // Fallback to en-US strictly, bypassing IdentifyLanguage.
+    logger.warn(
+      `[VoiceService] IdentifyLanguage failed (${error.message}). Falling back to en-US.`
+    );
+    const fallbackCmd = new StartStreamTranscriptionCommand({
+      LanguageCode: "en-US",
+      MediaEncoding: "pcm",
+      MediaSampleRateHertz: 16000,
+      AudioStream: audioStream(),
+    });
+    return await doTranscribe(fallbackCmd);
+  }
 }
 
 async function synthesize(text: string): Promise<Buffer> {
@@ -288,14 +304,17 @@ async function synthesize(text: string): Promise<Buffer> {
 
   const audioBuffers: Buffer[] = [];
 
+  const isFrench =
+    /\b(le|la|les|un|une|et|est|pour|dans|avec|bonjour|merci|oui|non|c'est|bien|je|tu|il|elle|nous|vous|ils|elles)\b/i.test(
+      text
+    );
+
   try {
     for (const chunkText of textChunks) {
       const cmd = new SynthesizeSpeechCommand({
-        // Available Generative Voices: Matthew (Male), Ruth (Female), Stephen (Male)
-        // Available Neural Voices (requires Engine.NEURAL): Joanna, Salli, Kendra, Kimberly, Justin, Joey
-        Engine: Engine.GENERATIVE,
-        LanguageCode: "en-US",
-        VoiceId: VoiceId.Matthew,
+        Engine: isFrench ? Engine.NEURAL : Engine.GENERATIVE,
+        LanguageCode: isFrench ? "fr-FR" : "en-US",
+        VoiceId: isFrench ? VoiceId.Lea : VoiceId.Matthew,
         OutputFormat: OutputFormat.MP3,
         Text: chunkText,
       });
@@ -323,19 +342,22 @@ async function synthesize(text: string): Promise<Buffer> {
 }
 
 export const voiceService = {
-  process: async (
-    pcmBuffer: Buffer,
+  transcribeAudio: async (pcmBuffer: Buffer): Promise<string> => {
+    const transcript = await transcribe(pcmBuffer);
+    if (!transcript) throw new Error("EMPTY_TRANSCRIPT");
+    return transcript;
+  },
+
+  askAI: async (
+    transcript: string,
     ctx: VoiceContext = {}
   ): Promise<{
-    transcript: string;
     speech: string;
     action: VoiceAction;
     audio: Buffer;
     events: unknown[];
+    sessionId: string;
   }> => {
-    const transcript = await transcribe(pcmBuffer);
-    if (!transcript) throw new Error("EMPTY_TRANSCRIPT");
-
     let weatherInfo = "unavailable";
     if (ctx.lat !== undefined && ctx.lng !== undefined && !isNaN(ctx.lat) && !isNaN(ctx.lng)) {
       try {
@@ -355,18 +377,23 @@ export const voiceService = {
       }
     }
 
-    let action = detectIntent(transcript);
-    const isCommand = action.type !== "speak";
-    const aiResponse = await askChatWonder(transcript, ctx, weatherInfo, isCommand);
+    const { response: aiResponse, sessionId } = await askChatWonder(transcript, ctx, weatherInfo);
     const speech = aiResponse.message || "I'm here to help with your style and more.";
 
-    // AI-Driven Routing
-    if (aiResponse.route_suggestion) {
+    let action: VoiceAction = { type: "speak" };
+    // Route strictly based on intent enum — no inferred routing from optional fields
+    const routeMap: Record<string, string> = {
+      FASHION: "/ai-recommendation-fashion",
+      COSMETIC: "/ai-recommendation-cosmetic",
+    };
+    const intent = aiResponse.intent;
+    if (intent === "MAP" && aiResponse.route_suggestion) {
       action = { type: "maps_navigate", destination: aiResponse.route_suggestion };
-    } else if (aiResponse.outfit_suggestion) {
-      action = { type: "navigate", route: "/outfit-builder" };
-    } else if (aiResponse.cosmetics_suggestion) {
-      action = { type: "navigate", route: "/ai-recommendation-cosmetic" };
+    } else if (intent === "FASHION" || intent === "COSMETIC") {
+      const route = routeMap[intent] ?? "/ai-recommendation-fashion"; // fallback guard
+      const suggestion =
+        intent === "FASHION" ? aiResponse.outfit_suggestion : aiResponse.cosmetics_suggestion;
+      action = { type: "navigate", route, suggestion: suggestion ?? undefined };
     }
 
     let enrichedEvents = aiResponse.events || [];
@@ -437,8 +464,31 @@ export const voiceService = {
       }
     }
 
-    return { transcript, speech, action, audio, events: enrichedEvents };
+    return { speech, action, audio, events: enrichedEvents, sessionId };
   },
 
   tts: async (text: string): Promise<Buffer> => synthesize(text),
+
+  suggestAI: async (type: "fashion" | "cosmetics", ctx: VoiceContext = {}): Promise<string> => {
+    let weatherInfo = "unavailable";
+    if (ctx.lat !== undefined && ctx.lng !== undefined && !isNaN(ctx.lat) && !isNaN(ctx.lng)) {
+      try {
+        const w = await weatherService.getWeather(ctx.lat, ctx.lng);
+        weatherInfo = `${Math.round(w.temperature)}°C, ${w.condition}, wind ${Math.round(w.windspeed)} km/h, humidity ${w.humidity}%`;
+      } catch (err) {
+        logger.warn(
+          `[VoiceService] Failed to fetch weather info for suggestAI: ${(err as Error).message}`
+        );
+      }
+    }
+    const transcript = `I need a quick ${type} recommendation based on the current weather.`;
+    const { response: aiResponse } = await askChatWonder(transcript, ctx, weatherInfo);
+
+    if (type === "fashion" && aiResponse.outfit_suggestion) {
+      return aiResponse.outfit_suggestion;
+    } else if (type === "cosmetics" && aiResponse.cosmetics_suggestion) {
+      return aiResponse.cosmetics_suggestion;
+    }
+    return aiResponse.message || "I recommend dressing comfortably for the current weather.";
+  },
 };

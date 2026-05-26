@@ -29,7 +29,10 @@ export interface ChatWonderEvent {
   route: RoutePlan;
 }
 
+export type AIIntent = "FASHION" | "COSMETIC" | "MAP" | "NONE";
+
 export interface ChatWonderResponse {
+  intent: AIIntent;
   message: string;
   outfit_suggestion: string | null;
   mood: string | null;
@@ -53,12 +56,37 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderResponse
       try {
         const parsed = JSON.parse(jsonMatch[0]);
         if (parsed.message) {
+          // Support both new { data: { outfit, cosmetics, route } } and old flat fields
+          const data = parsed.data ?? {};
+          const outfitSuggestion =
+            data.outfit ?? parsed.outfit_suggestion ?? parsed.outfitSuggestion ?? null;
+          const cosmeticsSuggestion =
+            data.cosmetics ?? parsed.cosmetics_suggestion ?? parsed.cosmeticsSuggestion ?? null;
+          const routeSuggestion =
+            data.route ?? parsed.route_suggestion ?? parsed.routeSuggestion ?? null;
+
+          // Derive strict intent enum
+          let intent: AIIntent = "NONE";
+          if (parsed.intent) {
+            const upper = String(parsed.intent).toUpperCase();
+            if (["FASHION", "COSMETIC", "MAP", "NONE"].includes(upper)) {
+              intent = upper as AIIntent;
+            }
+          } else if (outfitSuggestion) {
+            intent = "FASHION";
+          } else if (cosmeticsSuggestion) {
+            intent = "COSMETIC";
+          } else if (routeSuggestion) {
+            intent = "MAP";
+          }
+
           return {
-            message: parsed.message,
-            outfit_suggestion: parsed.outfit_suggestion ?? parsed.outfitSuggestion ?? null,
+            intent,
+            message: parsed.message.replace(/[*_~`#]/g, "").trim(),
+            outfit_suggestion: outfitSuggestion,
             mood: parsed.mood ?? null,
-            cosmetics_suggestion: parsed.cosmetics_suggestion ?? parsed.cosmeticsSuggestion ?? null,
-            route_suggestion: parsed.route_suggestion ?? parsed.routeSuggestion ?? null,
+            cosmetics_suggestion: cosmeticsSuggestion,
+            route_suggestion: routeSuggestion,
             images: Array.isArray(parsed.images) ? parsed.images : [],
             events: Array.isArray(parsed.events) ? parsed.events : [],
             raw: rawResponse,
@@ -70,8 +98,15 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderResponse
     }
 
     // 2. Fallback to raw text if JSON fails
+    let fallbackText = trimmed.replace(/\[Sources\][\s\S]*$/, "");
+    // Strip any raw JSON blocks that might have leaked and failed parsing
+    fallbackText = fallbackText.replace(/\{[\s\S]*\}/g, "");
+    // Strip common markdown characters that Polly would read out loud
+    fallbackText = fallbackText.replace(/[*_~`#]/g, "").trim();
+
     return {
-      message: trimmed.replace(/\[Sources\][\s\S]*$/, "").trim() || "Here's something for you.",
+      intent: "NONE" as AIIntent,
+      message: fallbackText || "I'm here to help you.",
       outfit_suggestion: null,
       mood: null,
       cosmetics_suggestion: null,
@@ -83,6 +118,7 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderResponse
   } catch (error) {
     logger.error(`[Parser] Failed to parse response: ${(error as Error).message}`);
     return {
+      intent: "NONE" as AIIntent,
       message: "I'm here to help you.",
       outfit_suggestion: null,
       mood: null,

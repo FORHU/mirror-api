@@ -1,14 +1,15 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from "aws-lambda";
+import logger from "../utils/logger";
 
 /**
  * Example AWS Lambda Handler
  */
 export const handler = async (
   event: APIGatewayProxyEvent,
-  context: Context
+  _context: Context
 ): Promise<APIGatewayProxyResult> => {
   try {
-    console.log("Event:", JSON.stringify(event, null, 2));
+    logger.info(`Event: ${JSON.stringify(event, null, 2)}`);
 
     // Parse the body if it exists
     const body = event.body ? JSON.parse(event.body) : null;
@@ -26,7 +27,7 @@ export const handler = async (
       }),
     };
   } catch (error) {
-    console.error("Error executing lambda:", error);
+    logger.error(`Error executing lambda: ${error}`);
     return {
       statusCode: 500,
       headers: {
