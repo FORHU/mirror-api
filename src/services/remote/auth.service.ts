@@ -174,18 +174,16 @@ export default class AuthSvc {
     };
   }
 
-
-
   static async updateProfile(userId: string, data: Prisma.UserUpdateInput) {
     try {
       const existingUser = await AuthRepo.findUserById(userId);
       const user = await AuthRepo.updateUser(userId, data);
-      
+
       // Only reset Chat Wonder session if the gender was actually changed
       if (data.gender && existingUser?.gender !== data.gender) {
         await CacheUtil.del(`chat:sessionId:${userId}`);
       }
-      
+
       // Always clear the cached user data to prevent stale profile details
       await CacheUtil.del(`user:${userId}`);
       return user;

@@ -92,7 +92,7 @@ function buildChatWonderQuery(
     });
 
   const contextLines = [
-    "SYSTEM: You are a Smart Mirror assistant. Keep all responses highly conversational, natural, and EXTREMELY concise (maximum 2-3 short sentences). Do not output markdown, lists, or long explanations.",
+    "SYSTEM: You are a Smart Mirror assistant. Keep all responses highly conversational, natural, and EXTREMELY concise (maximum 2-3 short sentences). Do not output markdown, lists, or long explanations. If the user asks for styling or fashion advice (e.g., 'style my fashion', 'what to wear'), act as an expert virtual stylist and give them a confident, specific clothing recommendation based on the current weather and time.",
     `[Smart Mirror — ${date}, ${time}]`,
     `Weather: ${weatherInfo}`,
     ctx.schedules ? `Schedule: ${ctx.schedules}` : null,
@@ -117,31 +117,10 @@ function buildChatWonderQuery(
 function detectIntent(transcript: string): VoiceAction {
   const t = transcript.toLowerCase().trim();
 
-  // Navigate to a physical place
-  const navMatch = t.match(/(?:take me to|navigate to|directions? to|drive to|go to)\s+(.+)/i);
-  if (navMatch) return { type: "maps_navigate", destination: navMatch[1].trim() };
-
-  // Travel mode
-  const modeMatch = t.match(
-    /(?:switch|change|set).{0,10}(?:to|mode).{0,5}(car|motorcycle|bicycle|bike|walking|walk)\b/i
-  );
-  if (modeMatch) {
-    const modeMap: Record<string, string> = { bike: "bicycle", walk: "walking" };
-    const raw = modeMatch[1].toLowerCase();
-    return { type: "set_profile", profile: modeMap[raw] ?? raw };
-  }
-
-  // Map controls
-  if (/\b(best route|avoid traffic|traffic.{0,10}route)\b/i.test(t))
-    return { type: "traffic_route" };
-  if (/\b(turn on|enable|show)\s+traffic\b/i.test(t)) return { type: "traffic_on" };
-  if (/\b(turn off|disable|hide)\s+traffic\b/i.test(t)) return { type: "traffic_off" };
-  if (/\b(stop|cancel|end)\s+navigation\b/i.test(t)) return { type: "stop_navigation" };
-
-  // Screen navigation
+  // 1. Screen navigation (Check these FIRST so 'go to fashion' doesn't trigger map navigation)
   if (/\b(open|show|go\s+to)\s+(the\s+)?map\b/i.test(t)) return { type: "navigate", route: "/map" };
   if (
-    /\b(build|create|make|assemble)\s+(an?\s+)?(outfit|look|style)\b|\b(pick|choose)\s+(clothes|outfit)\b/i.test(
+    /\b(build|create|make|assemble|style)\s+(an?\s+)?(outfit|look|style|fashion)\b|\b(pick|choose|go\s+to|open)\s+(clothes|outfit|fashion)\b/i.test(
       t
     )
   )
@@ -156,6 +135,27 @@ function detectIntent(transcript: string): VoiceAction {
   if (/\b(plan|set\s+up).{0,10}event\b/i.test(t))
     return { type: "navigate", route: "/event-setup" };
   if (/\b(home|main\s+screen|welcome)\b/i.test(t)) return { type: "navigate", route: "/" };
+
+  // 2. Travel mode
+  const modeMatch = t.match(
+    /(?:switch|change|set).{0,10}(?:to|mode).{0,5}(car|motorcycle|bicycle|bike|walking|walk)\b/i
+  );
+  if (modeMatch) {
+    const modeMap: Record<string, string> = { bike: "bicycle", walk: "walking" };
+    const raw = modeMatch[1].toLowerCase();
+    return { type: "set_profile", profile: modeMap[raw] ?? raw };
+  }
+
+  // 3. Map controls
+  if (/\b(best route|avoid traffic|traffic.{0,10}route)\b/i.test(t))
+    return { type: "traffic_route" };
+  if (/\b(turn on|enable|show)\s+traffic\b/i.test(t)) return { type: "traffic_on" };
+  if (/\b(turn off|disable|hide)\s+traffic\b/i.test(t)) return { type: "traffic_off" };
+  if (/\b(stop|cancel|end)\s+navigation\b/i.test(t)) return { type: "stop_navigation" };
+
+  // 4. Navigate to a physical place (Check this LAST)
+  const navMatch = t.match(/(?:take me to|navigate to|directions? to|drive to|go to)\s+(.+)/i);
+  if (navMatch) return { type: "maps_navigate", destination: navMatch[1].trim() };
 
   return { type: "speak" };
 }

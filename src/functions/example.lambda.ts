@@ -9,7 +9,7 @@ export const handler = async (
 ): Promise<APIGatewayProxyResult> => {
   try {
     console.log("Event:", JSON.stringify(event, null, 2));
-    
+
     // Parse the body if it exists
     const body = event.body ? JSON.parse(event.body) : null;
 
