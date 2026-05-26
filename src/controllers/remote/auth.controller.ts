@@ -92,7 +92,7 @@ export default class AuthController {
     const schema = Joi.object({
       data: Joi.object({
         username: Joi.string().optional(),
-        gender: Joi.string().valid("MALE", "FEMALE").optional(),
+        gender: Joi.string().valid("MALE", "FEMALE").required(),
       }).required(),
     });
 
