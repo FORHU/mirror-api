@@ -50,12 +50,7 @@ export default class TryOnService {
   /**
    * Triggers a try-on for a specific outfit
    */
-  static async runByOutfit(
-    userId: string,
-    outfitId: string,
-    modelImage?: string,
-    prompt?: string
-  ) {
+  static async runByOutfit(userId: string, outfitId: string, modelImage?: string, prompt?: string) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
     const outfit = await OutfitService.getOutfitById(outfitId, userId);
     const outfitImageUrl = outfit?.file?.fileUrl;

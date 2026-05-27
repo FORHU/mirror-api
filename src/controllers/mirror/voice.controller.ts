@@ -1,5 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { voiceService, VoiceContext } from "../../services/shared/voice.service";
+import { cognitiveVoiceService } from "../../services/shared/cognitive-voice.service";
+import { CHAT_WONDER_API_URL } from "../../config";
+import { weatherService } from "../../services/shared/weather.service";
+import { mapService } from "../../services/shared/map.service";
+import logger from "../../utils/logger";
 
 export default class VoiceController {
   static async transcribe(req: Request, res: Response, next: NextFunction) {
@@ -33,17 +38,55 @@ export default class VoiceController {
     const voiceCtx: VoiceContext = ctx || {};
 
     try {
-      const { speech, action, audio, events, sessionId } = await voiceService.askAI(
+      // Resolve weather in the controller so cognitiveVoiceService receives it as _weatherInfo
+      let weatherInfo = "unavailable";
+      if (
+        voiceCtx.lat !== undefined &&
+        voiceCtx.lng !== undefined &&
+        !isNaN(voiceCtx.lat) &&
+        !isNaN(voiceCtx.lng)
+      ) {
+        const [weatherResult, locationResult] = await Promise.allSettled([
+          weatherService.getWeather(voiceCtx.lat, voiceCtx.lng),
+          mapService.reverseGeocode(voiceCtx.lat, voiceCtx.lng),
+        ]);
+        if (weatherResult.status === "fulfilled") {
+          const w = weatherResult.value;
+          weatherInfo = `${Math.round(w.temperature)}°C, ${w.condition}, wind ${Math.round(w.windspeed)} km/h, humidity ${w.humidity}%`;
+        } else {
+          logger.warn(`[VoiceController] Weather fetch failed: ${weatherResult.reason}`);
+        }
+        if (locationResult.status === "fulfilled") {
+          voiceCtx.locationName = locationResult.value;
+        }
+      }
+
+      // Attach weather so cognitiveVoiceService can read it via _weatherInfo
+      (voiceCtx as Record<string, unknown>)._weatherInfo = weatherInfo;
+
+      const { response, sessionId } = await cognitiveVoiceService.ask(
         transcript,
-        voiceCtx
+        voiceCtx,
+        CHAT_WONDER_API_URL || ""
       );
 
+      // Synthesize TTS from the cognitive reply
+      const audio = await voiceService.tts(response.reply);
+
       return res.json({
-        reply: speech,
-        action,
-        events: events || [],
+        reply: response.reply,
+        action: response.action,
+        events: response.events || [],
         sessionId,
         audioBase64: audio.toString("base64"),
+        // New cognitive fields
+        intent: response.intent,
+        emotion: response.emotion,
+        requiresConfirmation: response.requiresConfirmation,
+        followUpQuestion: response.followUpQuestion,
+        suggestions: response.suggestions,
+        uiHints: response.uiHints,
+        memoryUpdates: response.memoryUpdates,
       });
     } catch (err) {
       next(err);
