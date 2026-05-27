@@ -6,7 +6,9 @@ export default class OutfitRepo {
     userId?: string | null,
     page: number = 1,
     limit: number = 20,
-    filters: { fileProvider?: string; fileProviderNot?: string } = {}
+    filters: { fileProvider?: string; fileProviderNot?: string } = {},
+    searchOutfit?: string,
+    searchOutfitItems?: string
   ) {
     const skip = (page - 1) * limit;
 
@@ -20,6 +22,40 @@ export default class OutfitRepo {
       where.file = { provider: { not: filters.fileProviderNot } };
     }
 
+    const andClauses: Prisma.OutfitWhereInput[] = Array.isArray(where.AND)
+      ? where.AND
+      : where.AND
+        ? [where.AND]
+        : [];
+
+    const outfitTerm = searchOutfit?.trim();
+    if (outfitTerm) {
+      andClauses.push({
+        OR: [
+          { name: { contains: outfitTerm, mode: "insensitive" } },
+          { description: { contains: outfitTerm, mode: "insensitive" } },
+        ],
+      });
+    }
+
+    const itemsTerm = searchOutfitItems?.trim();
+    if (itemsTerm) {
+      andClauses.push({
+        items: {
+          some: {
+            garment: {
+              OR: [
+                { name: { contains: itemsTerm, mode: "insensitive" } },
+                { description: { contains: itemsTerm, mode: "insensitive" } },
+              ],
+            },
+          },
+        },
+      });
+    }
+
+    if (andClauses.length) where.AND = andClauses;
+
     const [data, total] = await Promise.all([
       prisma.outfit.findMany({
         where,
@@ -29,9 +65,7 @@ export default class OutfitRepo {
           file: true,
           items: {
             include: {
-              garment: {
-                include: { file: true },
-              },
+              garment: { include: { file: true } },
             },
           },
         },

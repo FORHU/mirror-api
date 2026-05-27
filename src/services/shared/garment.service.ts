@@ -21,6 +21,8 @@ export default class GarmentService {
     const {
       page,
       limit,
+      searchGarment,
+      searchGarmentTags,
       garmentType,
       fittingSlot,
       category,
@@ -30,6 +32,9 @@ export default class GarmentService {
       userId,
       systemOnly,
     } = query;
+
+    const pickStr = (v: string | string[] | undefined) =>
+      v === undefined ? undefined : Array.isArray(v) ? v[0] : v;
 
     const filters: Prisma.GarmentWhereInput = {};
     if (systemOnly === "true") {
@@ -100,7 +105,9 @@ export default class GarmentService {
     return GarmentRepo.findAll(
       filters,
       page ? parseInt(page as string) : 1,
-      limit ? parseInt(limit as string) : 20
+      limit ? parseInt(limit as string) : 20,
+      pickStr(searchGarment),
+      pickStr(searchGarmentTags)
     );
   }
 

@@ -30,12 +30,15 @@ export default class OutfitService {
     userId?: string | null,
     query: Record<string, string | undefined> = {}
   ) {
-    const { page, limit, systemOnly } = query;
+    const { page, limit, searchOutfit, searchOutfitItems, systemOnly } = query;
     const effectiveUserId = systemOnly === "true" ? null : userId;
     return OutfitRepo.findByUserId(
       effectiveUserId,
       page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20
+      limit ? parseInt(limit) : 20,
+      {},
+      searchOutfit,
+      searchOutfitItems
     );
   }
 
