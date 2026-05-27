@@ -26,7 +26,8 @@ export default class FashnService {
   static async runTryOn(
     modelUrl: string,
     garmentUrl: string,
-    category: string
+    category: string,
+    prompt?: string
   ): Promise<FashnRunResponse> {
     try {
       logger.info(`Triggering FASHN.AI try-on for model: ${modelUrl}`);
@@ -39,6 +40,7 @@ export default class FashnService {
             model_image: modelUrl,
             garment_image: garmentUrl,
             category: category, // e.g. "tops", "bottoms", "one-pieces"
+            ...(prompt && { prompt }),
           },
         },
         { headers: this.headers }
@@ -70,7 +72,8 @@ export default class FashnService {
   static async runVideoTryOn(
     modelUrl: string,
     garmentUrl: string,
-    category: string
+    category: string,
+    prompt?: string
   ): Promise<FashnRunResponse> {
     if (!FASHN_VIDEO_MODEL) {
       throw { status: 503, message: "FASHN_VIDEO_MODEL not configured" };
@@ -87,6 +90,7 @@ export default class FashnService {
             model_image: modelUrl,
             garment_image: garmentUrl,
             category,
+            ...(prompt && { prompt }),
           },
         },
         { headers: this.headers }

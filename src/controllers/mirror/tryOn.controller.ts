@@ -17,6 +17,7 @@ export default class TryOnController {
       garmentImage: Joi.string().uri().required(),
       category: Joi.string().valid("tops", "bottoms", "one-pieces").required(),
       kioskId: Joi.string().required(),
+      prompt: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -26,7 +27,8 @@ export default class TryOnController {
       const result = await FashnService.runTryOn(
         value.modelImage,
         value.garmentImage,
-        value.category
+        value.category,
+        value.prompt
       );
 
       responseSuccess(res, 202, { predictionId: result.id }, "Try-on process started");
@@ -45,6 +47,7 @@ export default class TryOnController {
       garmentId: Joi.string().required(),
       modelImage: Joi.string().uri().optional(),
       kioskId: Joi.string().optional(),
+      prompt: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -56,7 +59,8 @@ export default class TryOnController {
         userId,
         value.garmentId,
         value.modelImage,
-        value.kioskId
+        value.kioskId,
+        value.prompt
       );
 
       responseSuccess(res, 202, result, "Try-on process started");
@@ -73,6 +77,7 @@ export default class TryOnController {
       outfitId: Joi.string().required(),
       modelImage: Joi.string().uri().optional(),
       kioskId: Joi.string().optional(),
+      prompt: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -84,7 +89,8 @@ export default class TryOnController {
         userId,
         value.outfitId,
         value.modelImage,
-        value.kioskId
+        value.kioskId,
+        value.prompt
       );
 
       responseSuccess(res, 202, result, "Try-on process started");
@@ -102,6 +108,7 @@ export default class TryOnController {
       garmentId: Joi.string().required(),
       modelImage: Joi.string().uri().optional(),
       kioskId: Joi.string().optional(),
+      prompt: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -113,7 +120,8 @@ export default class TryOnController {
         userId,
         value.garmentId,
         value.modelImage,
-        value.kioskId
+        value.kioskId,
+        value.prompt
       );
 
       responseSuccess(res, 202, result, "Video try-on process started");
@@ -130,6 +138,7 @@ export default class TryOnController {
       outfitId: Joi.string().required(),
       modelImage: Joi.string().uri().optional(),
       kioskId: Joi.string().optional(),
+      prompt: Joi.string().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
@@ -141,7 +150,8 @@ export default class TryOnController {
         userId,
         value.outfitId,
         value.modelImage,
-        value.kioskId
+        value.kioskId,
+        value.prompt
       );
 
       responseSuccess(res, 202, result, "Video try-on process started");

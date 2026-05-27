@@ -27,7 +27,8 @@ export default class TryOnService {
     userId: string,
     garmentId: string,
     modelImage?: string,
-    kioskId?: string
+    kioskId?: string,
+    prompt?: string
   ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
     const garment = await GarmentService.getGarmentById(garmentId);
@@ -38,7 +39,8 @@ export default class TryOnService {
     const result = await FashnService.runTryOn(
       modelImageUrl,
       garmentImageUrl,
-      COMPOSED_OUTFIT_CATEGORY
+      COMPOSED_OUTFIT_CATEGORY,
+      prompt
     );
 
     if (kioskId) {
@@ -55,7 +57,8 @@ export default class TryOnService {
     userId: string,
     outfitId: string,
     modelImage?: string,
-    kioskId?: string
+    kioskId?: string,
+    prompt?: string
   ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
     const outfit = await OutfitService.getOutfitById(outfitId, userId);
@@ -66,7 +69,8 @@ export default class TryOnService {
     const result = await FashnService.runTryOn(
       modelImageUrl,
       outfitImageUrl,
-      COMPOSED_OUTFIT_CATEGORY
+      COMPOSED_OUTFIT_CATEGORY,
+      prompt
     );
 
     if (kioskId) {
@@ -83,7 +87,8 @@ export default class TryOnService {
     userId: string,
     garmentId: string,
     modelImage?: string,
-    kioskId?: string
+    kioskId?: string,
+    prompt?: string
   ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
     const garment = await GarmentService.getGarmentById(garmentId);
@@ -94,7 +99,8 @@ export default class TryOnService {
     const result = await FashnService.runVideoTryOn(
       modelImageUrl,
       garmentImageUrl,
-      COMPOSED_OUTFIT_CATEGORY
+      COMPOSED_OUTFIT_CATEGORY,
+      prompt
     );
 
     if (kioskId) {
@@ -111,7 +117,8 @@ export default class TryOnService {
     userId: string,
     outfitId: string,
     modelImage?: string,
-    kioskId?: string
+    kioskId?: string,
+    prompt?: string
   ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
     const outfit = await OutfitService.getOutfitById(outfitId, userId);
@@ -122,7 +129,8 @@ export default class TryOnService {
     const result = await FashnService.runVideoTryOn(
       modelImageUrl,
       outfitImageUrl,
-      COMPOSED_OUTFIT_CATEGORY
+      COMPOSED_OUTFIT_CATEGORY,
+      prompt
     );
 
     if (kioskId) {
