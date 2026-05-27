@@ -72,20 +72,28 @@ The voice system exposes four tightly focused endpoints in `voice.controller.ts`
 **Purpose:** Full AI voice conversation — takes a transcript + context, returns spoken audio + a routing action.
 
 **Request Body:**
-```json
-{
-  "transcript": "What should I wear today?",
-  "ctx": {
-    "lat": 48.8566,
-    "lng": 2.3522,
-    "currentTime": "07:30 PM",
-    "currentDate": "Monday, May 26, 2026",
-    "schedules": "Team meeting @ Conference Room on 05/27/2026",
-    "currentPage": "Fashion Screen",
-    "isNavigating": false,
-    "sessionId": "abc123",
-    "userOutlineId": "outline_xyz"
-  }
+```typescript
+export interface VoiceContext {
+  lat?: number;
+  lng?: number;
+  trafficEnabled?: boolean;
+  isNavigating?: boolean;
+  profile?: string;
+  remainingDistance?: number;
+  remainingDuration?: number;
+  destinationName?: string;
+  currentInstruction?: string;
+  nextManeuverDistance?: number;
+  nextInstruction?: string;
+  currentTime?: string;
+  currentDate?: string;
+  schedules?: string;
+  currentPage?: string;
+  userOutlineId?: string;
+  staffClarification?: string;
+  sessionId?: string;
+  gender?: string;        // User gender from auth profile — injected into Layer 4
+  locationName?: string;  // Human-readable location reverse-geocoded from lat/lng
 }
 ```
 
@@ -93,12 +101,16 @@ The voice system exposes four tightly focused endpoints in `voice.controller.ts`
 
 **Processing (in `voice.service.ts`):**
 
-**Step 1 — Weather fetch:**
+**Step 1 — Weather + Location fetch (parallel):**
 ```
-weatherService.getWeather(ctx.lat, ctx.lng)
-→ "28°C, Sunny, wind 15 km/h, humidity 62%"
+Promise.allSettled([
+  weatherService.getWeather(ctx.lat, ctx.lng),
+  mapService.reverseGeocode(ctx.lat, ctx.lng),
+])
+→ weatherInfo: "28°C, Sunny, wind 15 km/h, humidity 62%"
+→ ctx.locationName: "Makati City, Metro Manila, Philippines"
 ```
-Cached in Redis for **5 minutes** keyed by `weather:{lat.toFixed(3)},{lng.toFixed(3)}` (~110m precision), so nearby requests within the window skip the upstream Open-Meteo call. Cache read/write failures are non-fatal — they log and fall through to a live fetch.
+Both fetched in parallel to avoid sequential latency. `reverseGeocode` calls Mapbox reverse geocoding (`/mapbox.places/{lng},{lat}.json`) and returns the human-readable `place_name`. Falls back to raw coordinates if Mapbox fails.
 
 Also saves a weather snapshot to `UserOutline` if `userOutlineId` is set (for itinerary planning).
 
@@ -109,7 +121,9 @@ Layer 1 — SYSTEM BEHAVIOR
   → Tone, conciseness, no markdown rules
 
 Layer 2 — INTENT DECISION RULES
-  → FASHION: weather + location, no clarifying questions
+  → EVENT (no plan yet): Ask for occasion — NONE intent, no outfit yet
+  → EVENT (plan known): FASHION intent using gender + weather → correct category
+  → FASHION (no event): weather + location, immediate suggestion
   → COSMETIC: weather + location, immediate suggestion
   → MAP: destination → route_suggestion
   → NONE: general conversation
@@ -126,7 +140,7 @@ Layer 3 — OUTPUT CONTRACT (strict)
   → "If you fail to follow this JSON format, your response is invalid."
 
 Layer 4 — CONTEXT BLOCK (dynamic)
-  → Date, Time, Weather, Screen, Schedule, Navigation state
+  → Date, Time, Location (human-readable), Weather, User Gender, Screen, Schedule, Navigation state
 ```
 
 **Step 3 — ChatWonder AI call:**

@@ -79,7 +79,7 @@ export default class CosmeticProductController {
 
     try {
       const result = await CosmeticProductService.getProducts(
-        req.query as unknown as Record<string, string | undefined>
+        req.query as unknown as Record<string, string | undefined | string[]>
       );
       return responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {

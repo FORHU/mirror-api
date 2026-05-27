@@ -21,7 +21,7 @@ export interface RoutePlan {
 }
 
 export interface ChatWonderEvent {
-  type: "jog" | "meeting" | "date";
+  type: string;
   timeBlock: string;
   context: WeatherContext;
   fashion: OutfitPlan;
@@ -29,7 +29,7 @@ export interface ChatWonderEvent {
   route: RoutePlan;
 }
 
-export type AIIntent = "FASHION" | "COSMETIC" | "MAP" | "NONE";
+export type AIIntent = "FASHION" | "COSMETIC" | "MAP" | "MENU" | "RESTART" | "NONE";
 
 export interface ChatWonderResponse {
   intent: AIIntent;
@@ -69,7 +69,7 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderResponse
           let intent: AIIntent = "NONE";
           if (parsed.intent) {
             const upper = String(parsed.intent).toUpperCase();
-            if (["FASHION", "COSMETIC", "MAP", "NONE"].includes(upper)) {
+            if (["FASHION", "COSMETIC", "MAP", "MENU", "RESTART", "NONE"].includes(upper)) {
               intent = upper as AIIntent;
             }
           } else if (outfitSuggestion) {

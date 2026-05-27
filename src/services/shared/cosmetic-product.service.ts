@@ -5,22 +5,38 @@ import { COSMETIC_CATEGORY, COSMETIC_FINISH, COSMETIC_TYPE, Prisma } from "@pris
 const fileNotFound = () => ({ status: 400, message: "Referenced file (fileUrlId) does not exist" });
 
 export default class CosmeticProductService {
-  static async getProducts(query: Record<string, string | undefined>) {
-    const { page, limit, type, brand, category } = query;
+  static async getProducts(query: Record<string, string | undefined | string[]>) {
+    const { page, limit, type, brand, category, tags } = query;
 
-    const filters: { type?: COSMETIC_TYPE; brand?: string; category?: COSMETIC_CATEGORY } = {};
-    if (type && (Object.values(COSMETIC_TYPE) as string[]).includes(type)) {
+    const filters: {
+      type?: COSMETIC_TYPE;
+      brand?: string;
+      category?: COSMETIC_CATEGORY;
+      tags?: string[];
+    } = {};
+    if (
+      type &&
+      typeof type === "string" &&
+      (Object.values(COSMETIC_TYPE) as string[]).includes(type)
+    ) {
       filters.type = type as COSMETIC_TYPE;
     }
-    if (category && (Object.values(COSMETIC_CATEGORY) as string[]).includes(category)) {
+    if (
+      category &&
+      typeof category === "string" &&
+      (Object.values(COSMETIC_CATEGORY) as string[]).includes(category)
+    ) {
       filters.category = category as COSMETIC_CATEGORY;
     }
     if (typeof brand === "string" && brand.trim()) filters.brand = brand.trim();
+    if (tags) {
+      filters.tags = Array.isArray(tags) ? tags : [tags];
+    }
 
     return CosmeticProductRepo.findAll(
       filters,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 20
+      page ? parseInt(String(page), 10) : 1,
+      limit ? parseInt(String(limit), 10) : 20
     );
   }
 

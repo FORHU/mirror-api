@@ -24,7 +24,7 @@ export interface ResolvedProduct {
 }
 
 export interface ChatWonderEvent {
-  type: "jog" | "meeting" | "date";
+  type: string;
   timeBlock: string;
   context: WeatherContext;
   fashion: {

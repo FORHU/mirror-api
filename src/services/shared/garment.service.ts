@@ -156,8 +156,9 @@ export default class GarmentService {
     }
 
     if (data.tags && Array.isArray(data.tags)) {
+      const uniqueTags = Array.from(new Set(data.tags));
       garmentData.tags = {
-        connectOrCreate: data.tags.map((tag: string) => ({
+        connectOrCreate: uniqueTags.map((tag: string) => ({
           where: { name: tag },
           create: { name: tag },
         })),
@@ -215,9 +216,10 @@ export default class GarmentService {
     }
 
     if (data.tags && Array.isArray(data.tags)) {
+      const uniqueTags = Array.from(new Set(data.tags));
       garmentData.tags = {
         set: [], // Clear existing tags
-        connectOrCreate: data.tags.map((tag: string) => ({
+        connectOrCreate: uniqueTags.map((tag: string) => ({
           where: { name: tag },
           create: { name: tag },
         })),

@@ -58,6 +58,26 @@ export interface DirectionsResponse {
 }
 
 export const mapService = {
+  reverseGeocode: async (lat: number, lng: number): Promise<string> => {
+    try {
+      const response = await axios.get<GeocodingResponse>(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json`,
+        {
+          params: {
+            access_token: MAPBOX_SECRET_TOKEN,
+            types: "place,district,locality,neighborhood,poi",
+            limit: 1,
+          },
+        }
+      );
+      const feature = response.data.features?.[0];
+      return feature?.place_name ?? `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    } catch (error) {
+      logger.warn(`[MapService] reverseGeocode failed: ${(error as Error).message}`);
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  },
+
   search: async (query: string, proximity?: string): Promise<GeocodingFeature[]> => {
     if (!query) return [];
 

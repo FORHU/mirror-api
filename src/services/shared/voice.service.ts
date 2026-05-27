@@ -17,6 +17,7 @@ import {
   CHAT_WONDER_API_URL,
 } from "../../config";
 import { weatherService } from "./weather.service";
+import { mapService } from "./map.service";
 import { prisma } from "../../utils/prisma";
 import { streamChat } from "../../utils/chat-wonder-stream";
 import {
@@ -49,6 +50,10 @@ export interface VoiceContext {
   userOutlineId?: string;
   staffClarification?: string;
   sessionId?: string;
+  gender?: string; // User's gender from auth profile (MALE | FEMALE)
+  locationName?: string; // Human-readable location resolved from lat/lng
+  eventPlan?: unknown[]; // Existing event plan from UserOutline to provide context to AI
+  mode?: string; // Pass mode flag e.g. "confirm_context_required"
 }
 
 export interface VoiceAction {
@@ -82,13 +87,17 @@ Rules:
 
 // ── Layer 2: DECISION / INTENT LOGIC — how to choose intents ────────────────
 const INTENT_RULES = `Intent decision rules:
-- If the user asks for fashion, styling, outfit, or clothing advice:
-  Use FASHION intent. Use weather, time, and location context. If no event is provided, do NOT ask questions — immediately suggest a best-fit outfit.
-- If the user asks for makeup, cosmetics, skincare, or beauty advice:
-  Use COSMETIC intent. Use weather, time, and location context. If no event is provided, immediately suggest a best-fit look.
-- If the user asks for directions, navigation, or how to get somewhere:
-  Use MAP intent and populate route_suggestion with the destination name.
-- If the request is unclear, general conversation, or not related to the above:
+- Your ONLY job is to classify the user's intent into one of: FASHION, COSMETIC, MAP, MENU, RESTART, or NONE.
+- DO NOT attempt to manage state, routing, or ask for confirmation to switch features. The frontend will handle all routing guards and confirmations securely.
+- If the user asks to go to a feature, just output that intent directly.
+- If the context contains 'mode: "confirm_context_required"', the user gave an ambiguous reply (e.g., "maybe") to a system prompt. You must ask them to clarify what they want in a friendly way (Use NONE intent).
+- If the user mentions an event but hasn't stated a specific reason/plan:
+  Use NONE intent and ask what the occasion is.
+- If you know the event/plan (e.g. going to a party, heading to work):
+  Use FASHION or COSMETIC intent. Factor in their gender and weather to recommend categories. Generate the events[] array.
+- If the user asks for directions:
+  Use MAP intent and populate route_suggestion.
+- If the request is unclear or general conversation:
   Use NONE intent and provide a helpful conversational reply.`;
 
 // ── Layer 3: STRICT OUTPUT CONTRACT — schema enforcement ────────────────────
@@ -96,13 +105,21 @@ const OUTPUT_CONTRACT = `OUTPUT CONTRACT — You MUST follow this exactly.
 
 Respond ONLY with valid JSON matching this schema:
 {
-  "intent": "FASHION" | "COSMETIC" | "MAP" | "NONE",
+  "intent": "FASHION" | "COSMETIC" | "MAP" | "MENU" | "RESTART" | "NONE",
   "message": "<spoken reply, max 2-3 sentences>",
   "data": {
     "outfit"?: "<specific clothing advice if intent is FASHION>",
     "cosmetics"?: "<specific makeup/skincare advice if intent is COSMETIC>",
     "route"?: "<destination name if intent is MAP>"
-  }
+  },
+  "events"?: [
+    {
+      "type": "<event type>",
+      "timeBlock": "<morning|afternoon|evening|night>",
+      "fashion"?: { "suggestion": "<text>", "tags": ["<tag>", "..."] },
+      "cosmetics"?: { "suggestion": "<text>", "tags": ["<tag>", "..."] }
+    }
+  ]
 }
 
 Strict rules:
@@ -110,6 +127,7 @@ Strict rules:
 - Do not wrap in markdown code blocks or backticks.
 - The "data" object must always be present, even if empty: "data": {}
 - Only include fields inside "data" that are relevant to the intent.
+- Include "events" only when intent is FASHION or COSMETIC and you have generated specific recommendations with tags.
 - If you fail to follow this JSON format, your response is invalid.`;
 
 function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo: string): string {
@@ -130,7 +148,12 @@ function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo
     `Smart Mirror Context:`,
     `- Date: ${date}`,
     `- Time: ${time}`,
+    ctx.locationName ? `- Location: ${ctx.locationName}` : null,
     `- Weather: ${weatherInfo}`,
+    ctx.gender ? `- User gender: ${ctx.gender}` : null,
+    ctx.eventPlan && ctx.eventPlan.length > 0
+      ? `- Planned Events: ${JSON.stringify(ctx.eventPlan)}`
+      : null,
     ctx.currentPage ? `- Screen: ${ctx.currentPage}` : null,
     ctx.schedules ? `- Schedule: ${ctx.schedules}` : null,
     ctx.isNavigating
@@ -359,8 +382,14 @@ export const voiceService = {
   }> => {
     let weatherInfo = "unavailable";
     if (ctx.lat !== undefined && ctx.lng !== undefined && !isNaN(ctx.lat) && !isNaN(ctx.lng)) {
-      try {
-        const w = await weatherService.getWeather(ctx.lat, ctx.lng);
+      // Resolve human-readable location name in parallel with weather fetch
+      const [weatherResult, locationName] = await Promise.allSettled([
+        weatherService.getWeather(ctx.lat, ctx.lng),
+        mapService.reverseGeocode(ctx.lat, ctx.lng),
+      ]);
+
+      if (weatherResult.status === "fulfilled") {
+        const w = weatherResult.value;
         weatherInfo = `${Math.round(w.temperature)}°C, ${w.condition}, wind ${Math.round(w.windspeed)} km/h, humidity ${w.humidity}%`;
         if (ctx.userOutlineId) {
           WeatherSnapshotService.ingestObservation(ctx.userOutlineId, {
@@ -371,8 +400,37 @@ export const voiceService = {
             windSpeed: Math.round(w.windspeed),
           }).catch((err) => logger.error(`[VoiceService] Weather snapshot failed: ${err.message}`));
         }
+      } else {
+        logger.warn(`[VoiceService] Failed to fetch weather info: ${weatherResult.reason}`);
+      }
+
+      if (locationName.status === "fulfilled") {
+        ctx.locationName = locationName.value;
+      } else {
+        logger.warn(`[VoiceService] reverseGeocode failed: ${locationName.reason}`);
+      }
+    }
+
+    if (ctx.userOutlineId) {
+      try {
+        const outline = await prisma.userOutline.findUnique({
+          where: { id: ctx.userOutlineId },
+          select: {
+            events: {
+              select: {
+                type: true,
+                timeBlock: true,
+                fashionSuggestion: true,
+                routeDestination: true,
+              },
+            },
+          },
+        });
+        if (outline?.events && outline.events.length > 0) {
+          ctx.eventPlan = outline.events;
+        }
       } catch (err) {
-        logger.warn(`[VoiceService] Failed to fetch weather info: ${(err as Error).message}`);
+        logger.warn(`[VoiceService] Failed to fetch outline events: ${(err as Error).message}`);
       }
     }
 
