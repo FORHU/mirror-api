@@ -131,9 +131,13 @@ Confirmation Rules:
   - User is on /authentication and tries to restart (navigate to "/")
   - Any action that would disrupt an active focused flow
 - Set "requiresConfirmation": false for all other cases.
+- When "requiresConfirmation" is true, the "reply" MUST be phrased as a clear yes/no question (e.g., "Are you sure you want to leave fashion and go to the map?"). Never emit requiresConfirmation: true with a statement-form reply — the client holds the action until the user answers, and a statement would strand the user.
 
 Gender Guard:
-- If the current page is "/" and the user tries to access fashion, cosmetics, or map features, you MUST navigate them to "/select-gender". Set the action to "navigate" with route "/select-gender", and reply explaining that they need to select a gender first.
+- The Smart Mirror Context above includes a "- User gender:" line when gender is known. Treat that line as authoritative.
+- If "- User gender:" IS present (MALE or FEMALE), gender is KNOWN. Proceed with the user's fashion/cosmetics request normally. DO NOT ask about gender, DO NOT navigate to /select-gender, DO NOT mention gender in the reply.
+- If "- User gender:" is ABSENT and the user asks for FASHION or COSMETICS, you MUST set action to "navigate" with route "/select-gender" and tell them to select a gender.
+- EXTREMELY IMPORTANT: If the user asks for anything related to MAPS, LOCATIONS, or DIRECTIONS, IGNORE gender entirely (known or not). You MUST immediately issue a map action (like "navigate" to "/map", or "maps_navigate"). NEVER ask for their gender when dealing with maps.
 
 If the context contains mode: "confirm_context_required", the user gave an ambiguous reply (e.g., "maybe") to a confirmation prompt. Ask them to clarify with a friendly follow-up question. Set action to null.`;
 
@@ -205,11 +209,13 @@ function buildCognitiveQuery(transcript: string, ctx: VoiceContext, weatherInfo:
 
   const contextParts = [
     `Smart Mirror Context:`,
+    ctx.gender
+      ? `- User gender: ${ctx.gender}  (KNOWN — do not ask again, proceed normally)`
+      : `- User gender: UNKNOWN  (fashion/cosmetics requests must navigate to /select-gender)`,
     `- Date: ${date}`,
     `- Time: ${time}`,
     ctx.locationName ? `- Location: ${ctx.locationName}` : null,
     `- Weather: ${weatherInfo}`,
-    ctx.gender ? `- User gender: ${ctx.gender}` : null,
     ctx.currentPage ? `- Current screen: ${ctx.currentPage}` : null,
     ctx.schedules ? `- Schedule: ${ctx.schedules}` : null,
     ctx.mode ? `- Mode flag: ${ctx.mode}` : null,

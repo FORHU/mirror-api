@@ -11,12 +11,16 @@ export default class AuthRepo {
     });
   }
 
-  static async createUser(data: { email: string; username: string; gender?: "MALE" | "FEMALE" }) {
+  static async createUser(data: {
+    email: string;
+    username: string;
+    gender?: "MALE" | "FEMALE" | null;
+  }) {
     return prisma.user.create({
       data: {
         email: data.email,
         username: data.username,
-        gender: data.gender ?? "MALE",
+        gender: data.gender,
       },
       select: {
         id: true,
@@ -182,7 +186,7 @@ export default class AuthRepo {
     const createData: Prisma.UserCreateInput = {
       email: data.email,
       username: data.username,
-      gender: "MALE",
+      // gender is optional now
     };
     if (avatarId) {
       createData.avatar = { connect: { id: avatarId } };
