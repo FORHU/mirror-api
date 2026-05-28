@@ -9,6 +9,7 @@ import logger from "../../utils/logger";
 export default class VoiceController {
   static async transcribe(req: Request, res: Response, next: NextFunction) {
     const pcmBuffer = req.body as Buffer;
+    const lang = (req.query.lang as string) || "en-US";
 
     if (!Buffer.isBuffer(pcmBuffer) || pcmBuffer.length === 0) {
       return res.status(400).json({ error: "No audio data received" });
@@ -18,7 +19,7 @@ export default class VoiceController {
     }
 
     try {
-      const transcript = await voiceService.transcribeAudio(pcmBuffer);
+      const transcript = await voiceService.transcribeAudio(pcmBuffer, lang);
       return res.json({ transcript });
     } catch (err) {
       if ((err as Error).message === "EMPTY_TRANSCRIPT") {
@@ -32,6 +33,7 @@ export default class VoiceController {
 
   static async ask(req: Request, res: Response, next: NextFunction) {
     const { transcript, ctx } = req.body;
+    const lang = (req.query.lang as string) || "en-US";
 
     if (!transcript) return res.status(400).json({ error: "transcript is required" });
 
@@ -71,7 +73,7 @@ export default class VoiceController {
       );
 
       // Synthesize TTS from the cognitive reply
-      const audio = await voiceService.tts(response.reply);
+      const audio = await voiceService.tts(response.reply, lang);
 
       return res.json({
         reply: response.reply,
