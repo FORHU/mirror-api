@@ -54,6 +54,7 @@ export interface VoiceContext {
   locationName?: string; // Human-readable location resolved from lat/lng
   eventPlan?: unknown[]; // Existing event plan from UserOutline to provide context to AI
   mode?: string; // Pass mode flag e.g. "confirm_context_required"
+  language?: string;
 }
 
 export interface VoiceAction {
@@ -160,6 +161,7 @@ function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo
       ? `- Navigation: active | destination: ${ctx.destinationName ?? "unknown"} | distance: ${formatDistance(ctx.remainingDistance)} | ETA: ${formatDuration(ctx.remainingDuration)}`
       : null,
     ctx.staffClarification?.trim() ? `- Staff note: ${ctx.staffClarification.trim()}` : null,
+    ctx.language ? `- Spoken Language: ${ctx.language}` : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -236,7 +238,7 @@ const transcribeClient = new TranscribeStreamingClient({
   credentials: awsCredentials,
 });
 
-async function transcribe(pcmBuffer: Buffer): Promise<string> {
+async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> {
   async function* audioStream() {
     const CHUNK = 32000;
     for (let offset = 0; offset < pcmBuffer.length; offset += CHUNK) {
@@ -266,9 +268,8 @@ async function transcribe(pcmBuffer: Buffer): Promise<string> {
 
   try {
     const cmd = new StartStreamTranscriptionCommand({
-      LanguageOptions: "en-US,fr-FR",
-      IdentifyLanguage: true,
-      PreferredLanguage: "en-US",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      LanguageCode: language as any,
       MediaEncoding: "pcm",
       MediaSampleRateHertz: 16000,
       AudioStream: audioStream(),
@@ -278,23 +279,12 @@ async function transcribe(pcmBuffer: Buffer): Promise<string> {
     if (!result) throw new Error("EMPTY_TRANSCRIPT");
     return result;
   } catch (err: unknown) {
-    const error = err as Error;
-    // If IdentifyLanguage fails due to short audio, it throws BadRequestException or we throw EMPTY_TRANSCRIPT.
-    // Fallback to en-US strictly, bypassing IdentifyLanguage.
-    logger.warn(
-      `[VoiceService] IdentifyLanguage failed (${error.message}). Falling back to en-US.`
-    );
-    const fallbackCmd = new StartStreamTranscriptionCommand({
-      LanguageCode: "en-US",
-      MediaEncoding: "pcm",
-      MediaSampleRateHertz: 16000,
-      AudioStream: audioStream(),
-    });
-    return await doTranscribe(fallbackCmd);
+    logger.error(`[VoiceService] Transcription failed: ${(err as Error).message}`);
+    throw err;
   }
 }
 
-async function synthesize(text: string): Promise<Buffer> {
+async function synthesize(text: string, language: string): Promise<Buffer> {
   logger.info(`[VoiceService] Synthesizing speech of length: ${text.length}`);
   logger.info(`[VoiceService] Speech text: ${text.substring(0, 100)}...`);
   const isFallbackText = text.includes("having trouble connecting");
@@ -326,17 +316,29 @@ async function synthesize(text: string): Promise<Buffer> {
 
   const audioBuffers: Buffer[] = [];
 
-  const isFrench =
-    /\b(le|la|les|un|une|et|est|pour|dans|avec|bonjour|merci|oui|non|c'est|bien|je|tu|il|elle|nous|vous|ils|elles)\b/i.test(
-      text
-    );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let engine: any = Engine.GENERATIVE;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let voiceId: any = VoiceId.Matthew;
+  let langCode = "en-US";
+
+  if (language === "fr-FR") {
+    engine = Engine.NEURAL;
+    voiceId = VoiceId.Lea;
+    langCode = "fr-FR";
+  } else if (language === "ko-KR") {
+    engine = Engine.NEURAL;
+    voiceId = VoiceId.Seoyeon;
+    langCode = "ko-KR";
+  }
 
   try {
     for (const chunkText of textChunks) {
       const cmd = new SynthesizeSpeechCommand({
-        Engine: isFrench ? Engine.NEURAL : Engine.GENERATIVE,
-        LanguageCode: isFrench ? "fr-FR" : "en-US",
-        VoiceId: isFrench ? VoiceId.Lea : VoiceId.Matthew,
+        Engine: engine,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        LanguageCode: langCode as any,
+        VoiceId: voiceId,
         OutputFormat: OutputFormat.MP3,
         Text: chunkText,
       });
@@ -364,8 +366,8 @@ async function synthesize(text: string): Promise<Buffer> {
 }
 
 export const voiceService = {
-  transcribeAudio: async (pcmBuffer: Buffer): Promise<string> => {
-    const transcript = await transcribe(pcmBuffer);
+  transcribeAudio: async (pcmBuffer: Buffer, language: string = "en-US"): Promise<string> => {
+    const transcript = await transcribe(pcmBuffer, language);
     if (!transcript) throw new Error("EMPTY_TRANSCRIPT");
     return transcript;
   },
@@ -498,7 +500,7 @@ export const voiceService = {
       }
     }
 
-    const audio = await synthesize(speech);
+    const audio = await synthesize(speech, ctx.language || "en-US");
 
     // ── Fire-and-forget: write messages + finalization without blocking ───────
     if (ctx.userOutlineId && resolvedConversationId) {
@@ -543,7 +545,8 @@ export const voiceService = {
     return { speech, action, audio, events: enrichedEvents, sessionId };
   },
 
-  tts: async (text: string): Promise<Buffer> => synthesize(text),
+  tts: async (text: string, language: string = "en-US"): Promise<Buffer> =>
+    synthesize(text, language),
 
   suggestAI: async (type: "fashion" | "cosmetics", ctx: VoiceContext = {}): Promise<string> => {
     let weatherInfo = "unavailable";

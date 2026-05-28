@@ -1,5 +1,5 @@
 import axios from "axios";
-import { FASHN_API_KEY, FASHN_BASE_URL, FASHN_VIDEO_MODEL } from "../../config";
+import { FASHN_API_KEY, FASHN_BASE_URL, FASHN_VIDEO_MODEL, FASHN_MODEL } from "../../config";
 import logger from "../../utils/logger";
 
 export interface FashnRunResponse {
@@ -32,16 +32,25 @@ export default class FashnService {
     try {
       logger.info(`Triggering FASHN.AI try-on for model: ${modelUrl}`);
 
-      const response = await axios.post(
-        `${FASHN_BASE_URL}/run`,
-        {
-          model_name: "tryon-v1.6",
-          inputs: {
+      const isMaxModel = FASHN_MODEL.includes("max");
+      const inputs = isMaxModel
+        ? {
+            model_image: modelUrl,
+            product_image: garmentUrl, // tryon-max uses product_image instead of garment_image
+            ...(prompt && { prompt }),
+          }
+        : {
             model_image: modelUrl,
             garment_image: garmentUrl,
             category: category, // e.g. "tops", "bottoms", "one-pieces"
             ...(prompt && { prompt }),
-          },
+          };
+
+      const response = await axios.post(
+        `${FASHN_BASE_URL}/run`,
+        {
+          model_name: FASHN_MODEL,
+          inputs,
         },
         { headers: this.headers }
       );
@@ -64,7 +73,7 @@ export default class FashnService {
    *
    * Notes:
    *   - `model_name` comes from FASHN_VIDEO_MODEL env var. The image flow
-   *     hardcodes "tryon-v1.6"; FASHN's video product is a different model id.
+   *     uses FASHN_MODEL (defaults to "tryon-max"); FASHN's video product is a different model id.
    *   - The `inputs` shape below mirrors the image schema. If FASHN's video
    *     model expects different field names (e.g. `model_video`, extra
    *     duration/fps params), adjust here once the model id is confirmed.
