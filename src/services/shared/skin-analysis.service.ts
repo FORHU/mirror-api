@@ -16,10 +16,7 @@ import logger from "../../utils/logger";
 
 // ─── Mock skin-analysis loader (dev) ────────────────────────────────────────
 
-const MOCK_HISTORY_PATH = path.resolve(
-  process.cwd(),
-  "src/mocks/skin-analysis.history.json"
-);
+const MOCK_HISTORY_PATH = path.resolve(process.cwd(), "src/mocks/skin-analysis.history.json");
 
 type PerfectCorpEntry = {
   success: boolean;
@@ -57,32 +54,34 @@ function parsePerfectCorpEntry(entry: PerfectCorpEntry) {
 
   // Determine skin type
   let skinType: "OILY" | "DRY" | "COMBINATION" | "NORMAL" | "SENSITIVE";
-  if (oilinessPct >= 70 && moistureIssue < 50)        skinType = "OILY";
-  else if (oilinessPct < 30 && moistureIssue >= 55)   skinType = "DRY";
-  else if (oilinessPct >= 55 && moistureIssue >= 50)  skinType = "COMBINATION";
-  else if ((s["redness"] ?? 0) >= 70)                 skinType = "SENSITIVE";
-  else                                                 skinType = "NORMAL";
+  if (oilinessPct >= 70 && moistureIssue < 50) skinType = "OILY";
+  else if (oilinessPct < 30 && moistureIssue >= 55) skinType = "DRY";
+  else if (oilinessPct >= 55 && moistureIssue >= 50) skinType = "COMBINATION";
+  else if ((s["redness"] ?? 0) >= 70) skinType = "SENSITIVE";
+  else skinType = "NORMAL";
 
   // Build concern list from thresholds
   const concerns: string[] = [];
-  if (oilinessPct >= 70)                              concerns.push("Oiliness");
-  if (moistureIssue >= 60)                            concerns.push("Mild dehydration");
-  if ((s["acne"]           ?? 0) >= 60)              concerns.push("Acne");
-  if ((s["wrinkle"]        ?? 0) >= 60)              concerns.push("Fine lines / wrinkles");
-  if ((s["dark_circle_v2"] ?? 0) >= 60)              concerns.push("Dark circles");
-  if ((s["age_spot"]       ?? 0) >= 60)              concerns.push("Age spots / hyperpigmentation");
-  if ((s["pore"]           ?? 0) >= 60)              concerns.push("Enlarged pores");
-  if ((s["redness"]        ?? 0) >= 70)              concerns.push("Redness / sensitivity");
-  if ((s["droopy_lower_eyelid"] ?? 0) >= 65 ||
-      (s["eye_bag"]             ?? 0) >= 65)         concerns.push("Under-eye puffiness");
-  if (concerns.length === 0)                          concerns.push("General maintenance");
+  if (oilinessPct >= 70) concerns.push("Oiliness");
+  if (moistureIssue >= 60) concerns.push("Mild dehydration");
+  if ((s["acne"] ?? 0) >= 60) concerns.push("Acne");
+  if ((s["wrinkle"] ?? 0) >= 60) concerns.push("Fine lines / wrinkles");
+  if ((s["dark_circle_v2"] ?? 0) >= 60) concerns.push("Dark circles");
+  if ((s["age_spot"] ?? 0) >= 60) concerns.push("Age spots / hyperpigmentation");
+  if ((s["pore"] ?? 0) >= 60) concerns.push("Enlarged pores");
+  if ((s["redness"] ?? 0) >= 70) concerns.push("Redness / sensitivity");
+  if ((s["droopy_lower_eyelid"] ?? 0) >= 65 || (s["eye_bag"] ?? 0) >= 65)
+    concerns.push("Under-eye puffiness");
+  if (concerns.length === 0) concerns.push("General maintenance");
 
   const routineTips: Record<string, string> = {
-    OILY:        "Use oil-free, mattifying products. Add a BHA toner to minimise pores and control shine.",
-    DRY:         "Focus on ceramide-rich moisturisers and hydrating serums. Avoid harsh stripping cleansers.",
-    COMBINATION: "Apply a lightweight gel moisturiser on the T-zone and a richer formula on dry patches.",
-    SENSITIVE:   "Choose fragrance-free, calming formulas with centella or oat extract to ease redness.",
-    NORMAL:      "Maintain your routine with a gentle cleanser, daily SPF, and a hydrating serum.",
+    OILY: "Use oil-free, mattifying products. Add a BHA toner to minimise pores and control shine.",
+    DRY: "Focus on ceramide-rich moisturisers and hydrating serums. Avoid harsh stripping cleansers.",
+    COMBINATION:
+      "Apply a lightweight gel moisturiser on the T-zone and a richer formula on dry patches.",
+    SENSITIVE:
+      "Choose fragrance-free, calming formulas with centella or oat extract to ease redness.",
+    NORMAL: "Maintain your routine with a gentle cleanser, daily SPF, and a hydrating serum.",
   };
 
   return {
@@ -153,9 +152,15 @@ async function askChatWonderForSkinProducts(
     let fullResponse = "";
 
     await streamChat(prompt, sessionId, undefined, {
-      onChunk:    (chunk) => { fullResponse += chunk; },
-      onComplete: () => { /* resolved by Promise */ },
-      onError:    (err) => { logger.warn(`[SkinAnalysis] ChatWonder stream error: ${err.message}`); },
+      onChunk: (chunk) => {
+        fullResponse += chunk;
+      },
+      onComplete: () => {
+        /* resolved by Promise */
+      },
+      onError: (err) => {
+        logger.warn(`[SkinAnalysis] ChatWonder stream error: ${err.message}`);
+      },
     });
 
     if (!fullResponse) return null;
@@ -234,7 +239,9 @@ export default class SkinAnalysisService {
       // TODO: call PerfectCorp API with file.fileUrl when API key is provisioned
       // const perfectCorpResult = await callPerfectCorpApi(file.fileUrl);
       // vision = parsePerfectCorpEntry(perfectCorpResult);
-      logger.warn("[SkinAnalysis] SKIN_ANALYSIS_ENABLED=true but real API not yet implemented — falling back to mock");
+      logger.warn(
+        "[SkinAnalysis] SKIN_ANALYSIS_ENABLED=true but real API not yet implemented — falling back to mock"
+      );
       vision = loadMockVision() ?? getFallbackVision();
     } else {
       vision = loadMockVision() ?? getFallbackVision();
@@ -242,8 +249,8 @@ export default class SkinAnalysisService {
 
     logger.info(
       `[SkinAnalysis] vision source=${SKIN_ANALYSIS_ENABLED ? "api" : "mock"} ` +
-      `skinType=${vision.skinType} oiliness=${vision.oilinessPct} ` +
-      `hydration=${vision.hydrationPct} concerns=[${vision.concerns.join(", ")}]`
+        `skinType=${vision.skinType} oiliness=${vision.oilinessPct} ` +
+        `hydration=${vision.hydrationPct} concerns=[${vision.concerns.join(", ")}]`
     );
 
     // 4. Ask ChatWonder to suggest products based on the skin profile,
@@ -289,6 +296,7 @@ export default class SkinAnalysisService {
         rawSignals: {
           vision,
           weather: weather ?? null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           perfectCorp: (vision as any).rawScores ?? null,
           chatWonderSuggestion: chatWonderSuggestion ?? null,
         },

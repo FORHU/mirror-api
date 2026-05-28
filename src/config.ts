@@ -54,10 +54,10 @@ export const isDev = NODE_ENV === "development";
 export const SKIN_ANALYSIS_ENABLED = process.env.SKIN_ANALYSIS_ENABLED === "true";
 
 // PostgreSQL (raw pg client — used by chatwonder-map script)
-export const PG_HOST     = process.env.PG_HOST     || "localhost";
-export const PG_PORT     = Number(process.env.PG_PORT || 5440);
-export const PG_USER     = process.env.PG_USER     || "admin";
+export const PG_HOST = process.env.PG_HOST || "localhost";
+export const PG_PORT = Number(process.env.PG_PORT || 5440);
+export const PG_USER = process.env.PG_USER || "admin";
 export const PG_PASSWORD = process.env.PG_PASSWORD || "mypassword";
-export const PG_DB       = process.env.PG_DB       || "mirror_db";
+export const PG_DB = process.env.PG_DB || "mirror_db";
 
 // Server reload triggered to pick up new ORS_API_KEY

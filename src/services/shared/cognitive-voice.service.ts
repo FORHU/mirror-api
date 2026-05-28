@@ -133,7 +133,7 @@ Confirmation Rules:
 - Set "requiresConfirmation": false for all other cases.
 
 Gender Guard:
-- If the current page is "/" or "/select-gender" and the user tries to navigate to "/ai-recommendation-fashion", "/ai-recommendation-cosmetic", or "/map", do NOT navigate. Instead, reply that they need to select their gender first and set action to null.
+- If the current page is "/" and the user tries to access fashion, cosmetics, or map features, you MUST navigate them to "/select-gender". Set the action to "navigate" with route "/select-gender", and reply explaining that they need to select a gender first.
 
 If the context contains mode: "confirm_context_required", the user gave an ambiguous reply (e.g., "maybe") to a confirmation prompt. Ask them to clarify with a friendly follow-up question. Set action to null.`;
 

@@ -43,7 +43,7 @@ export const foursquareService = {
       throw new Error("FOURSQUARE_KEY_MISSING");
     }
 
-    const response = await axios.get(`${BASE_URL}/places/nearby`, {
+    const response = await axios.get(`${BASE_URL}/places/search`, {
       headers: { Authorization: FOURSQUARE_API_KEY },
       params: {
         ll: `${lat},${lng}`,

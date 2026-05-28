@@ -343,7 +343,6 @@ export default class MapController {
       lng: Joi.number().min(-180).max(180).required(),
       radius: Joi.number().min(100).max(5000).default(1000),
     });
-
     const { error, value } = schema.validate(req.query);
     if (error) return res.status(400).json({ error: error.message });
 

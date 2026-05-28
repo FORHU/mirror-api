@@ -26,7 +26,7 @@ async function checkVoiceConnections() {
   }
 
   // 2. Check ChatWonder API
-  const chatWonderUrl = "http://ec2-13-212-152-38.ap-southeast-1.compute.amazonaws.com:8000";
+  const chatWonderUrl = process.env.CHAT_WONDER_API_URL;
   console.log(`\n2. Checking ChatWonder API (${chatWonderUrl})...`);
   if (!chatWonderUrl) {
     console.error("❌ CHAT_WONDER_API_URL is missing in .env");
