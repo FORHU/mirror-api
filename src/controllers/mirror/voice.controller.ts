@@ -73,7 +73,7 @@ export default class VoiceController {
       );
 
       // Synthesize TTS from the cognitive reply
-      const audio = await voiceService.tts(response.reply, lang);
+      const audio = await voiceService.tts(response.reply, lang, response.emotion);
 
       return res.json({
         reply: response.reply,

@@ -284,7 +284,26 @@ async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> 
   }
 }
 
-async function synthesize(text: string, language: string): Promise<Buffer> {
+function applyEmotionSSML(text: string, emotion?: string): string {
+  const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  switch (emotion) {
+    case "excited":
+      return `<speak><prosody rate="fast" pitch="high">${escapedText}</prosody></speak>`;
+    case "urgent":
+      return `<speak><prosody rate="fast">${escapedText}</prosody></speak>`;
+    case "curious":
+      return `<speak><prosody pitch="high">${escapedText}</prosody></speak>`;
+    case "relaxed":
+      return `<speak><prosody rate="slow" pitch="low">${escapedText}</prosody></speak>`;
+    case "frustrated":
+      return `<speak><prosody rate="slow" volume="loud">${escapedText}</prosody></speak>`;
+    case "neutral":
+    default:
+      return `<speak>${escapedText}</speak>`;
+  }
+}
+
+async function synthesize(text: string, language: string, emotion?: string): Promise<Buffer> {
   logger.info(`[VoiceService] Synthesizing speech of length: ${text.length}`);
   logger.info(`[VoiceService] Speech text: ${text.substring(0, 100)}...`);
   const isFallbackText = text.includes("having trouble connecting");
@@ -340,7 +359,8 @@ async function synthesize(text: string, language: string): Promise<Buffer> {
         LanguageCode: langCode as any,
         VoiceId: voiceId,
         OutputFormat: OutputFormat.MP3,
-        Text: chunkText,
+        Text: applyEmotionSSML(chunkText, emotion),
+        TextType: "ssml",
       });
 
       const res = await pollyClient.send(cmd);
@@ -545,8 +565,8 @@ export const voiceService = {
     return { speech, action, audio, events: enrichedEvents, sessionId };
   },
 
-  tts: async (text: string, language: string = "en-US"): Promise<Buffer> =>
-    synthesize(text, language),
+  tts: async (text: string, language: string = "en-US", emotion?: string): Promise<Buffer> =>
+    synthesize(text, language, emotion),
 
   suggestAI: async (type: "fashion" | "cosmetics", ctx: VoiceContext = {}): Promise<string> => {
     let weatherInfo = "unavailable";
