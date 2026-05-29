@@ -4,7 +4,8 @@ import { cognitiveVoiceService } from "../../services/shared/cognitive-voice.ser
 import { CHAT_WONDER_API_URL } from "../../config";
 import { weatherService } from "../../services/shared/weather.service";
 import { mapService } from "../../services/shared/map.service";
-import { resolveItineraryCosmetics } from "../../utils/chat-wonder-cosmetics.util";
+import { resolveItineraryCosmetics, ChatWonderEvent } from "../../utils/chat-wonder-cosmetics.util";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import logger from "../../utils/logger";
 
@@ -87,7 +88,7 @@ export default class VoiceController {
             if (response.events && response.events.length > 0) {
               response.events = await resolveItineraryCosmetics(
                 outline.userId,
-                response.events as any,
+                response.events as ChatWonderEvent[],
                 outline.conversationId || ""
               );
             }
@@ -100,10 +101,10 @@ export default class VoiceController {
               });
               const currentPrefs = (user?.preferences as Record<string, unknown>) || {};
               const newPrefs = { ...currentPrefs, ...response.memoryUpdates };
-              
+
               await prisma.user.update({
                 where: { id: outline.userId },
-                data: { preferences: newPrefs as any },
+                data: { preferences: newPrefs as Prisma.InputJsonValue },
               });
               logger.info(`[VoiceController] Saved memory updates for user ${outline.userId}`);
             }
