@@ -21,6 +21,8 @@ model User {
   homeLocationLng Float?
 
   userMeasurement Json? // For detailed { height: 90, wight: 70, usualSize: "M" }
+  preferences     Json? // To store long-term AI memories, preferred styles, etc.
+  
   avatarId        String?       @unique
   avatar          File?         @relation("UserAvatar", fields: [avatarId], references: [id])
   outlines        UserOutline[]

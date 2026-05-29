@@ -4,6 +4,8 @@ import { cognitiveVoiceService } from "../../services/shared/cognitive-voice.ser
 import { CHAT_WONDER_API_URL } from "../../config";
 import { weatherService } from "../../services/shared/weather.service";
 import { mapService } from "../../services/shared/map.service";
+import { resolveItineraryCosmetics } from "../../utils/chat-wonder-cosmetics.util";
+import { prisma } from "../../utils/prisma";
 import logger from "../../utils/logger";
 
 export default class VoiceController {
@@ -71,6 +73,47 @@ export default class VoiceController {
         voiceCtx,
         CHAT_WONDER_API_URL || ""
       );
+
+      // Run backend-side effects: save itinerary events and user preferences
+      if (voiceCtx.userOutlineId) {
+        try {
+          const outline = await prisma.userOutline.findUnique({
+            where: { id: voiceCtx.userOutlineId },
+            select: { userId: true, conversationId: true },
+          });
+
+          if (outline?.userId) {
+            // 1. Resolve Events (Itinerary & Cosmetics Engine)
+            if (response.events && response.events.length > 0) {
+              response.events = await resolveItineraryCosmetics(
+                outline.userId,
+                response.events as any,
+                outline.conversationId || ""
+              );
+            }
+
+            // 2. Persist Memory Updates (Preferences)
+            if (response.memoryUpdates && Object.keys(response.memoryUpdates).length > 0) {
+              const user = await prisma.user.findUnique({
+                where: { id: outline.userId },
+                select: { preferences: true },
+              });
+              const currentPrefs = (user?.preferences as Record<string, unknown>) || {};
+              const newPrefs = { ...currentPrefs, ...response.memoryUpdates };
+              
+              await prisma.user.update({
+                where: { id: outline.userId },
+                data: { preferences: newPrefs as any },
+              });
+              logger.info(`[VoiceController] Saved memory updates for user ${outline.userId}`);
+            }
+          }
+        } catch (err) {
+          logger.error(
+            `[VoiceController] Failed to process backend response effects: ${(err as Error).message}`
+          );
+        }
+      }
 
       // Synthesize TTS from the cognitive reply
       const audio = await voiceService.tts(response.reply, lang, response.emotion);

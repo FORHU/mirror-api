@@ -139,6 +139,14 @@ Gender Guard:
 - If "- User gender:" is ABSENT and the user asks for FASHION or COSMETICS, you MUST set action to "navigate" with route "/select-gender" and tell them to select a gender.
 - EXTREMELY IMPORTANT: If the user asks for anything related to MAPS, LOCATIONS, or DIRECTIONS, IGNORE gender entirely (known or not). You MUST immediately issue a map action (like "navigate" to "/map", or "maps_navigate"). NEVER ask for their gender when dealing with maps.
 
+Recommendation Guard (Fashion & Cosmetics):
+- Before navigating to /ai-recommendation-fashion or /ai-recommendation-cosmetic, you MUST know the user's intended destination, event, or venue (e.g., "the office", "a party", "the park").
+- If the venue/location is UNKNOWN, DO NOT navigate. Set action to "none", and ask the user where they are going.
+- For Fashion: If the venue is known, but the user hasn't specified if they want a single [ garment ] or a full [ outfit ], ask them to clarify before navigating.
+- Once the venue (and garment/outfit choice for fashion) is KNOWN:
+  1. Set the action type to "navigate" with the respective route.
+  2. You MUST populate the "events" array with an itinerary event object tailored to their destination and the weather.
+
 If the context contains mode: "confirm_context_required", the user gave an ambiguous reply (e.g., "maybe") to a confirmation prompt. Ask them to clarify with a friendly follow-up question. Set action to null.`;
 
 const OUTPUT_CONTRACT = `OUTPUT CONTRACT — You MUST follow this exactly.
@@ -164,7 +172,15 @@ Respond ONLY with valid JSON matching this schema:
     "overlay": null,
     "focus": null
   },
-  "events": []
+  "events": [
+    {
+      "type": "<event type e.g. casual outing, formal dinner>",
+      "timeBlock": "<morning|afternoon|evening|night>",
+      "fashion": { "suggestion": "<fashion advice based on weather/venue>" },
+      "cosmetics": { "suggestion": "<cosmetics advice>" },
+      "route": { "destination": "<venue/location name>" }
+    }
+  ]
 }
 
 Strict rules:
@@ -172,7 +188,7 @@ Strict rules:
 - Do not wrap in markdown code blocks or backticks.
 - "action" must be null if the intent is just conversational (speak/none).
 - "requiresConfirmation" must always be present (true or false).
-- "events" is optional, only include if generating fashion/cosmetic itinerary events.
+- "events" is optional, only include if generating fashion/cosmetic itinerary events. It can be an empty array [].
 - If you fail to follow this JSON format, your response is invalid.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
