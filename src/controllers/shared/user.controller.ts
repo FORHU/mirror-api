@@ -30,9 +30,7 @@ export default class UserController {
    */
   static async index(req: Request, res: Response, next: NextFunction) {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
-      const result = await UserService.listUsers(page, limit);
+      const result = await UserService.listUsers(req.query as Record<string, string | undefined>);
       return responseSuccess(
         res,
         200,

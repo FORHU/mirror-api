@@ -18,6 +18,8 @@ async function assertOutlineOwned(outlineId: string, userId: string) {
   return outline;
 }
 
+import { parsePagination } from "../../helpers/pagination.helper";
+
 export default class CosmeticRecommendationService {
   /**
    * Lists recommendations for the caller's outline. Refuses to serve
@@ -29,12 +31,8 @@ export default class CosmeticRecommendationService {
     query: Record<string, string | undefined> = {}
   ) {
     await assertOutlineOwned(outlineId, userId);
-    const { page, limit } = query;
-    return CosmeticRecommendationRepo.findByOutline(
-      outlineId,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 20
-    );
+    const { page, limit } = parsePagination(query);
+    return CosmeticRecommendationRepo.findByOutline(outlineId, page, limit);
   }
 
   static async getById(id: string, userId: string) {

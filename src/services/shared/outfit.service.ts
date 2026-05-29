@@ -5,6 +5,7 @@ import FileService from "./file.service";
 import logger from "../../utils/logger";
 import { s3Client } from "../../utils/s3";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { parsePagination } from "../../helpers/pagination.helper";
 import {
   CATEGORY,
   FITTING_SLOT,
@@ -30,12 +31,13 @@ export default class OutfitService {
     userId?: string | null,
     query: Record<string, string | undefined> = {}
   ) {
-    const { page, limit, searchOutfit, searchOutfitItems, systemOnly } = query;
+    const { searchOutfit, searchOutfitItems, systemOnly } = query;
+    const { page, limit } = parsePagination(query);
     const effectiveUserId = systemOnly === "true" ? null : userId;
     return OutfitRepo.findByUserId(
       effectiveUserId,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20,
+      page,
+      limit,
       {},
       searchOutfit,
       searchOutfitItems
@@ -51,13 +53,8 @@ export default class OutfitService {
     userId?: string,
     query: Record<string, string | undefined> = {}
   ) {
-    const { page, limit } = query;
-    return OutfitRepo.findByUserId(
-      userId,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20,
-      { fileProvider: "EXTERNAL" }
-    );
+    const { page, limit } = parsePagination(query);
+    return OutfitRepo.findByUserId(userId, page, limit, { fileProvider: "EXTERNAL" });
   }
 
   /**
@@ -68,13 +65,8 @@ export default class OutfitService {
     userId?: string,
     query: Record<string, string | undefined> = {}
   ) {
-    const { page, limit } = query;
-    return OutfitRepo.findByUserId(
-      userId,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20,
-      { fileProviderNot: "EXTERNAL" }
-    );
+    const { page, limit } = parsePagination(query);
+    return OutfitRepo.findByUserId(userId, page, limit, { fileProviderNot: "EXTERNAL" });
   }
 
   static async getOutfitById(id: string, userId?: string) {

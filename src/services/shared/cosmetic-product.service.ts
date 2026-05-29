@@ -2,11 +2,14 @@ import CosmeticProductRepo from "../../repositories/cosmetic-product.repository"
 import FileRepo from "../../repositories/file.repository";
 import { COSMETIC_CATEGORY, COSMETIC_FINISH, COSMETIC_TYPE, Prisma } from "@prisma/client";
 
+import { parsePagination } from "../../helpers/pagination.helper";
+
 const fileNotFound = () => ({ status: 400, message: "Referenced file (fileUrlId) does not exist" });
 
 export default class CosmeticProductService {
   static async getProducts(query: Record<string, string | undefined | string[]>) {
-    const { page, limit, type, brand, category, tags } = query;
+    const { type, brand, category, tags } = query;
+    const { page, limit } = parsePagination(query as any);
 
     const filters: {
       type?: COSMETIC_TYPE;
@@ -33,11 +36,7 @@ export default class CosmeticProductService {
       filters.tags = Array.isArray(tags) ? tags : [tags];
     }
 
-    return CosmeticProductRepo.findAll(
-      filters,
-      page ? parseInt(String(page), 10) : 1,
-      limit ? parseInt(String(limit), 10) : 20
-    );
+    return CosmeticProductRepo.findAll(filters, page, limit);
   }
 
   static async getProductById(id: string) {

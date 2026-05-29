@@ -13,6 +13,7 @@ import { streamChat } from "../../utils/chat-wonder-stream";
 import ChatWonderService from "./chat-wonder.service";
 import { SKIN_ANALYSIS_ENABLED, CHAT_WONDER_API_URL } from "../../config";
 import logger from "../../utils/logger";
+import { parsePagination } from "../../helpers/pagination.helper";
 
 // ─── Mock skin-analysis loader (dev) ────────────────────────────────────────
 
@@ -353,12 +354,8 @@ export default class SkinAnalysisService {
   }
 
   static async listForUser(userId: string, query: PaginationQuery = {}) {
-    const { page, limit } = query;
-    return SkinAnalysisRepo.findByUser(
-      userId,
-      page ? parseInt(String(page), 10) : 1,
-      limit ? parseInt(String(limit), 10) : 20
-    );
+    const { page, limit } = parsePagination(query);
+    return SkinAnalysisRepo.findByUser(userId, page, limit);
   }
 
   static async destroy(id: string, userId: string) {

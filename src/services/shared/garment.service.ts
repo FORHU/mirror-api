@@ -12,15 +12,15 @@ import {
 import FileService from "./file.service";
 import CacheUtil from "../../utils/cache.util";
 import { evaluateGarmentImage, GarmentEvaluation } from "../../utils/openai/evaluate-garment.util";
+import { parsePagination } from "../../helpers/pagination.helper";
 
 const GARMENT_CACHE_TTL = 1800; // 30 minutes — matches a typical user session
 const garmentKey = (id: string) => `garment:${id}`;
 
 export default class GarmentService {
   static async getGarments(query: Record<string, string | string[] | undefined>) {
+    const { page, limit } = parsePagination(query as any);
     const {
-      page,
-      limit,
       searchGarment,
       searchGarmentTags,
       garmentType,
@@ -104,8 +104,8 @@ export default class GarmentService {
 
     return GarmentRepo.findAll(
       filters,
-      page ? parseInt(page as string) : 1,
-      limit ? parseInt(limit as string) : 20,
+      page,
+      limit,
       pickStr(searchGarment),
       pickStr(searchGarmentTags)
     );

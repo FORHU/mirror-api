@@ -336,7 +336,7 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
   const audioBuffers: Buffer[] = [];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let engine: any = Engine.GENERATIVE;
+  let engine: any = Engine.NEURAL;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let voiceId: any = VoiceId.Matthew;
   let langCode = "en-US";

@@ -1,6 +1,8 @@
 import UserRepository from "../../repositories/user.repository";
 import { Prisma } from "@prisma/client";
 
+import { parsePagination } from "../../helpers/pagination.helper";
+
 export default class UserService {
   /**
    * Get user by ID
@@ -16,7 +18,8 @@ export default class UserService {
   /**
    * List users hehe
    */
-  static async listUsers(page?: number, limit?: number) {
+  static async listUsers(query: Record<string, string | undefined> = {}) {
+    const { page, limit } = parsePagination(query);
     return UserRepository.findAll(page, limit);
   }
 
