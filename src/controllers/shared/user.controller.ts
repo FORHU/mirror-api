@@ -34,7 +34,14 @@ export default class UserController {
       return responseSuccess(
         res,
         200,
-        buildPage(result.users, result.total, { page: result.page, limit: result.limit })
+        buildPage(result.users, result.total, {
+          page: result.page,
+          limit: result.limit,
+          sortBy: result.sortBy,
+          sortOrder: result.sortOrder,
+          search: result.search,
+          filters: result.filters,
+        })
       );
     } catch (error) {
       next(error);

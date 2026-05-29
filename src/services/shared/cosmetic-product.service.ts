@@ -36,7 +36,9 @@ export default class CosmeticProductService {
       filters.tags = Array.isArray(tags) ? tags : [tags];
     }
 
-    return CosmeticProductRepo.findAll(filters, page, limit);
+    const { sortBy, sortOrder, search, filters: parsedFilters } = parsePagination(query as any);
+    const result = await CosmeticProductRepo.findAll(filters, page, limit);
+    return { ...result, sortBy, sortOrder, search, filters: parsedFilters };
   }
 
   static async getProductById(id: string) {

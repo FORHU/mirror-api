@@ -47,6 +47,10 @@ export interface PaginationParams {
   page: number;
   limit: number;
   skip: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  search?: string;
+  filters?: Record<string, any>;
 }
 
 export interface PageResult<T> {
@@ -55,6 +59,10 @@ export interface PageResult<T> {
   page: number;
   limit: number;
   totalPages: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  search?: string;
+  filters?: Record<string, any>;
 }
 
 const DEFAULTS = { page: 1, limit: 20, maxLimit: 100 };
@@ -64,7 +72,7 @@ const DEFAULTS = { page: 1, limit: 20, maxLimit: 100 };
  * `{ page, limit, skip }` ready to hand to Prisma.
  */
 export function parsePagination(
-  query: { page?: string | number; limit?: string | number } | undefined | null,
+  query: Record<string, any> | undefined | null,
   opts: Partial<typeof DEFAULTS> = {}
 ): PaginationParams {
   const { page: defPage, limit: defLimit, maxLimit } = { ...DEFAULTS, ...opts };
@@ -75,7 +83,35 @@ export function parsePagination(
   const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : defPage;
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, maxLimit) : defLimit;
 
-  return { page, limit, skip: (page - 1) * limit };
+  let sortBy: string | undefined;
+  let sortOrder: "asc" | "desc" | undefined;
+  let search: string | undefined;
+  const filters: Record<string, any> = {};
+
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      if (key === "sortBy") {
+        sortBy = String(value);
+      } else if (key === "sortOrder") {
+        const lower = String(value).toLowerCase();
+        sortOrder = lower === "desc" ? "desc" : lower === "asc" ? "asc" : undefined;
+      } else if (key === "search") {
+        search = String(value);
+      } else if (key !== "page" && key !== "limit") {
+        filters[key] = value;
+      }
+    }
+  }
+
+  return {
+    page,
+    limit,
+    skip: (page - 1) * limit,
+    sortBy,
+    sortOrder,
+    search,
+    filters: Object.keys(filters).length ? filters : undefined,
+  };
 }
 
 /**
@@ -91,14 +127,25 @@ export function parsePagination(
 export function buildPage<T>(
   items: T[],
   total: number,
-  { page, limit }: { page: number; limit: number }
+  params: {
+    page: number;
+    limit: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    search?: string;
+    filters?: Record<string, any>;
+  }
 ): PageResult<T> {
   return {
     items,
     total,
-    page,
-    limit,
-    totalPages: limit > 0 ? Math.ceil(total / limit) : 0,
+    page: params.page,
+    limit: params.limit,
+    totalPages: params.limit > 0 ? Math.ceil(total / params.limit) : 0,
+    sortBy: params.sortBy,
+    sortOrder: params.sortOrder,
+    search: params.search,
+    filters: params.filters,
   };
 }
 
@@ -112,6 +159,17 @@ export function pageFromRepo<T>(result: {
   total: number;
   page: number;
   limit: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  search?: string;
+  filters?: Record<string, any>;
 }): PageResult<T> {
-  return buildPage(result.data, result.total, { page: result.page, limit: result.limit });
+  return buildPage(result.data, result.total, {
+    page: result.page,
+    limit: result.limit,
+    sortBy: result.sortBy,
+    sortOrder: result.sortOrder,
+    search: result.search,
+    filters: result.filters,
+  });
 }

@@ -32,16 +32,18 @@ export default class OutfitService {
     query: Record<string, string | undefined> = {}
   ) {
     const { searchOutfit, searchOutfitItems, systemOnly } = query;
-    const { page, limit } = parsePagination(query);
+    const { page, limit, search: globalSearch } = parsePagination(query);
     const effectiveUserId = systemOnly === "true" ? null : userId;
-    return OutfitRepo.findByUserId(
+    const result = await OutfitRepo.findByUserId(
       effectiveUserId,
       page,
       limit,
       {},
-      searchOutfit,
+      globalSearch || searchOutfit,
       searchOutfitItems
     );
+    const { sortBy, sortOrder, search, filters } = parsePagination(query);
+    return { ...result, sortBy, sortOrder, search, filters };
   }
 
   /**
@@ -53,8 +55,9 @@ export default class OutfitService {
     userId?: string,
     query: Record<string, string | undefined> = {}
   ) {
-    const { page, limit } = parsePagination(query);
-    return OutfitRepo.findByUserId(userId, page, limit, { fileProvider: "EXTERNAL" });
+    const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
+    const result = await OutfitRepo.findByUserId(userId, page, limit, { fileProvider: "EXTERNAL" });
+    return { ...result, sortBy, sortOrder, search, filters };
   }
 
   /**
@@ -65,8 +68,9 @@ export default class OutfitService {
     userId?: string,
     query: Record<string, string | undefined> = {}
   ) {
-    const { page, limit } = parsePagination(query);
-    return OutfitRepo.findByUserId(userId, page, limit, { fileProviderNot: "EXTERNAL" });
+    const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
+    const result = await OutfitRepo.findByUserId(userId, page, limit, { fileProviderNot: "EXTERNAL" });
+    return { ...result, sortBy, sortOrder, search, filters };
   }
 
   static async getOutfitById(id: string, userId?: string) {

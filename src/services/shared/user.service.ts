@@ -19,8 +19,9 @@ export default class UserService {
    * List users hehe
    */
   static async listUsers(query: Record<string, string | undefined> = {}) {
-    const { page, limit } = parsePagination(query);
-    return UserRepository.findAll(page, limit);
+    const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
+    const result = await UserRepository.findAll(page, limit);
+    return { ...result, sortBy, sortOrder, search, filters };
   }
 
   /**

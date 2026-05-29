@@ -354,8 +354,9 @@ export default class SkinAnalysisService {
   }
 
   static async listForUser(userId: string, query: PaginationQuery = {}) {
-    const { page, limit } = parsePagination(query);
-    return SkinAnalysisRepo.findByUser(userId, page, limit);
+    const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
+    const result = await SkinAnalysisRepo.findByUser(userId, page, limit);
+    return { ...result, sortBy, sortOrder, search, filters };
   }
 
   static async destroy(id: string, userId: string) {

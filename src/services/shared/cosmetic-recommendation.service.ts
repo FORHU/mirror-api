@@ -31,8 +31,9 @@ export default class CosmeticRecommendationService {
     query: Record<string, string | undefined> = {}
   ) {
     await assertOutlineOwned(outlineId, userId);
-    const { page, limit } = parsePagination(query);
-    return CosmeticRecommendationRepo.findByOutline(outlineId, page, limit);
+    const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
+    const result = await CosmeticRecommendationRepo.findByOutline(outlineId, page, limit);
+    return { ...result, sortBy, sortOrder, search, filters };
   }
 
   static async getById(id: string, userId: string) {

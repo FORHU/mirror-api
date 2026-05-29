@@ -19,7 +19,7 @@ const garmentKey = (id: string) => `garment:${id}`;
 
 export default class GarmentService {
   static async getGarments(query: Record<string, string | string[] | undefined>) {
-    const { page, limit } = parsePagination(query as any);
+    const { page, limit, search: globalSearch } = parsePagination(query as any);
     const {
       searchGarment,
       searchGarmentTags,
@@ -102,13 +102,15 @@ export default class GarmentService {
       filters.tags = { some: { name: Array.isArray(tag) ? tag[0] : tag } };
     }
 
-    return GarmentRepo.findAll(
+    const result = await GarmentRepo.findAll(
       filters,
       page,
       limit,
-      pickStr(searchGarment),
+      globalSearch || pickStr(searchGarment),
       pickStr(searchGarmentTags)
     );
+    const { sortBy, sortOrder, search, filters: parsedFilters } = parsePagination(query as any);
+    return { ...result, sortBy, sortOrder, search, filters: parsedFilters };
   }
 
   static async getGarmentById(id: string) {
