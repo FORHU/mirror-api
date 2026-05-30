@@ -79,10 +79,16 @@ jobs:
           ORS_API_KEY: ${{ secrets.ORS_API_KEY }}
           FASHN_API_KEY: ${{ secrets.FASHN_API_KEY }}
           FASHN_BASE_URL: ${{ secrets.FASHN_BASE_URL }}
+          FASHN_MODEL: ${{ secrets.FASHN_MODEL }}
           CHAT_WONDER_API_URL: ${{ secrets.CHAT_WONDER_API_URL }}
           BASE_URL: ${{ secrets.BASE_URL }}
           PORT: 3007
           THIRD_PARTY_API_KEY: ${{ secrets.THIRD_PARTY_API_KEY }}
+          REFRESH_TOKEN_EXPIRY: ${{ secrets.REFRESH_TOKEN_EXPIRY }}
+          KIOSK_DEVICE_SECRET: ${{ secrets.KIOSK_DEVICE_SECRET }}
+          FOURSQUARE_CLIENT_ID: ${{ secrets.FOURSQUARE_CLIENT_ID }}
+          FOURSQUARE_CLIENT_SECRET: ${{ secrets.FOURSQUARE_CLIENT_SECRET }}
+          FOURSQUARE_API_KEY: ${{ secrets.FOURSQUARE_API_KEY }}
           NODE_ENV: ${{ env.NODE_ENV }}
         run: |
           cat > ${{ github.workspace }}/mirror-api.env << EOF
@@ -107,11 +113,17 @@ jobs:
           ORS_API_KEY=${ORS_API_KEY}
           FASHN_API_KEY=${FASHN_API_KEY}
           FASHN_BASE_URL=${FASHN_BASE_URL}
+          FASHN_MODEL=${FASHN_MODEL}
           CHAT_WONDER_API_URL=${CHAT_WONDER_API_URL}
           BASE_URL=${BASE_URL}
           NODE_ENV=${{ env.NODE_ENV }}
           PORT=${PORT}
           THIRD_PARTY_API_KEY=${THIRD_PARTY_API_KEY}
+          REFRESH_TOKEN_EXPIRY=${REFRESH_TOKEN_EXPIRY}
+          KIOSK_DEVICE_SECRET=${KIOSK_DEVICE_SECRET}
+          FOURSQUARE_CLIENT_ID=${FOURSQUARE_CLIENT_ID}
+          FOURSQUARE_CLIENT_SECRET=${FOURSQUARE_CLIENT_SECRET}
+          FOURSQUARE_API_KEY=${FOURSQUARE_API_KEY}
           EOF
 
       - name: Copy env file to EC2
