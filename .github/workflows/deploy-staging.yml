@@ -86,9 +86,7 @@ jobs:
           THIRD_PARTY_API_KEY: ${{ secrets.THIRD_PARTY_API_KEY }}
           REFRESH_TOKEN_EXPIRY: ${{ secrets.REFRESH_TOKEN_EXPIRY }}
           KIOSK_DEVICE_SECRET: ${{ secrets.KIOSK_DEVICE_SECRET }}
-          FOURSQUARE_CLIENT_ID: ${{ secrets.FOURSQUARE_CLIENT_ID }}
-          FOURSQUARE_CLIENT_SECRET: ${{ secrets.FOURSQUARE_CLIENT_SECRET }}
-          FOURSQUARE_API_KEY: ${{ secrets.FOURSQUARE_API_KEY }}
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
           NODE_ENV: ${{ env.NODE_ENV }}
         run: |
           cat > ${{ github.workspace }}/mirror-api.env << EOF
@@ -121,9 +119,7 @@ jobs:
           THIRD_PARTY_API_KEY=${THIRD_PARTY_API_KEY}
           REFRESH_TOKEN_EXPIRY=${REFRESH_TOKEN_EXPIRY}
           KIOSK_DEVICE_SECRET=${KIOSK_DEVICE_SECRET}
-          FOURSQUARE_CLIENT_ID=${FOURSQUARE_CLIENT_ID}
-          FOURSQUARE_CLIENT_SECRET=${FOURSQUARE_CLIENT_SECRET}
-          FOURSQUARE_API_KEY=${FOURSQUARE_API_KEY}
+          GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY}
           EOF
 
       - name: Copy env file to EC2

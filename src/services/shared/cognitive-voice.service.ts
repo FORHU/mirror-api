@@ -114,6 +114,12 @@ Map Route Actions:
 - "traffic_on" → enable traffic overlay
 - "traffic_off" → disable traffic overlay
 - "set_profile" → change travel mode. payload: "profile": "car"|"motorcycle"|"bicycle"|"walking"
+- "maps_suggest_places" → show nearby POI suggestions on the map. payload: "category": "food"|"coffee"|"activities"|"shopping"|"medical"|"transit", "label": short display label string (e.g. "Nearby Restaurants").
+
+POI Suggestion Follow-up Rule:
+- EVERY TIME you emit a "maps_show_route" action, you MUST end the "reply" with a natural follow-up question asking if the user wants nearby suggestions. Keep it short and spoken — e.g. "Route set to [destination]. Want me to suggest what's nearby?" or "Heading to [destination] — should I find you some nearby spots?" Vary the phrasing naturally.
+- When the user says yes (or "sure", "go ahead", "show me", "yes please"), emit a "maps_suggest_places" action with the most appropriate category based on context. If no category is clear, default to "food".
+- When the user says no (or "no thanks", "skip it", "not now"), reply briefly and do nothing (action: null).
 
 Calendar Actions:
 - "calendar_save_event" → save an event. payload: "title", "eventType", "dateTime", "location"
@@ -124,7 +130,7 @@ User Actions:
 - "none" → uncertain, ask a follow-up question.
 
 Confirmation Rules:
-- CRITICAL: Map Route Actions ("maps_show_route", "maps_clear_route", "maps_camera_overview", "maps_camera_free") NEVER require confirmation. Always set "requiresConfirmation": false for these intents.
+- CRITICAL: Map Route Actions ("maps_show_route", "maps_clear_route", "maps_camera_overview", "maps_camera_free", "maps_suggest_places") NEVER require confirmation. Always set "requiresConfirmation": false for these intents.
 - Set "requiresConfirmation": true ONLY when:
   - User is on /ai-recommendation-fashion or /ai-recommendation-cosmetic and tries to navigate away to a different section or map
   - User is on /authentication and tries to restart (navigate to "/")
