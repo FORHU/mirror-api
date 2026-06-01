@@ -23,6 +23,7 @@ import skinAnalysisRoute from "./shared/skin-analysis.route";
 // External Routes (3rd Party)
 import externalGarmentRoute from "./external/garment.route";
 import externalOutfitRoute from "./external/outfit.route";
+import externalCosmeticRoute from "./external/cosmetic.route";
 import { authenticateApiKey } from "../middleware/api-key.middleware";
 
 const router = express.Router();
@@ -67,5 +68,6 @@ router.use("/mirror/skin-analyses", skinAnalysisRoute);
 // External endpoints (3rd party access)
 router.use("/external/garments", authenticateApiKey, externalGarmentRoute);
 router.use("/external/outfits", authenticateApiKey, externalOutfitRoute);
+router.use("/external/cosmetics", authenticateApiKey, externalCosmeticRoute);
 
 export default router;

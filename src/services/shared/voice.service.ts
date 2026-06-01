@@ -35,14 +35,11 @@ export interface VoiceContext {
   lat?: number;
   lng?: number;
   trafficEnabled?: boolean;
-  isNavigating?: boolean;
+  isRouteActive?: boolean;
   profile?: string;
-  remainingDistance?: number;
-  remainingDuration?: number;
+  routeDistance?: number;
+  routeDuration?: number;
   destinationName?: string;
-  currentInstruction?: string;
-  nextManeuverDistance?: number;
-  nextInstruction?: string;
   currentTime?: string;
   currentDate?: string;
   schedules?: string;
@@ -157,8 +154,8 @@ function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo
       : null,
     ctx.currentPage ? `- Screen: ${ctx.currentPage}` : null,
     ctx.schedules ? `- Schedule: ${ctx.schedules}` : null,
-    ctx.isNavigating
-      ? `- Navigation: active | destination: ${ctx.destinationName ?? "unknown"} | distance: ${formatDistance(ctx.remainingDistance)} | ETA: ${formatDuration(ctx.remainingDuration)}`
+    ctx.isRouteActive
+      ? `- Route: active | destination: ${ctx.destinationName ?? "unknown"} | distance: ${formatDistance(ctx.routeDistance)} | ETA: ${formatDuration(ctx.routeDuration)} | profile: ${ctx.profile ?? "unknown"}`
       : null,
     ctx.staffClarification?.trim() ? `- Staff note: ${ctx.staffClarification.trim()}` : null,
     ctx.language ? `- Spoken Language: ${ctx.language}` : null,

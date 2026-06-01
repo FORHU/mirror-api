@@ -19,7 +19,7 @@ const garmentKey = (id: string) => `garment:${id}`;
 
 export default class GarmentService {
   static async getGarments(query: Record<string, string | string[] | undefined>) {
-    const { page, limit, search: globalSearch } = parsePagination(query as any);
+    const { page, limit, search: globalSearch } = parsePagination(query as Record<string, unknown>);
     const {
       searchGarment,
       searchGarmentTags,
@@ -109,7 +109,12 @@ export default class GarmentService {
       globalSearch || pickStr(searchGarment),
       pickStr(searchGarmentTags)
     );
-    const { sortBy, sortOrder, search, filters: parsedFilters } = parsePagination(query as any);
+    const {
+      sortBy,
+      sortOrder,
+      search,
+      filters: parsedFilters,
+    } = parsePagination(query as Record<string, unknown>);
     return { ...result, sortBy, sortOrder, search, filters: parsedFilters };
   }
 

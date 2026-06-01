@@ -69,7 +69,9 @@ export default class OutfitService {
     query: Record<string, string | undefined> = {}
   ) {
     const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
-    const result = await OutfitRepo.findByUserId(userId, page, limit, { fileProviderNot: "EXTERNAL" });
+    const result = await OutfitRepo.findByUserId(userId, page, limit, {
+      fileProviderNot: "EXTERNAL",
+    });
     return { ...result, sortBy, sortOrder, search, filters };
   }
 

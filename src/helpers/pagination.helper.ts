@@ -50,7 +50,7 @@ export interface PaginationParams {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   search?: string;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 }
 
 export interface PageResult<T> {
@@ -62,7 +62,7 @@ export interface PageResult<T> {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   search?: string;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 }
 
 const DEFAULTS = { page: 1, limit: 20, maxLimit: 100 };
@@ -72,7 +72,7 @@ const DEFAULTS = { page: 1, limit: 20, maxLimit: 100 };
  * `{ page, limit, skip }` ready to hand to Prisma.
  */
 export function parsePagination(
-  query: Record<string, any> | undefined | null,
+  query: Record<string, unknown> | undefined | null,
   opts: Partial<typeof DEFAULTS> = {}
 ): PaginationParams {
   const { page: defPage, limit: defLimit, maxLimit } = { ...DEFAULTS, ...opts };
@@ -86,7 +86,7 @@ export function parsePagination(
   let sortBy: string | undefined;
   let sortOrder: "asc" | "desc" | undefined;
   let search: string | undefined;
-  const filters: Record<string, any> = {};
+  const filters: Record<string, unknown> = {};
 
   if (query) {
     for (const [key, value] of Object.entries(query)) {
@@ -133,7 +133,7 @@ export function buildPage<T>(
     sortBy?: string;
     sortOrder?: "asc" | "desc";
     search?: string;
-    filters?: Record<string, any>;
+    filters?: Record<string, unknown>;
   }
 ): PageResult<T> {
   return {
@@ -162,7 +162,7 @@ export function pageFromRepo<T>(result: {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   search?: string;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 }): PageResult<T> {
   return buildPage(result.data, result.total, {
     page: result.page,

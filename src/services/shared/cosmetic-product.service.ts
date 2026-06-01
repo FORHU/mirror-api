@@ -9,7 +9,7 @@ const fileNotFound = () => ({ status: 400, message: "Referenced file (fileUrlId)
 export default class CosmeticProductService {
   static async getProducts(query: Record<string, string | undefined | string[]>) {
     const { type, brand, category, tags } = query;
-    const { page, limit } = parsePagination(query as any);
+    const { page, limit } = parsePagination(query as Record<string, unknown>);
 
     const filters: {
       type?: COSMETIC_TYPE;
@@ -36,7 +36,12 @@ export default class CosmeticProductService {
       filters.tags = Array.isArray(tags) ? tags : [tags];
     }
 
-    const { sortBy, sortOrder, search, filters: parsedFilters } = parsePagination(query as any);
+    const {
+      sortBy,
+      sortOrder,
+      search,
+      filters: parsedFilters,
+    } = parsePagination(query as Record<string, unknown>);
     const result = await CosmeticProductRepo.findAll(filters, page, limit);
     return { ...result, sortBy, sortOrder, search, filters: parsedFilters };
   }

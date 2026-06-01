@@ -8,13 +8,12 @@ import type { VoiceContext } from "./voice.service";
 
 export type CognitiveIntent =
   | "navigate"
-  | "maps_navigate"
-  | "maps_preview_location"
-  | "maps_get_directions"
+  | "maps_show_route"
+  | "maps_clear_route"
+  | "maps_camera_overview"
+  | "maps_camera_free"
   | "traffic_on"
   | "traffic_off"
-  | "traffic_route"
-  | "stop_navigation"
   | "set_profile"
   | "calendar_save_event"
   | "select_gender"
@@ -106,15 +105,14 @@ const INTENT_RULES = `Intent and Action decision rules:
 
 Navigation Actions (use when user wants to go somewhere in the app):
 - "navigate" → app screen navigation. payload must include "route": one of "/", "/select-gender", "/authentication", "/ai-recommendation-fashion", "/ai-recommendation-cosmetic", "/map", "/overview", "/virtual-mirror"
-- "maps_navigate" → physical map navigation to a real destination. payload must include "destination": place name string.
-- "maps_preview_location" → show a place on the map without routing. payload includes "query", "label".
-- "maps_get_directions" → get directions to a place. payload includes "destination", "mode".
 
-Map Control Actions:
-- "traffic_on" → enable traffic layer
-- "traffic_off" → disable traffic layer  
-- "traffic_route" → find best route avoiding traffic
-- "stop_navigation" → stop active navigation
+Map Route Actions:
+- "maps_show_route" → show route to a destination. payload: "destination": place name string.
+- "maps_clear_route" → clear the current route and return to explore view. payload: {}.
+- "maps_camera_overview" → fit the full route into view ("zoom out", "show full route"). payload: {}.
+- "maps_camera_free" → zoom into the destination area ("zoom in", "focus on destination"). payload: {}.
+- "traffic_on" → enable traffic overlay
+- "traffic_off" → disable traffic overlay
 - "set_profile" → change travel mode. payload: "profile": "car"|"motorcycle"|"bicycle"|"walking"
 
 Calendar Actions:
@@ -235,8 +233,8 @@ function buildCognitiveQuery(transcript: string, ctx: VoiceContext, weatherInfo:
     ctx.currentPage ? `- Current screen: ${ctx.currentPage}` : null,
     ctx.schedules ? `- Schedule: ${ctx.schedules}` : null,
     ctx.mode ? `- Mode flag: ${ctx.mode}` : null,
-    ctx.isNavigating
-      ? `- Navigation: active | destination: ${ctx.destinationName ?? "unknown"} | distance: ${formatDistance(ctx.remainingDistance)} | ETA: ${formatDuration(ctx.remainingDuration)}`
+    ctx.isRouteActive
+      ? `- Route: active | destination: ${ctx.destinationName ?? "unknown"} | distance: ${formatDistance(ctx.routeDistance)} | ETA: ${formatDuration(ctx.routeDuration)} | profile: ${ctx.profile ?? "unknown"}`
       : null,
     ctx.eventPlan && ctx.eventPlan.length > 0
       ? `- Planned Events: ${JSON.stringify(ctx.eventPlan)}`
