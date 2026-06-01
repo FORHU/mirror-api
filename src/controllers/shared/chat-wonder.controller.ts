@@ -5,6 +5,7 @@ import { streamChat } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
 import { parseChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
 import { resolveItineraryCosmetics } from "../../utils/chat-wonder-cosmetics.util";
+import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
 import { emitToKiosk } from "../../utils/socket.util";
 import { prisma } from "../../utils/prisma";
 import logger from "../../utils/logger";
@@ -12,10 +13,27 @@ import { responseError } from "../../helpers/response.helper";
 
 export default class ChatWonderController {
   /**
+   * Retrieves or generates a ChatWonder session ID for the user.
+   */
+  static async getSessionId(req: Request, res: Response) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) {
+      return responseError(res, 401, "Unauthorized");
+    }
+
+    try {
+      const sessionId = await ChatWonderService.generateChatSessionId(userId);
+      return res.json({ status: "success", data: { sessionId } });
+    } catch (err) {
+      logger.error(`[ChatWonderController] getSessionId error: ${(err as Error).message}`);
+      return responseError(res, 500, (err as Error).message || "Internal server error");
+    }
+  }
+
+  /**
    * Handles streaming chat requests using Server-Sent Events (SSE).
    */
   static async streamChat(req: Request, res: Response) {
-    const { input, conversationId: inputConversationId, personas, kioskId } = req.body;
     const userId = (req as Request & { user?: { id: string } }).user?.id;
 
     if (!userId) {
@@ -23,8 +41,12 @@ export default class ChatWonderController {
     }
 
     const schema = Joi.object({
-      input: Joi.string().min(1).max(500).required(),
+      input: Joi.string().min(1).max(500).optional(),
+      user_input: Joi.string().min(1).max(500).optional(),
       conversationId: Joi.string().optional(),
+      session_id: Joi.string().optional(),
+      type: Joi.string().optional(),
+      weather: Joi.object().optional(),
       personas: Joi.object({
         system: Joi.string().optional().allow(null, ""),
         fashion: Joi.string().optional().allow(null, ""),
@@ -32,12 +54,18 @@ export default class ChatWonderController {
         maps: Joi.string().optional().allow(null, ""),
       }).optional(),
       kioskId: Joi.string().optional(),
-    });
+    }).or("input", "user_input"); // Require at least one of these
 
-    const { error } = schema.validate(req.body);
+    const { error, value } = schema.validate(req.body, { allowUnknown: true });
     if (error) {
       return responseError(res, 400, error.message);
     }
+
+    const input = value.input || value.user_input;
+    const inputConversationId = value.conversationId; // Note: session_id is a different Forhu AI concept, we keep conversationId logic
+    const personas = value.personas;
+    const kioskId = value.kioskId;
+    const frontendWeather = value.weather;
 
     try {
       // 1. Ensure conversation exists
@@ -54,7 +82,11 @@ export default class ChatWonderController {
       const userMessage = await ChatWonderService.saveUserMessage(userId, conversationId, input);
 
       // 4. Build user wardrobe & weather context for prompt enrichment
-      const userContext = await ChatWonderService.buildUserContext(userId, conversationId);
+      const userContext = await ChatWonderService.buildUserContext(
+        userId,
+        conversationId,
+        frontendWeather
+      );
 
       // 5. Prepare prompt for external API
       const wrappedInput = await ChatWonderService.getAdditionalPrompt(
@@ -86,11 +118,14 @@ export default class ChatWonderController {
             const parsed = parseChatWonderResponse(cleaned);
 
             // Enrich the itinerary events with resolved physical database products
-            const enrichedEvents = await resolveItineraryCosmetics(
+            let enrichedEvents = await resolveItineraryCosmetics(
               userId,
               parsed.events,
               conversationId
             );
+
+            // Enrich the itinerary events with resolved physical map coordinates
+            enrichedEvents = await resolveItineraryLocations(userId, enrichedEvents);
 
             // Check if user input contains finalization keywords to save/finalize the plan draft
             const isFinalization =

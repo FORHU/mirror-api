@@ -159,8 +159,13 @@ Respond ONLY with valid JSON matching this schema:
   },
   "emotion": "neutral" | "excited" | "urgent" | "curious" | "relaxed" | "frustrated",
   "action": {
-    "type": "<action type from the list above>",
-    "payload": { <action-specific fields> }
+    "type": "<action type>",
+    "payload": { 
+      "route": "<optional route>",
+      "destination": "<optional destination>",
+      "suggestion": "<garment or outfit (for fashion)>",
+      "gender": "<optional gender>"
+    }
   } | null,
   "followUpQuestion": "<optional clarifying question or null>",
   "requiresConfirmation": false | true,

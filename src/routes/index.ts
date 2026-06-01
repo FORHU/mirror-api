@@ -19,6 +19,7 @@ import outlineRoute from "./shared/outline.route";
 import cosmeticProductRoute from "./shared/cosmetic-product.route";
 import cosmeticRecommendationRoute from "./shared/cosmetic-recommendation.route";
 import skinAnalysisRoute from "./shared/skin-analysis.route";
+import sharedGeocodeRoute from "./shared/geocode.route";
 
 // External Routes (3rd Party)
 import externalGarmentRoute from "./external/garment.route";
@@ -50,6 +51,7 @@ router.use("/remote/cosmetic-products", cosmeticProductRoute);
 router.use("/remote/cosmetic-recommendations", cosmeticRecommendationRoute);
 router.use("/remote/skin-analyses", skinAnalysisRoute);
 router.use("/remote/chat-wonder", chatWonderRoute);
+router.use("/remote/geocode", sharedGeocodeRoute);
 
 // Mirror endpoints
 router.use("/mirror/try-on", mirrorTryOnRoute);
@@ -64,6 +66,7 @@ router.use("/mirror/outlines", outlineRoute);
 router.use("/mirror/cosmetic-products", cosmeticProductRoute);
 router.use("/mirror/cosmetic-recommendations", cosmeticRecommendationRoute);
 router.use("/mirror/skin-analyses", skinAnalysisRoute);
+router.use("/mirror/geocode", sharedGeocodeRoute);
 
 // External endpoints (3rd party access)
 router.use("/external/garments", authenticateApiKey, externalGarmentRoute);

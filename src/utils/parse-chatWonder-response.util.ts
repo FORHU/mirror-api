@@ -17,6 +17,11 @@ export interface RoutePlan {
   suggestion: string;
   origin?: string;
   destination?: string;
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+  address?: string;
+  map_error?: string;
   [key: string]: unknown;
 }
 

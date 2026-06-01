@@ -80,7 +80,8 @@ export default class ChatWonderService {
    */
   static async buildUserContext(
     userId: string,
-    conversationId?: string
+    conversationId?: string,
+    frontendWeather?: Record<string, any>
   ): Promise<{
     garments: string;
     outfits: string;
@@ -123,10 +124,16 @@ export default class ChatWonderService {
       logger.warn(`[ChatWonderService] buildUserContext outfits error: ${(e as Error).message}`);
     }
 
-    // --- Weather from linked UserOutline ---
+    // --- Weather from frontend or linked UserOutline ---
     let weatherBlock = "No weather data available.";
     try {
-      if (conversationId) {
+      if (frontendWeather && Object.keys(frontendWeather).length > 0) {
+        // Prioritize live frontend weather data
+        weatherBlock =
+          `Temperature: ${frontendWeather.temperature_c}°C | Precipitation: ${frontendWeather.precipitation_mm}mm | ` +
+          `Condition: ${frontendWeather.description}\n` +
+          `Weather Tags: ${frontendWeather.is_cold ? "Cold" : ""} ${frontendWeather.is_hot ? "Hot" : ""} ${frontendWeather.is_rainy ? "Rainy" : ""}`;
+      } else if (conversationId) {
         const outline = await prisma.userOutline.findUnique({
           where: { conversationId },
           include: { weather: true },
