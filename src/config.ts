@@ -47,9 +47,7 @@ export const ORS_API_KEY = process.env.ORS_API_KEY || "";
 
 export const THIRD_PARTY_API_KEY = process.env.THIRD_PARTY_API_KEY || "";
 
-export const FOURSQUARE_API_KEY = process.env.FOURSQUARE_API_KEY || "";
-export const FOURSQUARE_CLIENT_ID = process.env.FOURSQUARE_CLIENT_ID || "";
-export const FOURSQUARE_CLIENT_SECRET = process.env.FOURSQUARE_CLIENT_SECRET || "";
+export const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || "";
 
 export const isDev = NODE_ENV === "development";
 
