@@ -1,10 +1,8 @@
 import express from "express";
 
-// Remote Routes (Mobile Web)
-import remoteAuthRoute from "./remote/auth.route";
-import remoteUserRoute from "./shared/user.route";
-
 // Mirror Routes (Kiosk Web)
+import mirrorAuthRoute from "./remote/auth.route";
+import mirrorUserRoute from "./shared/user.route";
 import mirrorTryOnRoute from "./mirror/tryOn.route";
 import mirrorGarmentRoute from "./shared/garment.route";
 import mirrorOutfitRoute from "./shared/outfit.route";
@@ -39,19 +37,6 @@ router.get("/", (_, res) => {
 
 // TOP PRIORITY: Explicit route for companion app directions removed
 
-// Remote endpoints
-router.use("/remote/auth", remoteAuthRoute);
-router.use("/remote/users", remoteUserRoute);
-router.use("/remote/generation", mirrorGenerationRoute);
-router.use("/remote/file-uploads", mirrorFileUploadRoute);
-router.use("/remote/garments", mirrorGarmentRoute);
-router.use("/remote/outfits", mirrorOutfitRoute);
-router.use("/remote/outlines", outlineRoute);
-router.use("/remote/cosmetic-products", cosmeticProductRoute);
-router.use("/remote/cosmetic-recommendations", cosmeticRecommendationRoute);
-router.use("/remote/skin-analyses", skinAnalysisRoute);
-router.use("/remote/chat-wonder", chatWonderRoute);
-router.use("/remote/geocode", sharedGeocodeRoute);
 
 // Mirror endpoints
 router.use("/mirror/try-on", mirrorTryOnRoute);
@@ -67,6 +52,9 @@ router.use("/mirror/cosmetic-products", cosmeticProductRoute);
 router.use("/mirror/cosmetic-recommendations", cosmeticRecommendationRoute);
 router.use("/mirror/skin-analyses", skinAnalysisRoute);
 router.use("/mirror/geocode", sharedGeocodeRoute);
+router.use("/mirror/auth", mirrorAuthRoute);
+router.use("/mirror/users", mirrorUserRoute);
+router.use("/mirror/generation", mirrorGenerationRoute);
 
 // External endpoints (3rd party access)
 router.use("/external/garments", authenticateApiKey, externalGarmentRoute);

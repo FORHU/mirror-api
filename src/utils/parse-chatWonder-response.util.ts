@@ -3,12 +3,33 @@ import type { WeatherContext } from "./cosmetics.util";
 
 export interface OutfitPlan {
   suggestion: string;
+  resolved_products?: string[];
+  resolvedProducts?: ResolvedProduct[];
   tags?: string[];
+  [key: string]: unknown;
+}
+
+export interface ResolvedProduct {
+  id: string;
+  name?: string;
+  brand?: string | null;
+  details?: string | null;
+  type?: string | null;
+  spf?: number | null;
+  finish?: string | null;
+  hexColor?: string | null;
+  imageUrl?: string | null;
+  score?: number;
+  rank?: number;
+  reason?: string;
   [key: string]: unknown;
 }
 
 export interface CosmeticPlan {
   suggestion: string;
+  resolved_products?: string[];
+  resolvedProducts?: ResolvedProduct[];
+  reason?: string;
   tags?: string[];
   [key: string]: unknown;
 }
@@ -17,6 +38,8 @@ export interface RoutePlan {
   suggestion: string;
   origin?: string;
   destination?: string;
+  origin_lng?: string | number;
+  destination_lat?: string | number;
   lat?: number;
   lng?: number;
   placeId?: string;
@@ -31,12 +54,12 @@ export interface ChatWonderEvent {
   context: WeatherContext;
   fashion: OutfitPlan;
   cosmetics: CosmeticPlan;
-  route: RoutePlan;
+  map: RoutePlan;
 }
 
 export type AIIntent = "FASHION" | "COSMETIC" | "MAP" | "MENU" | "RESTART" | "NONE";
 
-export interface ChatWonderResponse {
+export interface ChatWonderParsedResponse {
   intent: AIIntent;
   message: string;
   outfit_suggestion: string | null;
@@ -45,13 +68,15 @@ export interface ChatWonderResponse {
   route_suggestion: string | null;
   images: { url: string; caption?: string }[];
   events: ChatWonderEvent[];
+  sets?: Record<string, unknown>[];
   raw: string;
+  isFallback?: boolean;
 }
 
 /**
  * Parse ChatWonder response (handles both JSON and markdown formats)
  */
-export function parseChatWonderResponse(rawResponse: string): ChatWonderResponse {
+export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedResponse {
   try {
     const trimmed = rawResponse.trim();
 
@@ -60,7 +85,7 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderResponse
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.message) {
+        if (parsed.message || parsed.sets || parsed.success) {
           // Support both new { data: { outfit, cosmetics, route } } and old flat fields
           const data = parsed.data ?? {};
           const outfitSuggestion =
@@ -85,15 +110,29 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderResponse
             intent = "MAP";
           }
 
+          let finalMessage = parsed.message ? parsed.message.replace(/[*_~`#]/g, "").trim() : "";
+
+          // Join the specialized suggestions into the main message block for the UI
+          if (outfitSuggestion && !finalMessage.includes(outfitSuggestion)) {
+            finalMessage += `\n\n[ garments ] ${outfitSuggestion}`;
+          }
+          if (cosmeticsSuggestion && !finalMessage.includes(cosmeticsSuggestion)) {
+            finalMessage += `\n\n[ cosmetics ] ${cosmeticsSuggestion}`;
+          }
+          if (routeSuggestion && !finalMessage.includes(routeSuggestion)) {
+            finalMessage += `\n\n[ map ] ${routeSuggestion}`;
+          }
+
           return {
             intent,
-            message: parsed.message.replace(/[*_~`#]/g, "").trim(),
+            message: finalMessage.trim(),
             outfit_suggestion: outfitSuggestion,
             mood: parsed.mood ?? null,
             cosmetics_suggestion: cosmeticsSuggestion,
             route_suggestion: routeSuggestion,
             images: Array.isArray(parsed.images) ? parsed.images : [],
             events: Array.isArray(parsed.events) ? parsed.events : [],
+            sets: Array.isArray(parsed.sets) ? parsed.sets : [],
             raw: rawResponse,
           };
         }

@@ -27,7 +27,7 @@ const itemSchema = Joi.object({
   layerLevel: Joi.string()
     .valid(...Object.values(LAYER_LEVEL))
     .optional(),
-});
+}).unknown(true);
 
 const outfitSchema = Joi.object({
   name: Joi.string().required(),
@@ -39,7 +39,8 @@ const outfitSchema = Joi.object({
     .optional(),
   fileId: Joi.string().optional(),
   file: Joi.object().optional(), // Manual file metadata
-});
+  metaData: Joi.alternatives().try(Joi.object(), Joi.string()).optional(),
+}).unknown(true);
 
 // PATCH variant: every field optional, no defaults. `items` is only touched
 // when the caller explicitly sends it — otherwise the repo leaves the
@@ -54,7 +55,8 @@ const outfitUpdateSchema = Joi.object({
     .optional(),
   fileId: Joi.string().optional(),
   file: Joi.object().optional(),
-});
+  metaData: Joi.alternatives().try(Joi.object(), Joi.string()).optional(),
+}).unknown(true);
 
 // Shared "AI passthrough" fields the caller can pre-fill on the AI flows.
 // Whatever's supplied here is honored verbatim by `pickProvided`.
@@ -77,11 +79,11 @@ const aiProvidedFields = {
 const evaluateSchema = Joi.object({
   ...aiProvidedFields,
   items: Joi.array().items(itemSchema).default([]),
-});
+}).unknown(true);
 
 const evaluateHybridSchema = Joi.object({
   ...aiProvidedFields,
-});
+}).unknown(true);
 
 export default class OutfitController {
   static async index(req: Request, res: Response, next: NextFunction) {
@@ -158,7 +160,7 @@ export default class OutfitController {
   private static prepareBody(body: Record<string, unknown>) {
     const cleaned = { ...body } as Record<string, unknown>;
 
-    const strictJsonFields = ["items", "file", "tags", "generate"];
+    const strictJsonFields = ["items", "file", "tags", "generate", "metaData"];
     for (const field of strictJsonFields) {
       if (typeof cleaned[field] === "string") {
         try {

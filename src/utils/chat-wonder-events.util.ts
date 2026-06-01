@@ -1,4 +1,6 @@
 import { prisma } from "./prisma";
+import type { WeatherContext } from "./cosmetics.util";
+import type { SKIN_TYPE } from "@prisma/client";
 import { ChatWonderEvent } from "./parse-chatWonder-response.util";
 export type { ChatWonderEvent };
 import logger from "./logger";
@@ -9,7 +11,7 @@ import logger from "./logger";
  * UserOutline to the active user's SkinAnalysis scan dynamically, and persisting
  * ItineraryEvent and CosmeticRecommendation records under the active draft.
  */
-export async function resolveItineraryCosmetics(
+export async function resolveItineraryEvents(
   userId: string,
   events: ChatWonderEvent[],
   conversationId: string
@@ -93,7 +95,7 @@ export async function resolveItineraryCosmetics(
       }
 
       logger.info(
-        `[resolveItineraryCosmetics] Event: ${event.type} in ${event.timeBlock} persisted with ${event.cosmetics?.resolvedProducts?.length || 0} pre-resolved products from ChatWonder.`
+        `[resolveItineraryEvents] Event: ${event.type} in ${event.timeBlock} persisted with ${event.cosmetics?.resolvedProducts?.length || 0} cosmetics and ${event.fashion?.resolvedProducts?.length || 0} garments.`
       );
     }
 
@@ -101,7 +103,7 @@ export async function resolveItineraryCosmetics(
     return events;
   } catch (error) {
     logger.error(
-      `[resolveItineraryCosmetics] Error during resolution: ${(error as Error).message}`
+      `[resolveItineraryEvents] Error during resolution: ${(error as Error).message}`
     );
     return events;
   }

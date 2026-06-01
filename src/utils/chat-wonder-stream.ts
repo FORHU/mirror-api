@@ -14,7 +14,8 @@ export async function streamChat(
   persona: string | undefined,
   callbacks: StreamCallbacks,
   documentContext: string = "",
-  userHistorySelect: string = ""
+  userHistorySelect: string = "",
+  weather: Record<string, unknown> = {}
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!CHAT_WONDER_API_URL) {
@@ -22,6 +23,17 @@ export async function streamChat(
       callbacks.onError(error);
       return reject(error);
     }
+
+    let completed = false;
+    const safeComplete = () => {
+      if (completed) return;
+      completed = true;
+      try {
+        callbacks.onComplete();
+      } catch (e) {
+        // Ignore if already completed
+      }
+    };
 
     const wsUrl = CHAT_WONDER_API_URL.replace("http://", "ws://").replace("https://", "wss://");
     const wsEndpoint = `${wsUrl}/chat-stream`;
@@ -33,46 +45,95 @@ export async function streamChat(
     ws.on("open", () => {
       logger.info("[CHAT-WONDER-STREAM] WebSocket connected");
 
+      const { PromptBuilder } = require("../ai/prompt/prompt.builder");
+      
+      const builtPrompt = PromptBuilder.build({
+        input: userInput,
+        persona,
+        context: {
+          weather,
+          document_context: documentContext,
+        },
+        history: userHistorySelect,
+      });
+
       const payload = {
-        user_input: userInput,
-        user_history_select: userHistorySelect,
         session_id: sessionId,
-        document_context: documentContext,
+        system: builtPrompt.system,
+        user_input: builtPrompt.user,
+        context: builtPrompt.context,
       };
       logger.info(
-        `[CHAT-WONDER-STREAM] user payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "...", document_context: payload.document_context ? `[${payload.document_context.split("\n").length} lines]` : "" })}`
+        `[CHAT-WONDER-STREAM] user payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "..." })}`
       );
       ws.send(JSON.stringify(payload));
     });
 
     ws.on("message", (data: WebSocket.Data) => {
-      const message = data.toString();
+      const raw = data.toString();
 
-      if (message === "__END__") {
-        logger.info("[CHAT-WONDER-STREAM] Stream complete");
-        ws.close();
-        callbacks.onComplete();
-        resolve();
+      let msg: any;
+      try {
+        msg = JSON.parse(raw);
+      } catch {
+        // Fallback for backward compatibility with old backend formats
+        if (raw === "__END__") {
+          logger.info("[CHAT-WONDER-STREAM] Stream complete (legacy)");
+          safeComplete();
+          ws.close();
+          resolve();
+          return;
+        }
+
+        if (raw.startsWith("[Error]")) {
+          logger.error(`[CHAT-WONDER-STREAM] Error: ${raw}`);
+          const error = new Error(raw);
+          callbacks.onError(error);
+          ws.close();
+          reject(error);
+          return;
+        }
+
+        if (raw.startsWith("[Tool]")) {
+          logger.info(`[CHAT-WONDER-STREAM] Tool execution: ${raw}`);
+          return;
+        }
+
+        logger.info(`[CHAT-WONDER-STREAM] Received chunk (${raw.length} chars) (legacy)`);
+        callbacks.onChunk(raw);
         return;
       }
 
-      if (message.startsWith("[Error]")) {
-        logger.error(`[CHAT-WONDER-STREAM] Error: ${message}`);
-        const error = new Error(message);
-        callbacks.onError(error);
-        ws.close();
-        reject(error);
-        return;
-      }
+      // JSON Protocol Parsing
+      switch (msg.type) {
+        case "chunk":
+          callbacks.onChunk(msg.data ?? raw);
+          break;
 
-      if (message.startsWith("[Tool]")) {
-        logger.info(`[CHAT-WONDER-STREAM] Tool execution: ${message}`);
-        return;
-      }
+        case "tool":
+          logger.info(`[CHAT-WONDER-STREAM] Tool: ${msg.name}`);
+          break;
 
-      // Send chunk to frontend
-      logger.info(`[CHAT-WONDER-STREAM] Received chunk (${message.length} chars)`);
-      callbacks.onChunk(message);
+        case "end":
+          logger.info("[CHAT-WONDER-STREAM] Stream complete");
+          safeComplete();
+          ws.close();
+          resolve();
+          break;
+
+        case "error":
+          logger.error(`[CHAT-WONDER-STREAM] Error: ${msg.message}`);
+          callbacks.onError(new Error(msg.message));
+          ws.close();
+          reject(new Error(msg.message));
+          break;
+
+        default:
+          // External API sends JSON in an unrecognized format — treat the raw message as a chunk
+          logger.info(`[CHAT-WONDER-STREAM] Unrecognized JSON type "${msg.type ?? "none"}", treating as raw chunk`);
+          callbacks.onChunk(raw);
+          break;
+      }
     });
 
     ws.on("error", (error) => {
@@ -83,6 +144,9 @@ export async function streamChat(
 
     ws.on("close", () => {
       logger.info("[CHAT-WONDER-STREAM] WebSocket closed");
+      // Fallback: If the server closes the connection abruptly without sending __END__
+      safeComplete();
+      resolve();
     });
   });
 }

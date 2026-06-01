@@ -283,28 +283,19 @@ function parseCognitiveResponse(raw: string): CognitiveResponse {
     const parsed = JSON.parse(jsonMatch[0]);
     if (!parsed.reply) return fallback;
 
-    return {
-      reply: String(parsed.reply)
-        .replace(/[*_~`#]/g, "")
-        .trim(),
-      intent: {
-        primary: parsed.intent?.primary ?? "none",
-        secondary: parsed.intent?.secondary ?? null,
-        confidence: Number(parsed.intent?.confidence ?? 0),
-      },
-      emotion: parsed.emotion ?? "neutral",
-      action: parsed.action ?? null,
-      followUpQuestion: parsed.followUpQuestion ?? null,
-      requiresConfirmation: Boolean(parsed.requiresConfirmation),
-      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
-      memoryUpdates: parsed.memoryUpdates ?? {},
-      uiHints: {
-        overlay: parsed.uiHints?.overlay ?? null,
-        focus: parsed.uiHints?.focus ?? null,
-      },
-      events: Array.isArray(parsed.events) ? parsed.events : [],
-      raw,
-    };
+    const { CognitiveResponseSchema } = require("../../ai/schemas/chatwonder.schema");
+    const validated = CognitiveResponseSchema.safeParse(parsed);
+
+    if (!validated.success) {
+      logger.error(`[CognitiveVoiceService] Invalid AI schema: ${validated.error.message}`);
+      return fallback;
+    }
+
+    const data = validated.data;
+    data.raw = raw;
+    data.reply = data.reply.replace(/[*_~`#]/g, "").trim();
+
+    return data as CognitiveResponse;
   } catch (err) {
     logger.warn(
       `[CognitiveVoiceService] Failed to parse cognitive response: ${(err as Error).message}`

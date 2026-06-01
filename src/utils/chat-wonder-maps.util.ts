@@ -1,6 +1,6 @@
 import { ChatWonderEvent } from "./parse-chatWonder-response.util";
 import { mapService } from "../services/shared/map.service";
-import { prisma } from "./prisma";
+
 import logger from "./logger";
 
 /**
@@ -8,14 +8,10 @@ import logger from "./logger";
  * (e.g., "McDonald's, Cebu") into precise Lat/Lng coordinates.
  */
 export async function resolveItineraryLocations(
-  userId: string,
   events: ChatWonderEvent[]
 ): Promise<ChatWonderEvent[]> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { homeLocationLat: true, homeLocationLng: true },
-    });
+
 
     // Deep clone to avoid mutating original references just in case
     const enrichedEvents = JSON.parse(JSON.stringify(events)) as ChatWonderEvent[];
@@ -23,35 +19,39 @@ export async function resolveItineraryLocations(
     // Promise.all to geocode concurrently for maximum speed
     await Promise.all(
       enrichedEvents.map(async (event) => {
-        if (event.route && event.route.destination) {
+        if (event.map && event.map.destination) {
           try {
             logger.info(
-              `[ResolveItineraryLocations] Resolving location globally for: ${event.route.destination}`
+              `[ResolveItineraryLocations] Resolving location globally for: ${event.map.destination}`
             );
 
             // Use mapService.search which has no hardcoded proximity bias
-            const results = await mapService.search(event.route.destination);
+            const results = await mapService.search(event.map.destination);
 
             if (results && results.length > 0) {
               const bestMatch = results[0];
-              event.route.lat = bestMatch.center[1];
-              event.route.lng = bestMatch.center[0];
-              event.route.placeId = bestMatch.id;
-              event.route.address = bestMatch.place_name;
+              event.map.lat = bestMatch.center[1];
+              event.map.lng = bestMatch.center[0];
+              // Populate the new schema keys too
+              event.map.destination_lat = bestMatch.center[1];
+              event.map.origin_lng = bestMatch.center[0];
+              
+              event.map.placeId = bestMatch.id;
+              event.map.address = bestMatch.place_name;
               logger.info(
                 `[ResolveItineraryLocations] Successfully mapped to: ${bestMatch.place_name}`
               );
             } else {
               logger.warn(
-                `[ResolveItineraryLocations] No results found for ${event.route.destination}`
+                `[ResolveItineraryLocations] No results found for ${event.map.destination}`
               );
-              event.route.map_error = `I couldn't find the exact location for ${event.route.destination} on the map. Can you be more specific?`;
+              event.map.map_error = `I couldn't find the exact location for ${event.map.destination} on the map. Can you be more specific?`;
             }
           } catch (err) {
             logger.warn(
-              `[ResolveItineraryLocations] Failed to geocode ${event.route.destination}: ${(err as Error).message}`
+              `[ResolveItineraryLocations] Failed to geocode ${event.map.destination}: ${(err as Error).message}`
             );
-            event.route.map_error = `I had trouble finding ${event.route.destination} on the map. Can you be more specific?`;
+            event.map.map_error = `I had trouble finding ${event.map.destination} on the map. Can you be more specific?`;
           }
         }
       })

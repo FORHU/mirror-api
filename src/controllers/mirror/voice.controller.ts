@@ -4,7 +4,7 @@ import { cognitiveVoiceService } from "../../services/shared/cognitive-voice.ser
 import { CHAT_WONDER_API_URL } from "../../config";
 import { weatherService } from "../../services/shared/weather.service";
 import { mapService } from "../../services/shared/map.service";
-import { resolveItineraryCosmetics, ChatWonderEvent } from "../../utils/chat-wonder-cosmetics.util";
+import { resolveItineraryEvents, ChatWonderEvent } from "../../utils/chat-wonder-events.util";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import logger from "../../utils/logger";
@@ -86,7 +86,7 @@ export default class VoiceController {
           if (outline?.userId) {
             // 1. Resolve Events (Itinerary & Cosmetics Engine)
             if (response.events && response.events.length > 0) {
-              response.events = await resolveItineraryCosmetics(
+              let enrichedEvents = await resolveItineraryEvents(
                 outline.userId,
                 response.events as ChatWonderEvent[],
                 outline.conversationId || ""

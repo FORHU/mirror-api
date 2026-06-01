@@ -31,9 +31,9 @@ import { prisma } from "../../utils/prisma";
 import { streamChat } from "../../utils/chat-wonder-stream";
 import {
   parseChatWonderResponse,
-  type ChatWonderResponse,
+  type ChatWonderParsedResponse,
 } from "../../utils/parse-chatWonder-response.util";
-import { resolveItineraryCosmetics } from "../../utils/chat-wonder-cosmetics.util";
+import { resolveItineraryEvents, ChatWonderEvent } from "../../utils/chat-wonder-events.util";
 import logger from "../../utils/logger";
 import ChatRepository from "../../repositories/chat.repository";
 import WeatherSnapshotService from "./weather-snapshot.service";
@@ -261,7 +261,7 @@ async function askChatWonder(
   transcript: string,
   ctx: VoiceContext,
   weatherInfo: string
-): Promise<{ response: ChatWonderResponse; sessionId: string }> {
+): Promise<{ response: ChatWonderParsedResponse; sessionId: string }> {
   const query = buildChatWonderQuery(transcript, ctx, weatherInfo);
   const [sid, documentContext, userHistorySelect] = await Promise.all([
     getChatWonderSession(ctx.sessionId),
@@ -575,7 +575,7 @@ export const voiceService = {
           }
 
           if (enrichedEvents.length > 0) {
-            enrichedEvents = await resolveItineraryCosmetics(
+            enrichedEvents = await resolveItineraryEvents(
               outline.userId,
               aiResponse.events,
               resolvedConversationId
