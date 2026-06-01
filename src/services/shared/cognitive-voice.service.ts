@@ -378,41 +378,55 @@ export const cognitiveVoiceService = {
     // NOTE: catalog is intentionally NOT injected here — cognitive service only
     // handles navigation intent. Product matching runs after navigation in resolveItineraryCosmetics.
     const userHistorySelect = await (ctx.userOutlineId
-      ? prisma.userOutline.findUnique({
-          where: { id: ctx.userOutlineId },
-          select: { conversationId: true },
-        }).then(async (outline) => {
-          if (!outline?.conversationId) return "";
-          const messages = await ChatRepository.getHistory(outline.conversationId, 6);
-          if (!messages.length) return "";
-          const history = messages
-            .reverse()
-            .map((m) => `${m.role === "USER" ? "User" : "Assistant"}: ${m.message}`)
-            .join("\n");
-          logger.info(`[CognitiveVoiceService] History injected: ${messages.length} messages`);
-          return history;
-        }).catch((err) => {
-          logger.warn(`[CognitiveVoiceService] Failed to fetch history: ${(err as Error).message}`);
-          return "";
-        })
+      ? prisma.userOutline
+          .findUnique({
+            where: { id: ctx.userOutlineId },
+            select: { conversationId: true },
+          })
+          .then(async (outline) => {
+            if (!outline?.conversationId) return "";
+            const messages = await ChatRepository.getHistory(outline.conversationId, 6);
+            if (!messages.length) return "";
+            const history = messages
+              .reverse()
+              .map((m) => `${m.role === "USER" ? "User" : "Assistant"}: ${m.message}`)
+              .join("\n");
+            logger.info(`[CognitiveVoiceService] History injected: ${messages.length} messages`);
+            return history;
+          })
+          .catch((err) => {
+            logger.warn(
+              `[CognitiveVoiceService] Failed to fetch history: ${(err as Error).message}`
+            );
+            return "";
+          })
       : Promise.resolve(""));
     const documentContext = "";
 
-    logger.info(`[CognitiveVoiceService] Using session: ${sid} | history turns: ${userHistorySelect ? userHistorySelect.split("\n").length : 0}`);
+    logger.info(
+      `[CognitiveVoiceService] Using session: ${sid} | history turns: ${userHistorySelect ? userHistorySelect.split("\n").length : 0}`
+    );
 
     let raw = "";
     try {
-      await streamChat(query, sid, "mirror", {
-        onChunk: (chunk) => {
-          raw += chunk;
+      await streamChat(
+        query,
+        sid,
+        "mirror",
+        {
+          onChunk: (chunk) => {
+            raw += chunk;
+          },
+          onComplete: () => {
+            /* stream complete */
+          },
+          onError: (err) => {
+            logger.error(`[CognitiveVoiceService] Stream error: ${err.message}`);
+          },
         },
-        onComplete: () => {
-          /* stream complete */
-        },
-        onError: (err) => {
-          logger.error(`[CognitiveVoiceService] Stream error: ${err.message}`);
-        },
-      }, documentContext, userHistorySelect);
+        documentContext,
+        userHistorySelect
+      );
     } catch (err) {
       logger.error(`[CognitiveVoiceService] Stream failed: ${(err as Error).message}`);
     }

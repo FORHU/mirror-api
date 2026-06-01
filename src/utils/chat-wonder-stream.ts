@@ -39,7 +39,9 @@ export async function streamChat(
         session_id: sessionId,
         document_context: documentContext,
       };
-      logger.info(`[CHAT-WONDER-STREAM] user payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "...", document_context: payload.document_context ? `[${payload.document_context.split("\n").length} lines]` : "" })}`);
+      logger.info(
+        `[CHAT-WONDER-STREAM] user payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "...", document_context: payload.document_context ? `[${payload.document_context.split("\n").length} lines]` : "" })}`
+      );
       ws.send(JSON.stringify(payload));
     });
 

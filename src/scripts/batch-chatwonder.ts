@@ -24,7 +24,9 @@ function extractS3Key(url: string | null | undefined): string | null {
 async function callChatWonder(frontKey: string, backKey: string | null) {
   const body: Record<string, string> = { front_s3_key: frontKey };
   if (backKey) body.back_s3_key = backKey;
-  const res = await axios.post(`${CHAT_WONDER_API_URL}/api/cosmetics/scan`, body, { timeout: 30_000 });
+  const res = await axios.post(`${CHAT_WONDER_API_URL}/api/cosmetics/scan`, body, {
+    timeout: 30_000,
+  });
   return res.data;
 }
 
@@ -46,7 +48,9 @@ async function main() {
     startIndex = (pageNum - 1) * BATCH_SIZE;
   }
   if (startIndex > 0) {
-    console.log(`⏩ Starting from index ${startIndex} (page ${Math.floor(startIndex / BATCH_SIZE) + 1})\n`);
+    console.log(
+      `⏩ Starting from index ${startIndex} (page ${Math.floor(startIndex / BATCH_SIZE) + 1})\n`
+    );
   }
   if (retryFailed) {
     console.log(`🔁 --retry-failed: failed entries will be re-queued.\n`);

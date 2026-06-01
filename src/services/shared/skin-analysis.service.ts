@@ -12,7 +12,12 @@ import {
 import { streamChat } from "../../utils/chat-wonder-stream";
 import ChatWonderService from "./chat-wonder.service";
 import axios from "axios";
-import { SKIN_ANALYSIS_ENABLED, CHAT_WONDER_API_URL, YOUCAM_API_KEY, YOUCAM_API_URL } from "../../config";
+import {
+  SKIN_ANALYSIS_ENABLED,
+  CHAT_WONDER_API_URL,
+  YOUCAM_API_KEY,
+  YOUCAM_API_URL,
+} from "../../config";
 import logger from "../../utils/logger";
 import { parsePagination } from "../../helpers/pagination.helper";
 
@@ -120,7 +125,9 @@ function getFallbackVision() {
 
 // ─── YouCam / PerfectCorp real API call ─────────────────────────────────────
 
-async function callYouCamApi(imageUrl: string): Promise<ReturnType<typeof parsePerfectCorpEntry> | null> {
+async function callYouCamApi(
+  imageUrl: string
+): Promise<ReturnType<typeof parsePerfectCorpEntry> | null> {
   if (!YOUCAM_API_KEY) {
     logger.warn("[SkinAnalysis] YOUCAM_API_KEY not set — cannot call real API");
     return null;
@@ -134,7 +141,7 @@ async function callYouCamApi(imageUrl: string): Promise<ReturnType<typeof parseP
       {
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${YOUCAM_API_KEY}`,
+          Authorization: `Bearer ${YOUCAM_API_KEY}`,
         },
         timeout: 15_000,
       }
@@ -153,7 +160,7 @@ async function callYouCamApi(imageUrl: string): Promise<ReturnType<typeof parseP
     for (let attempt = 0; attempt < 10; attempt++) {
       await new Promise((r) => setTimeout(r, 3_000));
       const pollRes = await axios.get(pollUrl, {
-        headers: { "Authorization": `Bearer ${YOUCAM_API_KEY}` },
+        headers: { Authorization: `Bearer ${YOUCAM_API_KEY}` },
         timeout: 10_000,
       });
 
@@ -198,9 +205,17 @@ async function buildSkinCatalogContext(): Promise<string> {
     const catalog = await prisma.cosmeticProduct.findMany({
       take: 50,
       select: {
-        id: true, name: true, brand: true, type: true, category: true,
-        benefits: true, tags: true, spf: true, finish: true,
-        priceAmount: true, priceUnit: true,
+        id: true,
+        name: true,
+        brand: true,
+        type: true,
+        category: true,
+        benefits: true,
+        tags: true,
+        spf: true,
+        finish: true,
+        priceAmount: true,
+        priceUnit: true,
         fileUrl: { select: { fileUrl: true, thumbnailUrl: true } },
       },
     });
@@ -221,7 +236,9 @@ async function buildSkinCatalogContext(): Promise<string> {
         ` | image:${imageUrl}`
       );
     });
-    logger.info(`[SkinAnalysis] Catalog injected into document_context: ${catalog.length} products`);
+    logger.info(
+      `[SkinAnalysis] Catalog injected into document_context: ${catalog.length} products`
+    );
     return `Available cosmetic products:\n${lines.join("\n")}`;
   } catch (err) {
     logger.warn(`[SkinAnalysis] Failed to build catalog context: ${(err as Error).message}`);
@@ -252,21 +269,29 @@ async function askChatWonderForSkinProducts(
     }
 
     const prompt = buildSkinPrompt(vision);
-    logger.info(`[SkinAnalysis] Sending skin profile to ChatWonder | session: ${sessionId} | catalog injected: ${documentContext ? "yes" : "no"}`);
+    logger.info(
+      `[SkinAnalysis] Sending skin profile to ChatWonder | session: ${sessionId} | catalog injected: ${documentContext ? "yes" : "no"}`
+    );
 
     let fullResponse = "";
 
-    await streamChat(prompt, sessionId, undefined, {
-      onChunk: (chunk) => {
-        fullResponse += chunk;
+    await streamChat(
+      prompt,
+      sessionId,
+      undefined,
+      {
+        onChunk: (chunk) => {
+          fullResponse += chunk;
+        },
+        onComplete: () => {
+          /* resolved by Promise */
+        },
+        onError: (err) => {
+          logger.warn(`[SkinAnalysis] ChatWonder stream error: ${err.message}`);
+        },
       },
-      onComplete: () => {
-        /* resolved by Promise */
-      },
-      onError: (err) => {
-        logger.warn(`[SkinAnalysis] ChatWonder stream error: ${err.message}`);
-      },
-    }, documentContext);
+      documentContext
+    );
 
     if (!fullResponse) {
       logger.warn("[SkinAnalysis] ChatWonder returned empty response");
@@ -415,7 +440,10 @@ export default class SkinAnalysisService {
     }
     if (ranked.length > 0) {
       logger.info(
-        `[SkinAnalysis] Top ranked: ${ranked.slice(0, 3).map((r) => `score:${r.score} id:${r.productId}`).join(" | ")}`
+        `[SkinAnalysis] Top ranked: ${ranked
+          .slice(0, 3)
+          .map((r) => `score:${r.score} id:${r.productId}`)
+          .join(" | ")}`
       );
     }
 

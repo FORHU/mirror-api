@@ -34,7 +34,8 @@ export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 export const CHAT_WONDER_API_URL = process.env.CHAT_WONDER_API_URL || "";
 
 export const YOUCAM_API_KEY = process.env.YOUCAM_API_KEY || "";
-export const YOUCAM_API_URL = process.env.YOUCAM_API_URL || "https://api.perfectcorp.com/s2b/v1.0/image/async/eai";
+export const YOUCAM_API_URL =
+  process.env.YOUCAM_API_URL || "https://api.perfectcorp.com/s2b/v1.0/image/async/eai";
 
 // Shared secret kiosk devices must present when calling `register_kiosk` over the socket.
 export const KIOSK_DEVICE_SECRET = process.env.KIOSK_DEVICE_SECRET || "";

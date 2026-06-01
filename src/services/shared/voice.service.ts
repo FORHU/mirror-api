@@ -197,9 +197,17 @@ async function buildCatalogContext(): Promise<string> {
     const catalog = await prisma.cosmeticProduct.findMany({
       take: 50,
       select: {
-        id: true, name: true, brand: true, type: true, category: true,
-        benefits: true, tags: true, spf: true, finish: true,
-        priceAmount: true, priceUnit: true,
+        id: true,
+        name: true,
+        brand: true,
+        type: true,
+        category: true,
+        benefits: true,
+        tags: true,
+        spf: true,
+        finish: true,
+        priceAmount: true,
+        priceUnit: true,
       },
     });
     if (!catalog.length) {
@@ -217,7 +225,9 @@ async function buildCatalogContext(): Promise<string> {
         ` | price:${p.priceAmount != null ? `${p.priceAmount} ${p.priceUnit ?? ""}`.trim() : "none"}`
       );
     });
-    logger.info(`[VoiceService] Catalog injected into document_context: ${catalog.length} products`);
+    logger.info(
+      `[VoiceService] Catalog injected into document_context: ${catalog.length} products`
+    );
     return `Available cosmetic products:\n${lines.join("\n")}`;
   } catch (err) {
     logger.warn(`[VoiceService] Failed to build catalog context: ${(err as Error).message}`);
@@ -269,20 +279,29 @@ async function askChatWonder(
     };
   }
 
-  logger.info(`[VoiceService] Using ChatWonder session: ${sid} | history turns: ${userHistorySelect ? userHistorySelect.split("\n").length : 0}`);
+  logger.info(
+    `[VoiceService] Using ChatWonder session: ${sid} | history turns: ${userHistorySelect ? userHistorySelect.split("\n").length : 0}`
+  );
   let raw = "";
   try {
-    await streamChat(query, sid, "mirror", {
-      onChunk: (chunk) => {
-        raw += chunk;
+    await streamChat(
+      query,
+      sid,
+      "mirror",
+      {
+        onChunk: (chunk) => {
+          raw += chunk;
+        },
+        onComplete: () => {
+          /* stream complete */
+        },
+        onError: (err) => {
+          logger.error(`[VoiceService] ChatWonder stream error: ${err.message}`);
+        },
       },
-      onComplete: () => {
-        /* stream complete */
-      },
-      onError: (err) => {
-        logger.error(`[VoiceService] ChatWonder stream error: ${err.message}`);
-      },
-    }, documentContext, userHistorySelect);
+      documentContext,
+      userHistorySelect
+    );
   } catch (err) {
     logger.error(`[VoiceService] ChatWonder failed: ${(err as Error).message}`);
     return {
