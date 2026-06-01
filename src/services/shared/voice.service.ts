@@ -33,7 +33,7 @@ import {
   parseChatWonderResponse,
   type ChatWonderParsedResponse,
 } from "../../utils/parse-chatWonder-response.util";
-import { resolveItineraryEvents, ChatWonderEvent } from "../../utils/chat-wonder-events.util";
+import { resolveItineraryEvents } from "../../utils/chat-wonder-events.util";
 import logger from "../../utils/logger";
 import ChatRepository from "../../repositories/chat.repository";
 import WeatherSnapshotService from "./weather-snapshot.service";

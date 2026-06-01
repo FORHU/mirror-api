@@ -43,8 +43,8 @@ export default class ChatWonderController {
     }
 
     const schema = Joi.object({
-      input: Joi.string().min(1).max(500).optional(),
-      user_input: Joi.string().min(1).max(500).optional(),
+      input: Joi.string().min(1).max(5000).optional(),
+      user_input: Joi.string().min(1).max(5000).optional(),
       conversationId: Joi.string().optional(),
       session_id: Joi.string().optional(),
       type: Joi.string().optional(),
@@ -65,7 +65,6 @@ export default class ChatWonderController {
 
     const input = value.input || value.user_input;
     const inputConversationId = value.conversationId; // Note: session_id is a different Forhu AI concept, we keep conversationId logic
-    const personas = value.personas;
     const kioskId = value.kioskId;
     const frontendWeather = value.weather;
 
@@ -86,10 +85,12 @@ export default class ChatWonderController {
       // 4. (Removed buildUserContext since AI has direct access)
 
       // 5. Generate strict JSON enforcement prompt to act as the "persona"
-      const user = await prisma.user.findUnique({ where: { id: userId }, select: { gender: true } });
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { gender: true },
+      });
       const gender = user?.gender ?? "FEMALE";
       const personaPrompt = ChatWonderService.getPersonaPrompt(input, gender);
-
 
       // 6. Set SSE headers
       res.setHeader("Content-Type", "text/event-stream");
@@ -210,7 +211,9 @@ export default class ChatWonderController {
               // This ensures the NEXT request uses a valid session without any extra overhead.
               // We do NOT retry inline here — that would double the response time.
               await CacheUtil.del(`chat:sessionId:${userId}`);
-              logger.info(`[ChatWonderController] Stale session cleared for user ${userId}. Pre-warming fresh session...`);
+              logger.info(
+                `[ChatWonderController] Stale session cleared for user ${userId}. Pre-warming fresh session...`
+              );
 
               // Fire-and-forget: fetch fresh session into cache so next call is instant
               ChatWonderService.generateChatSessionId(userId, true)
@@ -218,7 +221,9 @@ export default class ChatWonderController {
                 .catch((e) => logger.warn(`[ChatWonderController] Pre-warm failed: ${e.message}`));
 
               // Return a clean session_expired event so frontend can immediately retry
-              res.write(`data: ${JSON.stringify({ type: "error", code: "session_expired", message: "Session expired. Please resend your message." })}\n\n`);
+              res.write(
+                `data: ${JSON.stringify({ type: "error", code: "session_expired", message: "Session expired. Please resend your message." })}\n\n`
+              );
               res.end();
               return;
             }

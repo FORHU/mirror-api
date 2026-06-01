@@ -11,8 +11,6 @@ export async function resolveItineraryLocations(
   events: ChatWonderEvent[]
 ): Promise<ChatWonderEvent[]> {
   try {
-
-
     // Deep clone to avoid mutating original references just in case
     const enrichedEvents = JSON.parse(JSON.stringify(events)) as ChatWonderEvent[];
 
@@ -35,7 +33,7 @@ export async function resolveItineraryLocations(
               // Populate the new schema keys too
               event.map.destination_lat = bestMatch.center[1];
               event.map.origin_lng = bestMatch.center[0];
-              
+
               event.map.placeId = bestMatch.id;
               event.map.address = bestMatch.place_name;
               logger.info(

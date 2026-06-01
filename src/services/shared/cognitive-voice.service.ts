@@ -1,5 +1,6 @@
 import { streamChat } from "../../utils/chat-wonder-stream";
 import logger from "../../utils/logger";
+import { CognitiveResponseSchema } from "../../ai/schemas/chatwonder.schema";
 import type { VoiceContext } from "./voice.service";
 import { prisma } from "../../utils/prisma";
 import ChatRepository from "../../repositories/chat.repository";
@@ -289,7 +290,6 @@ function parseCognitiveResponse(raw: string): CognitiveResponse {
     const parsed = JSON.parse(jsonMatch[0]);
     if (!parsed.reply) return fallback;
 
-    const { CognitiveResponseSchema } = require("../../ai/schemas/chatwonder.schema");
     const validated = CognitiveResponseSchema.safeParse(parsed);
 
     if (!validated.success) {

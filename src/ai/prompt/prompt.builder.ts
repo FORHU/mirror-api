@@ -7,7 +7,7 @@ export class PromptBuilder {
   }: {
     input: string;
     persona?: string;
-    context?: any;
+    context?: Record<string, unknown>;
     history?: string;
   }) {
     return {

@@ -348,17 +348,24 @@ export default class MapController {
     if (error) return res.status(400).json({ error: error.message });
 
     try {
-      const pois = await googlePlacesService.nearbyPOIs(value.lat, value.lng, value.radius, value.category);
+      const pois = await googlePlacesService.nearbyPOIs(
+        value.lat,
+        value.lng,
+        value.radius,
+        value.category
+      );
       return res.json({ pois });
     } catch (err: any) {
       if (err.message === "GOOGLE_PLACES_KEY_MISSING") {
-        return res
-          .status(502)
-          .json({ error: "Google Places API key not configured. Set GOOGLE_PLACES_API_KEY in .env" });
+        return res.status(502).json({
+          error: "Google Places API key not configured. Set GOOGLE_PLACES_API_KEY in .env",
+        });
       }
       const upstreamStatus = err.response?.status;
       if (upstreamStatus && upstreamStatus >= 400) {
-        logger.error(`[MapController] Google Places nearbyPOIs failed: ${upstreamStatus} ${err.response?.data?.error?.message ?? err.message}`);
+        logger.error(
+          `[MapController] Google Places nearbyPOIs failed: ${upstreamStatus} ${err.response?.data?.error?.message ?? err.message}`
+        );
         return res.status(502).json({ error: "POI service unavailable", upstream: upstreamStatus });
       }
       next(err);

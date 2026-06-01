@@ -77,7 +77,11 @@ export async function resolveItineraryCosmetics(
         createdEventId = createdEvent.id;
 
         // B. Persist the CosmeticRecommendation rows directly from ChatWonder's resolvedProducts
-        if (event.cosmetics?.resolvedProducts && event.cosmetics.resolvedProducts.length && createdEventId) {
+        if (
+          event.cosmetics?.resolvedProducts &&
+          event.cosmetics.resolvedProducts.length &&
+          createdEventId
+        ) {
           await prisma.cosmeticRecommendation.createMany({
             data: event.cosmetics.resolvedProducts.map((r) => ({
               userOutlineId: outline.id, // 🛡️ Legacy master list link

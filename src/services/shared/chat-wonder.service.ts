@@ -4,7 +4,6 @@ import CacheUtil from "../../utils/cache.util";
 import axios from "axios";
 import ChatRepository from "../../repositories/chat.repository";
 
-
 export default class ChatWonderService {
   /**
    * Generates the appropriate strict JSON persona based on the user's intent tags.
@@ -82,6 +81,17 @@ If the user mentions a new event or location that is not part of their current c
       ]
     }
   ]
+}`;
+    }
+
+    if (input.includes("[ overview ]")) {
+      return `You are ChatWonder, a lifestyle assistant. The user is on the final Overview summary page and has finished selecting their fashion and cosmetics. Your job is to act as a conversational companion, praising and evaluating their excellent selections, and describing why those items are perfect for their day. Be genuinely kind, supportive, and uplifting—never criticize or roast their choices. Respond ONLY with VALID JSON matching exactly this schema, with no markdown formatting. Do NOT include unescaped line breaks inside the JSON string (use \\n if needed).
+
+{
+  "message": "Your conversational response praising and evaluating their choices",
+  "outfit_suggestion": null,
+  "cosmetics_suggestion": null,
+  "events": []
 }`;
     }
 

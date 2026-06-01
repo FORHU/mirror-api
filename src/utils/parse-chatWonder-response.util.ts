@@ -137,7 +137,25 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
           };
         }
       } catch (err) {
-        logger.warn("[Parser] JSON parse failed, falling back to markdown");
+        logger.warn(
+          `[Parser] JSON parse failed, falling back to markdown. Raw response was: ${rawResponse}`
+        );
+        // Attempt to salvage the "message" field if JSON is slightly malformed
+        const msgMatch = jsonMatch[0].match(/"message"\s*:\s*"([^"]+)"/);
+        if (msgMatch && msgMatch[1]) {
+          return {
+            intent: "NONE" as AIIntent,
+            message: msgMatch[1].replace(/\\n/g, "\n"),
+            outfit_suggestion: null,
+            mood: null,
+            cosmetics_suggestion: null,
+            route_suggestion: null,
+            images: [],
+            events: [],
+            sets: [],
+            raw: rawResponse,
+          };
+        }
       }
     }
 
@@ -150,7 +168,7 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
 
     return {
       intent: "NONE" as AIIntent,
-      message: fallbackText || "I'm here to help you.",
+      message: fallbackText || rawResponse,
       outfit_suggestion: null,
       mood: null,
       cosmetics_suggestion: null,
@@ -160,10 +178,12 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
       raw: rawResponse,
     };
   } catch (error) {
-    logger.error(`[Parser] Failed to parse response: ${(error as Error).message}`);
+    logger.error(
+      `[Parser] Failed to parse response: ${(error as Error).message}. Raw: ${rawResponse}`
+    );
     return {
       intent: "NONE" as AIIntent,
-      message: "I'm here to help you.",
+      message: rawResponse || "I'm here to help you.",
       outfit_suggestion: null,
       mood: null,
       cosmetics_suggestion: null,

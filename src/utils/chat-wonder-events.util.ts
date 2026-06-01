@@ -1,6 +1,4 @@
 import { prisma } from "./prisma";
-import type { WeatherContext } from "./cosmetics.util";
-import type { SKIN_TYPE } from "@prisma/client";
 import { ChatWonderEvent } from "./parse-chatWonder-response.util";
 export type { ChatWonderEvent };
 import logger from "./logger";
@@ -79,7 +77,11 @@ export async function resolveItineraryEvents(
         createdEventId = createdEvent.id;
 
         // B. Persist the CosmeticRecommendation rows directly from ChatWonder's resolvedProducts
-        if (event.cosmetics?.resolvedProducts && event.cosmetics.resolvedProducts.length && createdEventId) {
+        if (
+          event.cosmetics?.resolvedProducts &&
+          event.cosmetics.resolvedProducts.length &&
+          createdEventId
+        ) {
           await prisma.cosmeticRecommendation.createMany({
             data: event.cosmetics.resolvedProducts.map((r) => ({
               userOutlineId: outline.id, // 🛡️ Legacy master list link
@@ -102,9 +104,7 @@ export async function resolveItineraryEvents(
     // Return the events completely untouched, as ChatWonder already resolved everything!
     return events;
   } catch (error) {
-    logger.error(
-      `[resolveItineraryEvents] Error during resolution: ${(error as Error).message}`
-    );
+    logger.error(`[resolveItineraryEvents] Error during resolution: ${(error as Error).message}`);
     return events;
   }
 }

@@ -4,8 +4,13 @@ import { GOOGLE_PLACES_API_KEY } from "../../config";
 const BASE_URL = "https://places.googleapis.com/v1";
 
 const EXPLORE_TYPES = [
-  "restaurant", "cafe", "bar", "park",
-  "tourist_attraction", "museum", "shopping_mall",
+  "restaurant",
+  "cafe",
+  "bar",
+  "park",
+  "tourist_attraction",
+  "museum",
+  "shopping_mall",
 ];
 
 const CATEGORY_TO_TYPES: Record<string, string[]> = {
@@ -92,14 +97,17 @@ function buildPhotoUrl(photoName: string): string {
 }
 
 export const googlePlacesService = {
-  nearbyPOIs: async (lat: number, lng: number, radiusM = 1000, category?: string): Promise<PlacePOI[]> => {
+  nearbyPOIs: async (
+    lat: number,
+    lng: number,
+    radiusM = 1000,
+    category?: string
+  ): Promise<PlacePOI[]> => {
     if (!GOOGLE_PLACES_API_KEY) {
       throw new Error("GOOGLE_PLACES_KEY_MISSING");
     }
 
-    const includedTypes = category
-      ? (CATEGORY_TO_TYPES[category] ?? [category])
-      : EXPLORE_TYPES;
+    const includedTypes = category ? (CATEGORY_TO_TYPES[category] ?? [category]) : EXPLORE_TYPES;
 
     const response = await axios.post(
       `${BASE_URL}/places:searchNearby`,
@@ -132,7 +140,8 @@ export const googlePlacesService = {
       return {
         placeId: p.id,
         name: p.displayName?.text ?? "Place",
-        category: GOOGLE_TYPE_TO_CATEGORY[p.primaryType ?? ""] ?? p.primaryTypeDisplayName?.text ?? "Place",
+        category:
+          GOOGLE_TYPE_TO_CATEGORY[p.primaryType ?? ""] ?? p.primaryTypeDisplayName?.text ?? "Place",
         categoryIcon: "",
         lat: placeLat,
         lng: placeLng,

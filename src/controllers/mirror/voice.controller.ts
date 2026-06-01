@@ -86,7 +86,7 @@ export default class VoiceController {
           if (outline?.userId) {
             // 1. Resolve Events (Itinerary & Cosmetics Engine)
             if (response.events && response.events.length > 0) {
-              let enrichedEvents = await resolveItineraryEvents(
+              await resolveItineraryEvents(
                 outline.userId,
                 response.events as ChatWonderEvent[],
                 outline.conversationId || ""

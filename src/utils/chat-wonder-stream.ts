@@ -1,6 +1,15 @@
 import WebSocket from "ws";
 import { CHAT_WONDER_API_URL } from "../config";
 import logger from "./logger";
+import { PromptBuilder } from "../ai/prompt/prompt.builder";
+
+interface StreamMessage {
+  type?: string;
+  data?: string;
+  name?: string;
+  message?: string;
+  [key: string]: unknown;
+}
 
 export interface StreamCallbacks {
   onChunk: (chunk: string) => void;
@@ -45,8 +54,6 @@ export async function streamChat(
     ws.on("open", () => {
       logger.info("[CHAT-WONDER-STREAM] WebSocket connected");
 
-      const { PromptBuilder } = require("../ai/prompt/prompt.builder");
-      
       const builtPrompt = PromptBuilder.build({
         input: userInput,
         persona,
@@ -72,7 +79,7 @@ export async function streamChat(
     ws.on("message", (data: WebSocket.Data) => {
       const raw = data.toString();
 
-      let msg: any;
+      let msg: StreamMessage | null = null;
       try {
         msg = JSON.parse(raw);
       } catch {
@@ -104,6 +111,11 @@ export async function streamChat(
         return;
       }
 
+      if (!msg || typeof msg !== "object") {
+        logger.warn(`[CHAT-WONDER-STREAM] Received non-object JSON message: ${raw}`);
+        return;
+      }
+
       // JSON Protocol Parsing
       switch (msg.type) {
         case "chunk":
@@ -130,7 +142,9 @@ export async function streamChat(
 
         default:
           // External API sends JSON in an unrecognized format — treat the raw message as a chunk
-          logger.info(`[CHAT-WONDER-STREAM] Unrecognized JSON type "${msg.type ?? "none"}", treating as raw chunk`);
+          logger.info(
+            `[CHAT-WONDER-STREAM] Unrecognized JSON type "${msg.type ?? "none"}", treating as raw chunk`
+          );
           callbacks.onChunk(raw);
           break;
       }

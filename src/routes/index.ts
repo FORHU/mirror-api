@@ -37,7 +37,6 @@ router.get("/", (_, res) => {
 
 // TOP PRIORITY: Explicit route for companion app directions removed
 
-
 // Mirror endpoints
 router.use("/mirror/try-on", mirrorTryOnRoute);
 router.use("/mirror/garments", mirrorGarmentRoute);
