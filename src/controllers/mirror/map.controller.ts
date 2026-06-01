@@ -342,18 +342,25 @@ export default class MapController {
       lat: Joi.number().min(-90).max(90).required(),
       lng: Joi.number().min(-180).max(180).required(),
       radius: Joi.number().min(100).max(5000).default(1000),
+      category: Joi.string().optional(),
     });
-    const { error, value } = schema.validate(req.query);
+    const { error, value } = schema.validate(req.query, { allowUnknown: false });
     if (error) return res.status(400).json({ error: error.message });
 
     try {
-      const pois = await foursquareService.nearbyPOIs(value.lat, value.lng, value.radius);
+      const pois = await foursquareService.nearbyPOIs(value.lat, value.lng, value.radius, value.category);
       return res.json({ pois });
     } catch (err: any) {
       if (err.message === "FOURSQUARE_KEY_MISSING") {
         return res
           .status(502)
           .json({ error: "Foursquare API key not configured. Set FOURSQUARE_API_KEY in .env" });
+      }
+      // Don't leak Foursquare's raw 4xx/5xx — return 502 so frontend knows it's upstream
+      const upstreamStatus = err.response?.status;
+      if (upstreamStatus && upstreamStatus >= 400) {
+        logger.error(`[MapController] Foursquare nearbyPOIs failed: ${upstreamStatus} ${err.response?.data?.message ?? err.message}`);
+        return res.status(502).json({ error: "POI service unavailable", upstream: upstreamStatus });
       }
       next(err);
     }

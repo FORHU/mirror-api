@@ -38,7 +38,7 @@ function buildPhotoUrl(photo: FsqPhoto): string | null {
 }
 
 export const foursquareService = {
-  nearbyPOIs: async (lat: number, lng: number, radiusM = 1000): Promise<FoursquarePOI[]> => {
+  nearbyPOIs: async (lat: number, lng: number, radiusM = 1000, category?: string): Promise<FoursquarePOI[]> => {
     if (!FOURSQUARE_API_KEY || FOURSQUARE_API_KEY === "your_foursquare_api_key_here") {
       throw new Error("FOURSQUARE_KEY_MISSING");
     }
@@ -48,8 +48,9 @@ export const foursquareService = {
       params: {
         ll: `${lat},${lng}`,
         radius: radiusM,
-        categories: EXPLORE_CATEGORIES,
-        fields: "fsq_id,name,categories,geocodes,location,photos,distance",
+        categories: category ?? EXPLORE_CATEGORIES,
+        // "distance" is auto-included by Foursquare when ll is provided — not a valid field name
+        fields: "fsq_id,name,categories,geocodes,location,photos",
         limit: 15,
       },
     });
