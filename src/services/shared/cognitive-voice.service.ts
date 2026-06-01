@@ -1,6 +1,8 @@
 import { streamChat } from "../../utils/chat-wonder-stream";
 import logger from "../../utils/logger";
 import type { VoiceContext } from "./voice.service";
+import { prisma } from "../../utils/prisma";
+import ChatRepository from "../../repositories/chat.repository";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COGNITIVE RESPONSE TYPES
@@ -372,6 +374,32 @@ export const cognitiveVoiceService = {
 
     logger.debug(`[CognitiveVoiceService] Query:\n${query}`);
 
+    // Fetch conversation history so AI remembers prior turns
+    // NOTE: catalog is intentionally NOT injected here — cognitive service only
+    // handles navigation intent. Product matching runs after navigation in resolveItineraryCosmetics.
+    const userHistorySelect = await (ctx.userOutlineId
+      ? prisma.userOutline.findUnique({
+          where: { id: ctx.userOutlineId },
+          select: { conversationId: true },
+        }).then(async (outline) => {
+          if (!outline?.conversationId) return "";
+          const messages = await ChatRepository.getHistory(outline.conversationId, 6);
+          if (!messages.length) return "";
+          const history = messages
+            .reverse()
+            .map((m) => `${m.role === "USER" ? "User" : "Assistant"}: ${m.message}`)
+            .join("\n");
+          logger.info(`[CognitiveVoiceService] History injected: ${messages.length} messages`);
+          return history;
+        }).catch((err) => {
+          logger.warn(`[CognitiveVoiceService] Failed to fetch history: ${(err as Error).message}`);
+          return "";
+        })
+      : Promise.resolve(""));
+    const documentContext = "";
+
+    logger.info(`[CognitiveVoiceService] Using session: ${sid} | history turns: ${userHistorySelect ? userHistorySelect.split("\n").length : 0}`);
+
     let raw = "";
     try {
       await streamChat(query, sid, "mirror", {
@@ -384,7 +412,7 @@ export const cognitiveVoiceService = {
         onError: (err) => {
           logger.error(`[CognitiveVoiceService] Stream error: ${err.message}`);
         },
-      });
+      }, documentContext, userHistorySelect);
     } catch (err) {
       logger.error(`[CognitiveVoiceService] Stream failed: ${(err as Error).message}`);
     }

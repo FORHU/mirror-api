@@ -192,13 +192,72 @@ async function getChatWonderSession(sessionId?: string): Promise<string> {
   }
 }
 
+async function buildCatalogContext(): Promise<string> {
+  try {
+    const catalog = await prisma.cosmeticProduct.findMany({
+      take: 50,
+      select: {
+        id: true, name: true, brand: true, type: true, category: true,
+        benefits: true, tags: true, spf: true, finish: true,
+        priceAmount: true, priceUnit: true,
+      },
+    });
+    if (!catalog.length) {
+      logger.warn("[VoiceService] Catalog is empty — no products injected into document_context");
+      return "";
+    }
+    const lines = catalog.map((p) => {
+      const tags = Array.isArray(p.tags) ? (p.tags as string[]).join(",") : "";
+      const benefits = Array.isArray(p.benefits) ? (p.benefits as string[]).join(",") : "";
+      return (
+        `- [${p.id}] ${p.brand ?? ""} ${p.name}` +
+        ` | type:${p.type ?? "unknown"} | category:${p.category ?? "none"}` +
+        ` | finish:${p.finish ?? "none"} | spf:${p.spf ?? "none"}` +
+        ` | benefits:${benefits || "none"} | tags:${tags || "none"}` +
+        ` | price:${p.priceAmount != null ? `${p.priceAmount} ${p.priceUnit ?? ""}`.trim() : "none"}`
+      );
+    });
+    logger.info(`[VoiceService] Catalog injected into document_context: ${catalog.length} products`);
+    return `Available cosmetic products:\n${lines.join("\n")}`;
+  } catch (err) {
+    logger.warn(`[VoiceService] Failed to build catalog context: ${(err as Error).message}`);
+    return "";
+  }
+}
+
+async function buildConversationHistory(userOutlineId?: string): Promise<string> {
+  if (!userOutlineId) return "";
+  try {
+    const outline = await prisma.userOutline.findUnique({
+      where: { id: userOutlineId },
+      select: { conversationId: true },
+    });
+    if (!outline?.conversationId) return "";
+    const messages = await ChatRepository.getHistory(outline.conversationId, 6);
+    if (!messages.length) return "";
+    const history = messages
+      .reverse()
+      .map((m) => `${m.role === "USER" ? "User" : "Assistant"}: ${m.message}`)
+      .join("\n");
+    logger.info(`[VoiceService] Conversation history injected: ${messages.length} messages`);
+    return history;
+  } catch (err) {
+    logger.warn(`[VoiceService] Failed to fetch conversation history: ${(err as Error).message}`);
+    return "";
+  }
+}
+
 async function askChatWonder(
   transcript: string,
   ctx: VoiceContext,
   weatherInfo: string
 ): Promise<{ response: ChatWonderResponse; sessionId: string }> {
   const query = buildChatWonderQuery(transcript, ctx, weatherInfo);
-  const sid = await getChatWonderSession(ctx.sessionId);
+  const [sid, documentContext, userHistorySelect] = await Promise.all([
+    getChatWonderSession(ctx.sessionId),
+    buildCatalogContext(),
+    buildConversationHistory(ctx.userOutlineId),
+  ]);
   logger.debug(`query --------- ${query}`);
   if (!sid) {
     logger.error("[VoiceService] No ChatWonder session ID available — cannot stream chat");
@@ -210,7 +269,7 @@ async function askChatWonder(
     };
   }
 
-  logger.info(`[VoiceService] Using ChatWonder session: ${sid}`);
+  logger.info(`[VoiceService] Using ChatWonder session: ${sid} | history turns: ${userHistorySelect ? userHistorySelect.split("\n").length : 0}`);
   let raw = "";
   try {
     await streamChat(query, sid, "mirror", {
@@ -223,7 +282,7 @@ async function askChatWonder(
       onError: (err) => {
         logger.error(`[VoiceService] ChatWonder stream error: ${err.message}`);
       },
-    });
+    }, documentContext, userHistorySelect);
   } catch (err) {
     logger.error(`[VoiceService] ChatWonder failed: ${(err as Error).message}`);
     return {

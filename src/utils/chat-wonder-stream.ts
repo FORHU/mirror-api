@@ -12,7 +12,9 @@ export async function streamChat(
   userInput: string,
   sessionId: string,
   persona: string | undefined,
-  callbacks: StreamCallbacks
+  callbacks: StreamCallbacks,
+  documentContext: string = "",
+  userHistorySelect: string = ""
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!CHAT_WONDER_API_URL) {
@@ -33,11 +35,11 @@ export async function streamChat(
 
       const payload = {
         user_input: userInput,
-        user_history_select: "",
+        user_history_select: userHistorySelect,
         session_id: sessionId,
-        document_context: "",
+        document_context: documentContext,
       };
-      logger.info(`[CHAT-WONDER-STREAM] user payload: ${JSON.stringify(payload)}`);
+      logger.info(`[CHAT-WONDER-STREAM] user payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "...", document_context: payload.document_context ? `[${payload.document_context.split("\n").length} lines]` : "" })}`);
       ws.send(JSON.stringify(payload));
     });
 

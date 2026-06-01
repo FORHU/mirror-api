@@ -48,8 +48,9 @@ export type ScoredProduct = {
   signals: Record<string, number>; // contribution per rule, for debugging
 };
 
-const MIN_SCORE = 25; // products below this drop out
+const MIN_SCORE = 10; // products below this drop out
 const MAX_RESULTS = 10;
+const FALLBACK_RESULTS = 5; // if nothing passes MIN_SCORE, show top N anyway
 
 // Concern keyword → preference. Match is substring, case-insensitive.
 const CONCERN_RULES: Array<{
@@ -195,14 +196,17 @@ export function scoreProduct(
 }
 
 export function rankProducts(input: AnalysisInput, products: ProductForScoring[]): ScoredProduct[] {
-  const scored = products
+  const all = products
     .map((p) => {
       const { score, reason, signals } = scoreProduct(input, p);
       return { productId: p.id, score, reason, signals };
     })
-    .filter((s) => s.score >= MIN_SCORE)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, MAX_RESULTS);
+    .sort((a, b) => b.score - a.score);
 
-  return scored.map((s, i) => ({ ...s, rank: i + 1 }));
+  const passed = all.filter((s) => s.score >= MIN_SCORE).slice(0, MAX_RESULTS);
+
+  // Fallback: if nothing meets the threshold, return the highest-scoring products anyway
+  const result = passed.length > 0 ? passed : all.slice(0, FALLBACK_RESULTS);
+
+  return result.map((s, i) => ({ ...s, rank: i + 1 }));
 }

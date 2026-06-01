@@ -72,5 +72,6 @@ router.use("/mirror/geocode", sharedGeocodeRoute);
 router.use("/external/garments", authenticateApiKey, externalGarmentRoute);
 router.use("/external/outfits", authenticateApiKey, externalOutfitRoute);
 router.use("/external/cosmetics", authenticateApiKey, externalCosmeticRoute);
+router.use("/external/cosmetic-products", authenticateApiKey, externalCosmeticRoute);
 
 export default router;

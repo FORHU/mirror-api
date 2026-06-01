@@ -6,16 +6,36 @@ import { parsePagination } from "../../helpers/pagination.helper";
 
 const fileNotFound = () => ({ status: 400, message: "Referenced file (fileUrlId) does not exist" });
 
+const splitSearchTerms = (value: string) =>
+  value
+    .split(",")
+    .map((term) => term.trim())
+    .filter(Boolean);
+
 export default class CosmeticProductService {
   static async getProducts(query: Record<string, string | undefined | string[]>) {
     const { type, brand, category, tags } = query;
-    const { page, limit } = parsePagination(query as Record<string, unknown>);
+    const {
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      search,
+      filters: parsedFilters,
+    } = parsePagination(query as Record<string, unknown>);
+    const rawSearch =
+      typeof query.search === "string"
+        ? query.search
+        : typeof query.q === "string"
+          ? query.q
+          : undefined;
 
     const filters: {
       type?: COSMETIC_TYPE;
       brand?: string;
       category?: COSMETIC_CATEGORY;
       tags?: string[];
+      searchTerms?: string[];
     } = {};
     if (
       type &&
@@ -35,15 +55,12 @@ export default class CosmeticProductService {
     if (tags) {
       filters.tags = Array.isArray(tags) ? tags : [tags];
     }
+    if (rawSearch?.trim()) {
+      filters.searchTerms = splitSearchTerms(rawSearch);
+    }
 
-    const {
-      sortBy,
-      sortOrder,
-      search,
-      filters: parsedFilters,
-    } = parsePagination(query as Record<string, unknown>);
     const result = await CosmeticProductRepo.findAll(filters, page, limit);
-    return { ...result, sortBy, sortOrder, search, filters: parsedFilters };
+    return { ...result, sortBy, sortOrder, search: rawSearch ?? search, filters: parsedFilters };
   }
 
   static async getProductById(id: string) {
