@@ -6,6 +6,15 @@ import {
   VoiceId,
   OutputFormat,
 } from "@aws-sdk/client-polly";
+
+const GENERATIVE_VOICES = new Set<string>([
+  VoiceId.Ruth,
+  VoiceId.Matthew,
+  VoiceId.Stephen,
+  VoiceId.Amy,
+  VoiceId.Brian,
+  VoiceId.Aria,
+]);
 import {
   TranscribeStreamingClient,
   StartStreamTranscriptionCommand,
@@ -303,23 +312,28 @@ function applyEmotionSSML(text: string, emotion?: string): string {
 async function synthesize(text: string, language: string, emotion?: string): Promise<Buffer> {
   logger.info(`[VoiceService] Synthesizing speech of length: ${text.length}`);
   logger.info(`[VoiceService] Speech text: ${text.substring(0, 100)}...`);
-  const isFallbackText = text.includes("having trouble connecting");
 
+  const isFallbackText = text.includes("having trouble connecting");
   if (isFallbackText) {
     try {
-      const fallbackPath = path.join(__dirname, "../../assets/error-fallback.mp3");
-      return fs.readFileSync(fallbackPath);
+      return fs.readFileSync(path.join(__dirname, "../../assets/error-fallback.mp3"));
     } catch (e) {
       logger.error(`[VoiceService] Failed to read local fallback MP3: ${(e as Error).message}`);
-      // Continue to Polly as a last resort
     }
   }
+
+  // Voice config per language — default to Ruth (generative) for en-US
+  const langMap: Record<string, { voiceId: VoiceId; langCode: string }> = {
+    "fr-FR": { voiceId: VoiceId.Lea, langCode: "fr-FR" },
+    "ko-KR": { voiceId: VoiceId.Seoyeon, langCode: "ko-KR" },
+  };
+  const { voiceId, langCode } = langMap[language] ?? { voiceId: VoiceId.Ruth, langCode: "en-US" };
+  const engine = GENERATIVE_VOICES.has(voiceId) ? Engine.GENERATIVE : Engine.NEURAL;
 
   const maxChunkLength = 2000;
   const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
   const textChunks: string[] = [];
   let currentChunk = "";
-
   for (const sentence of sentences) {
     if (currentChunk.length + sentence.length <= maxChunkLength) {
       currentChunk += sentence;
@@ -332,50 +346,30 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
 
   const audioBuffers: Buffer[] = [];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let engine: any = Engine.NEURAL;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let voiceId: any = VoiceId.Matthew;
-  let langCode = "en-US";
-
-  if (language === "fr-FR") {
-    engine = Engine.NEURAL;
-    voiceId = VoiceId.Lea;
-    langCode = "fr-FR";
-  } else if (language === "ko-KR") {
-    engine = Engine.NEURAL;
-    voiceId = VoiceId.Seoyeon;
-    langCode = "ko-KR";
-  }
-
   try {
     for (const chunkText of textChunks) {
+      // Generative engine does not support SSML — use plain text
+      const useSSML = engine === Engine.NEURAL;
       const cmd = new SynthesizeSpeechCommand({
         Engine: engine,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         LanguageCode: langCode as any,
         VoiceId: voiceId,
         OutputFormat: OutputFormat.MP3,
-        Text: applyEmotionSSML(chunkText, emotion),
-        TextType: "ssml",
+        Text: useSSML ? applyEmotionSSML(chunkText, emotion) : chunkText,
+        TextType: useSSML ? "ssml" : "text",
       });
 
       const res = await pollyClient.send(cmd);
       if (!res.AudioStream) throw new Error("No audio stream returned");
-      const chunks: Uint8Array[] = [];
-      // @ts-expect-error - AsyncIterable typing is incomplete in AWS SDK for AudioStream
-      for await (const streamChunk of res.AudioStream) {
-        chunks.push(streamChunk);
-      }
-      audioBuffers.push(Buffer.concat(chunks));
+      const audioArray = await res.AudioStream.transformToByteArray();
+      audioBuffers.push(Buffer.from(audioArray));
     }
     return Buffer.concat(audioBuffers);
   } catch (err) {
     logger.error(`[VoiceService] AWS Polly failed: ${(err as Error).message}`);
-    // If Polly itself fails, try reading the local fallback file
     try {
-      const fallbackPath = path.join(__dirname, "../../assets/error-fallback.mp3");
-      return fs.readFileSync(fallbackPath);
+      return fs.readFileSync(path.join(__dirname, "../../assets/error-fallback.mp3"));
     } catch (e) {
       throw new Error(`TTS synthesis failed, and fallback audio not found`);
     }
