@@ -11,7 +11,8 @@ import {
 } from "../../utils/cosmetics.util";
 import { streamChat } from "../../utils/chat-wonder-stream";
 import ChatWonderService from "./chat-wonder.service";
-import { SKIN_ANALYSIS_ENABLED, CHAT_WONDER_API_URL } from "../../config";
+import axios from "axios";
+import { SKIN_ANALYSIS_ENABLED, CHAT_WONDER_API_URL, YOUCAM_API_KEY, YOUCAM_API_URL } from "../../config";
 import logger from "../../utils/logger";
 import { parsePagination } from "../../helpers/pagination.helper";
 
@@ -49,8 +50,11 @@ function parsePerfectCorpEntry(entry: PerfectCorpEntry) {
   }
 
   const oilinessPct = s["oiliness"] ?? 50;
-  // PerfectCorp "moisture" = moisture-issue severity; high → dry skin
-  const moistureIssue = s["moisture"] ?? 50;
+  // PerfectCorp "moisture" = moisture-issue severity; high → dry skin.
+  // When absent (some YouCam response shapes omit it), fall back based on oiliness:
+  // high oiliness → low moisture issue; low oiliness → neutral.
+  const hasMoisture = "moisture" in s;
+  const moistureIssue = hasMoisture ? s["moisture"] : oilinessPct >= 70 ? 30 : 50;
   const hydrationPct = Math.round(100 - moistureIssue);
 
   // Determine skin type
@@ -114,6 +118,65 @@ function getFallbackVision() {
   };
 }
 
+// ─── YouCam / PerfectCorp real API call ─────────────────────────────────────
+
+async function callYouCamApi(imageUrl: string): Promise<ReturnType<typeof parsePerfectCorpEntry> | null> {
+  if (!YOUCAM_API_KEY) {
+    logger.warn("[SkinAnalysis] YOUCAM_API_KEY not set — cannot call real API");
+    return null;
+  }
+
+  try {
+    // Step 1: submit async job
+    const submitRes = await axios.post(
+      YOUCAM_API_URL,
+      { image_url: imageUrl, effects: [{ id: "skin_analysis" }] },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${YOUCAM_API_KEY}`,
+        },
+        timeout: 15_000,
+      }
+    );
+
+    const jobId: string = submitRes.data?.job_id ?? submitRes.data?.request_id;
+    if (!jobId) {
+      logger.warn("[SkinAnalysis] YouCam did not return a job_id");
+      return null;
+    }
+
+    logger.info(`[SkinAnalysis] YouCam job submitted: ${jobId}`);
+
+    // Step 2: poll for result (max 30s)
+    const pollUrl = YOUCAM_API_URL.replace("/async/", "/result/") + `/${jobId}`;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await new Promise((r) => setTimeout(r, 3_000));
+      const pollRes = await axios.get(pollUrl, {
+        headers: { "Authorization": `Bearer ${YOUCAM_API_KEY}` },
+        timeout: 10_000,
+      });
+
+      const status: string = pollRes.data?.status ?? "processing";
+      if (status === "processing" || status === "queued") continue;
+      if (status !== "done" && status !== "success" && status !== "completed") {
+        logger.warn(`[SkinAnalysis] YouCam job failed with status: ${status}`);
+        return null;
+      }
+
+      const result = pollRes.data?.result ?? pollRes.data;
+      logger.info(`[SkinAnalysis] YouCam result received for job ${jobId}`);
+      return parsePerfectCorpEntry(result as PerfectCorpEntry);
+    }
+
+    logger.warn(`[SkinAnalysis] YouCam job ${jobId} timed out after 30s`);
+    return null;
+  } catch (err) {
+    logger.warn(`[SkinAnalysis] YouCam API call failed: ${(err as Error).message}`);
+    return null;
+  }
+}
+
 // ─── ChatWonder skin-analysis prompt ────────────────────────────────────────
 
 function buildSkinPrompt(vision: ReturnType<typeof parsePerfectCorpEntry>): string {
@@ -124,9 +187,46 @@ function buildSkinPrompt(vision: ReturnType<typeof parsePerfectCorpEntry>): stri
     `- Hydration: ${vision.hydrationPct}%\n` +
     `- Skin Concerns: ${vision.concerns.join(", ")}\n` +
     `- Routine Tip: ${vision.routineTip}\n\n` +
-    `Based on this profile, suggest the most suitable skincare and cosmetic products for this user. ` +
-    `Include specific product types (moisturizer, serum, sunscreen, etc.) and key ingredients to look for.`
+    `Based on this skin profile, recommend the most suitable products for this user. ` +
+    `You MUST reference specific product names from the "Available cosmetic products" list provided in document_context. ` +
+    `Mention 2-3 product names by name and explain briefly why each suits their skin profile.`
   );
+}
+
+async function buildSkinCatalogContext(): Promise<string> {
+  try {
+    const catalog = await prisma.cosmeticProduct.findMany({
+      take: 50,
+      select: {
+        id: true, name: true, brand: true, type: true, category: true,
+        benefits: true, tags: true, spf: true, finish: true,
+        priceAmount: true, priceUnit: true,
+        fileUrl: { select: { fileUrl: true, thumbnailUrl: true } },
+      },
+    });
+    if (!catalog.length) {
+      logger.warn("[SkinAnalysis] Catalog is empty — no products injected into document_context");
+      return "";
+    }
+    const lines = catalog.map((p) => {
+      const tags = Array.isArray(p.tags) ? (p.tags as string[]).join(",") : "";
+      const benefits = Array.isArray(p.benefits) ? (p.benefits as string[]).join(",") : "";
+      const imageUrl = p.fileUrl?.thumbnailUrl ?? p.fileUrl?.fileUrl ?? "none";
+      return (
+        `- [${p.id}] ${p.brand ?? ""} ${p.name}` +
+        ` | type:${p.type ?? "unknown"} | category:${p.category ?? "none"}` +
+        ` | finish:${p.finish ?? "none"} | spf:${p.spf ?? "none"}` +
+        ` | benefits:${benefits || "none"} | tags:${tags || "none"}` +
+        ` | price:${p.priceAmount != null ? `${p.priceAmount} ${p.priceUnit ?? ""}`.trim() : "none"}` +
+        ` | image:${imageUrl}`
+      );
+    });
+    logger.info(`[SkinAnalysis] Catalog injected into document_context: ${catalog.length} products`);
+    return `Available cosmetic products:\n${lines.join("\n")}`;
+  } catch (err) {
+    logger.warn(`[SkinAnalysis] Failed to build catalog context: ${(err as Error).message}`);
+    return "";
+  }
 }
 
 async function askChatWonderForSkinProducts(
@@ -139,10 +239,12 @@ async function askChatWonderForSkinProducts(
   }
 
   try {
-    // Get or generate a session ID for this user (falls back to a system session)
-    const sessionId = userId
-      ? String(await ChatWonderService.generateChatSessionId(userId))
-      : `skin-scan-${Date.now()}`;
+    const [sessionId, documentContext] = await Promise.all([
+      userId
+        ? ChatWonderService.generateChatSessionId(userId).then(String)
+        : Promise.resolve(`skin-scan-${Date.now()}`),
+      buildSkinCatalogContext(),
+    ]);
 
     if (!sessionId) {
       logger.warn("[SkinAnalysis] Could not get ChatWonder session ID — skipping");
@@ -150,6 +252,8 @@ async function askChatWonderForSkinProducts(
     }
 
     const prompt = buildSkinPrompt(vision);
+    logger.info(`[SkinAnalysis] Sending skin profile to ChatWonder | session: ${sessionId} | catalog injected: ${documentContext ? "yes" : "no"}`);
+
     let fullResponse = "";
 
     await streamChat(prompt, sessionId, undefined, {
@@ -162,17 +266,23 @@ async function askChatWonderForSkinProducts(
       onError: (err) => {
         logger.warn(`[SkinAnalysis] ChatWonder stream error: ${err.message}`);
       },
-    });
+    }, documentContext);
 
-    if (!fullResponse) return null;
+    if (!fullResponse) {
+      logger.warn("[SkinAnalysis] ChatWonder returned empty response");
+      return null;
+    }
+
+    logger.info(`[SkinAnalysis] ChatWonder raw response length: ${fullResponse.length} chars`);
 
     // Try to extract cosmetics_suggestion from JSON response; fall back to raw text
     try {
       const json = JSON.parse(fullResponse);
       const suggestion = json.cosmetics_suggestion || json.message || fullResponse;
-      logger.info(`[SkinAnalysis] ChatWonder suggestion: ${String(suggestion).slice(0, 120)}…`);
+      logger.info(`[SkinAnalysis] ChatWonder suggestion: ${String(suggestion).slice(0, 200)}…`);
       return String(suggestion);
     } catch {
+      logger.info(`[SkinAnalysis] ChatWonder suggestion (raw): ${fullResponse.slice(0, 200)}…`);
       return fullResponse;
     }
   } catch (err) {
@@ -237,13 +347,13 @@ export default class SkinAnalysisService {
     let vision: ReturnType<typeof parsePerfectCorpEntry>;
 
     if (SKIN_ANALYSIS_ENABLED) {
-      // TODO: call PerfectCorp API with file.fileUrl when API key is provisioned
-      // const perfectCorpResult = await callPerfectCorpApi(file.fileUrl);
-      // vision = parsePerfectCorpEntry(perfectCorpResult);
-      logger.warn(
-        "[SkinAnalysis] SKIN_ANALYSIS_ENABLED=true but real API not yet implemented — falling back to mock"
-      );
-      vision = loadMockVision() ?? getFallbackVision();
+      const youCamResult = await callYouCamApi(file.fileUrl);
+      if (youCamResult) {
+        vision = youCamResult;
+      } else {
+        logger.warn("[SkinAnalysis] YouCam call failed — falling back to mock");
+        vision = loadMockVision() ?? getFallbackVision();
+      }
     } else {
       vision = loadMockVision() ?? getFallbackVision();
     }
@@ -273,6 +383,14 @@ export default class SkinAnalysisService {
       },
     });
 
+    logger.info(`[SkinAnalysis] Catalog loaded: ${catalog.length} products for scoring`);
+    if (catalog.length > 0) {
+      const sample = catalog[0];
+      logger.info(
+        `[SkinAnalysis] Sample product attributes — type:${sample.type} | tags:${JSON.stringify(sample.tags)} | oilFree:${sample.oilFree} | hydrating:${sample.hydrating} | spf:${sample.spf} | finish:${sample.finish}`
+      );
+    }
+
     const engineInput: AnalysisInput = {
       skinType: vision.skinType,
       hydrationPct: vision.hydrationPct,
@@ -281,7 +399,25 @@ export default class SkinAnalysisService {
       weather,
     };
 
+    logger.info(
+      `[SkinAnalysis] Scoring input — skinType:${engineInput.skinType} | hydration:${engineInput.hydrationPct}% | oiliness:${engineInput.oilinessPct}% | concerns:[${engineInput.concerns.join(", ")}]`
+    );
+
     const ranked = rankProducts(engineInput, catalog as ProductForScoring[]);
+
+    logger.info(
+      `[SkinAnalysis] Scoring result — ${catalog.length} products scored, ${ranked.length} passed MIN_SCORE threshold`
+    );
+    if (ranked.length === 0 && catalog.length > 0) {
+      logger.warn(
+        "[SkinAnalysis] All products scored below MIN_SCORE=25 — check that products have type, tags, oilFree, hydrating, spf, or finish set in the DB"
+      );
+    }
+    if (ranked.length > 0) {
+      logger.info(
+        `[SkinAnalysis] Top ranked: ${ranked.slice(0, 3).map((r) => `score:${r.score} id:${r.productId}`).join(" | ")}`
+      );
+    }
 
     // 5. Persist analysis + recommendations atomically
     const created = await SkinAnalysisRepo.createWithRecommendations(

@@ -24,7 +24,7 @@ async function generateErrorAudio() {
     // Available Neural Voices (requires Engine.NEURAL): Joanna, Salli, Kendra, Kimberly, Justin, Joey
     Engine: Engine.GENERATIVE,
     LanguageCode: "en-US",
-    VoiceId: VoiceId.Matthew,
+    VoiceId: VoiceId.Ruth,
     OutputFormat: OutputFormat.MP3,
     Text: text,
   });

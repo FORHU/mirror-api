@@ -4,19 +4,32 @@ import { responseSuccess, responseError } from "../../helpers/response.helper";
 import { pageFromRepo } from "../../helpers/pagination.helper";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+const getIngredients = (metaData: any) => {
+  if (Array.isArray(metaData)) return metaData;
+  if (Array.isArray(metaData?.ingredients)) return metaData.ingredients;
+  return [];
+};
+
 export const mapCosmeticForAI = (cosmetic: any) => ({
   id: cosmetic.id,
   name: cosmetic.name,
   brand: cosmetic.brand,
+  details: cosmetic.details,
   type: cosmetic.type,
   category: cosmetic.category,
   hexColor: cosmetic.hexColor,
   finish: cosmetic.finish,
   benefits: cosmetic.benefits,
   tags: cosmetic.tags,
+  ingredients: getIngredients(cosmetic.metaData),
+  spf: cosmetic.spf,
+  waterproof: cosmetic.waterproof,
+  transferProof: cosmetic.transferProof,
+  hydrating: cosmetic.hydrating,
+  oilFree: cosmetic.oilFree,
   priceAmount: cosmetic.priceAmount,
   priceUnit: cosmetic.priceUnit,
-  imageUrl: cosmetic.fileUrl ? cosmetic.fileUrl.url : null,
+  imageUrl: cosmetic.fileUrl ? cosmetic.fileUrl.fileUrl : null,
 });
 
 export default class ExternalCosmeticController {
