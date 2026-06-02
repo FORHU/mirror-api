@@ -9,7 +9,11 @@ import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
 import { resolveSetProducts } from "../../utils/resolve-set-garments.util";
 import { buildOutfitCatalog, resolveSetOutfits } from "../../utils/chat-wonder-outfits.util";
 import { emitToKiosk } from "../../utils/socket.util";
-import { buildSkinCatalogContext, buildFallbackCosmeticsSet, resolveDestinationWeather } from "../../services/shared/skin-analysis.service";
+import {
+  buildSkinCatalogContext,
+  buildFallbackCosmeticsSet,
+  resolveDestinationWeather,
+} from "../../services/shared/skin-analysis.service";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
 import CacheUtil from "../../utils/cache.util";
@@ -109,7 +113,7 @@ export default class ChatWonderController {
         await CacheUtil.del(`chat:sessionId:${userId}`);
         logger.info(`[ChatWonderController.streamRaw] Stale session cleared for user ${userId}.`);
       }
-      
+
       return responseError(res, 500, (err as Error).message || "Internal server error");
     }
   }
@@ -204,7 +208,7 @@ export default class ChatWonderController {
             // [outfits] → validate outfitId and hydrate from DB outfit records
             // everything else → resolve individual garment/cosmetic ids
             const gender = await ChatWonderService.getUserGender(userId);
-            const resolvedSets = input.includes("[outfits]")
+            let resolvedSets = input.includes("[outfits]")
               ? await resolveSetOutfits(parsed.sets as Record<string, unknown>[])
               : await resolveSetProducts(parsed.sets, gender);
 
@@ -305,9 +309,7 @@ export default class ChatWonderController {
       };
 
       // 7. Build catalogue context for cosmetics requests, then stream
-      const documentContext = input.includes("[cosmetics]")
-        ? await buildSkinCatalogContext()
-        : "";
+      const documentContext = input.includes("[cosmetics]") ? await buildSkinCatalogContext() : "";
 
       await streamChat({
         userInput: input,

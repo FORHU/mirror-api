@@ -323,7 +323,9 @@ async function askChatWonderForSkinProducts(
 // Extracts location names from a user input string, geocodes each one,
 // fetches live weather, and merges into a single worst-case WeatherContext.
 
-export async function resolveDestinationWeather(input: string): Promise<WeatherContext | undefined> {
+export async function resolveDestinationWeather(
+  input: string
+): Promise<WeatherContext | undefined> {
   try {
     const matches = [
       ...input.matchAll(/\b(?:at|in|to)\s+([A-Z][^,.\n!?]+?)(?=\s+for\b|\s+and\b|\s*,|\s*\.|$)/gi),
@@ -395,9 +397,8 @@ export async function buildFallbackCosmeticsSet(
   weather?: WeatherContext
 ): Promise<Record<string, unknown> | null> {
   try {
-    const output = (
-      skinPayload.output as Array<{ type: string; ui_score?: number; score?: number }>
-    ) ?? [];
+    const output =
+      (skinPayload.output as Array<{ type: string; ui_score?: number; score?: number }>) ?? [];
 
     const entry: PerfectCorpEntry = {
       success: true,
@@ -410,10 +411,18 @@ export async function buildFallbackCosmeticsSet(
 
     const catalog = await prisma.cosmeticProduct.findMany({
       select: {
-        id: true, type: true, tags: true, spf: true,
-        waterproof: true, transferProof: true, hydrating: true,
-        oilFree: true, finish: true,
-        name: true, brand: true, category: true,
+        id: true,
+        type: true,
+        tags: true,
+        spf: true,
+        waterproof: true,
+        transferProof: true,
+        hydrating: true,
+        oilFree: true,
+        finish: true,
+        name: true,
+        brand: true,
+        category: true,
         fileUrl: { select: { fileUrl: true, thumbnailUrl: true } },
       },
     });
@@ -434,8 +443,11 @@ export async function buildFallbackCosmeticsSet(
     const productMap = new Map(catalog.map((p) => [p.id, p]));
 
     const skinTypeLabels: Record<string, string> = {
-      OILY: "oily", DRY: "dry", COMBINATION: "combination",
-      SENSITIVE: "sensitive", NORMAL: "normal",
+      OILY: "oily",
+      DRY: "dry",
+      COMBINATION: "combination",
+      SENSITIVE: "sensitive",
+      NORMAL: "normal",
     };
     const SKIN_TYPES = new Set(["OILY", "DRY", "COMBINATION", "SENSITIVE", "NORMAL"]);
 

@@ -310,8 +310,6 @@ export const voiceService = {
     return transcript;
   },
 
-
-
   tts: async (text: string, language: string = "en-US", emotion?: string): Promise<Buffer> =>
     synthesize(text, language, emotion),
 
