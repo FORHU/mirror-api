@@ -93,6 +93,7 @@ function repairJson(input: string): string {
  * Build the structured response from a successfully-parsed object.
  */
 function buildFromParsed(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parsed: Record<string, any>,
   rawResponse: string
 ): ChatWonderParsedResponse {
@@ -102,8 +103,7 @@ function buildFromParsed(
     data.outfit ?? parsed.outfit_suggestion ?? parsed.outfitSuggestion ?? null;
   const cosmeticsSuggestion =
     data.cosmetics ?? parsed.cosmetics_suggestion ?? parsed.cosmeticsSuggestion ?? null;
-  const routeSuggestion =
-    data.route ?? parsed.route_suggestion ?? parsed.routeSuggestion ?? null;
+  const routeSuggestion = data.route ?? parsed.route_suggestion ?? parsed.routeSuggestion ?? null;
 
   // Derive strict intent enum
   let intent: AIIntent = "NONE";
@@ -157,6 +157,7 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
     // 1. Try to find and parse JSON
     const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let parsed: Record<string, any> | null = null;
       try {
         parsed = JSON.parse(jsonMatch[0]);

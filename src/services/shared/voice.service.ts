@@ -192,49 +192,6 @@ async function getChatWonderSession(sessionId?: string): Promise<string> {
   }
 }
 
-async function buildCatalogContext(): Promise<string> {
-  try {
-    const catalog = await prisma.cosmeticProduct.findMany({
-      take: 50,
-      select: {
-        id: true,
-        name: true,
-        brand: true,
-        type: true,
-        category: true,
-        benefits: true,
-        tags: true,
-        spf: true,
-        finish: true,
-        priceAmount: true,
-        priceUnit: true,
-      },
-    });
-    if (!catalog.length) {
-      logger.warn("[VoiceService] Catalog is empty — no products injected into document_context");
-      return "";
-    }
-    const lines = catalog.map((p) => {
-      const tags = Array.isArray(p.tags) ? (p.tags as string[]).join(",") : "";
-      const benefits = Array.isArray(p.benefits) ? (p.benefits as string[]).join(",") : "";
-      return (
-        `- [${p.id}] ${p.brand ?? ""} ${p.name}` +
-        ` | type:${p.type ?? "unknown"} | category:${p.category ?? "none"}` +
-        ` | finish:${p.finish ?? "none"} | spf:${p.spf ?? "none"}` +
-        ` | benefits:${benefits || "none"} | tags:${tags || "none"}` +
-        ` | price:${p.priceAmount != null ? `${p.priceAmount} ${p.priceUnit ?? ""}`.trim() : "none"}`
-      );
-    });
-    logger.info(
-      `[VoiceService] Catalog injected into document_context: ${catalog.length} products`
-    );
-    return `Available cosmetic products:\n${lines.join("\n")}`;
-  } catch (err) {
-    logger.warn(`[VoiceService] Failed to build catalog context: ${(err as Error).message}`);
-    return "";
-  }
-}
-
 async function buildConversationHistory(userOutlineId?: string): Promise<string> {
   if (!userOutlineId) return "";
   try {
@@ -263,9 +220,12 @@ async function askChatWonder(
   weatherInfo: string
 ): Promise<{ response: ChatWonderParsedResponse; sessionId: string }> {
   const query = buildChatWonderQuery(transcript, ctx, weatherInfo);
-  const [sid, documentContext, userHistorySelect] = await Promise.all([
+  // Catalog is no longer injected into the prompt (saved tokens + keeps our
+  // product data on our side). Cosmetic recommendations are matched to real
+  // CosmeticProduct rows by attributes after parsing — see resolveSetProducts.
+  const documentContext = "";
+  const [sid, userHistorySelect] = await Promise.all([
     getChatWonderSession(ctx.sessionId),
-    buildCatalogContext(),
     buildConversationHistory(ctx.userOutlineId),
   ]);
   logger.debug(`query --------- ${query}`);

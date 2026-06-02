@@ -150,12 +150,6 @@ export default class ChatWonderController {
                 }
               }
 
-              // Save AI response to history
-              const aiMessage = await ChatWonderService.saveAIMessage(
-                userId,
-                conversationId,
-                parsed.message
-              );
               logger.debug(
                 `parsed data -- - - - -- - -\n` +
                   `data: ${JSON.stringify({

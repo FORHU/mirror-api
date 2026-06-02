@@ -1,6 +1,7 @@
 import { streamChat } from "../../utils/chat-wonder-stream";
 import logger from "../../utils/logger";
 import { CognitiveResponseSchema } from "../../ai/schemas/chatwonder.schema";
+import { repairJson } from "../../utils/json-repair.util";
 import type { VoiceContext } from "./voice.service";
 import { prisma } from "../../utils/prisma";
 import ChatRepository from "../../repositories/chat.repository";
@@ -140,11 +141,21 @@ Confirmation Rules:
 - Set "requiresConfirmation": false for all other cases.
 - When "requiresConfirmation" is true, the "reply" MUST be phrased as a clear yes/no question (e.g., "Are you sure you want to leave fashion and go to the map?"). Never emit requiresConfirmation: true with a statement-form reply — the client holds the action until the user answers, and a statement would strand the user.
 
+Screen Ground-Truth Rule:
+- The "- Current screen:" line in the context shows the user's ACTUAL current route and is authoritative. Trust it over conversation history.
+- NEVER tell the user they are "already on", "already in", or "already at" a screen unless "- Current screen:" actually matches that route.
+- "/select-gender" means the user is on the gender selection screen and has NOT yet reached fashion ("/ai-recommendation-fashion") or cosmetics ("/ai-recommendation-cosmetic"). If they ask to go to fashion/cosmetics from here, navigate them there (subject to the Gender Guard) — do NOT claim they are already there.
+
 Gender Guard:
 - The Smart Mirror Context above includes a "- User gender:" line when gender is known. Treat that line as authoritative.
 - If "- User gender:" IS present (MALE or FEMALE), gender is KNOWN. Proceed with the user's fashion/cosmetics request normally. DO NOT ask about gender, DO NOT navigate to /select-gender, DO NOT mention gender in the reply.
 - If "- User gender:" is ABSENT and the user asks for FASHION or COSMETICS, you MUST set action to "navigate" with route "/select-gender" and tell them to select a gender.
 - EXTREMELY IMPORTANT: If the user asks for anything related to MAPS, LOCATIONS, or DIRECTIONS, IGNORE gender entirely (known or not). You MUST immediately issue a map action (use "maps_show_route" to give directions). NEVER ask for their gender when dealing with maps.
+
+Gender Capture Rule:
+- When the user STATES or SELECTS their gender — e.g. "male", "I'm male", "I am a man", "I'm a guy", "female", "I'm female", "I am a woman", "I'm a girl" — you MUST emit action "select_gender" with payload.gender set to EXACTLY "MALE" or "FEMALE" (uppercase). Confirm warmly and briefly (e.g. "Got it!").
+- After the user provides their gender, NEVER ask for it again in the same reply. Treat the gender as captured.
+- This is the expected interaction whenever "- Current screen:" is "/select-gender" — capturing the gender is your primary job on that screen.
 
 Recommendation Guard (Fashion & Cosmetics):
 - Before navigating to /ai-recommendation-fashion or /ai-recommendation-cosmetic, you MUST know the user's intended destination, event, or venue (e.g., "the office", "a party", "the park").
@@ -153,6 +164,13 @@ Recommendation Guard (Fashion & Cosmetics):
 - Once the venue (and garment/outfit choice for fashion) is KNOWN:
   1. Set the action type to "navigate" with the respective route. For Fashion, you MUST include "suggestion": "garment" or "suggestion": "outfit" in the action payload.
   2. You MUST populate the "events" array with itinerary event objects for EACH destination (if the user discusses a multi-event day) tailored to the venue and weather.
+
+Direct Launch Rule (Main Menu — OVERRIDES the Recommendation Guard):
+- "/authentication" is the main menu / launchpad. When "- Current screen:" is "/authentication" and the user asks for FASHION, COSMETICS, or MAPS, you MUST navigate DIRECTLY to that feature and provide recommendations. Do NOT interrogate for a venue first — the venue requirement above does NOT apply when launching from "/authentication".
+- GENDER IS A HARD PRECONDITION for Fashion and Cosmetics. If gender is UNKNOWN, you MUST navigate to "/select-gender" first and NEVER to "/ai-recommendation-fashion" or "/ai-recommendation-cosmetic". This applies even on the main menu — "direct launch" does NOT bypass gender.
+- ONLY when gender is KNOWN: Fashion → navigate "/ai-recommendation-fashion" (if no garment/outfit preference was stated, default to "suggestion": "outfit"); Cosmetics → navigate "/ai-recommendation-cosmetic".
+- Maps/directions → emit "maps_show_route" if a destination is given, otherwise navigate "/map". Maps ignore gender.
+- Populate the "events" array with recommendation events based on whatever context is available (weather, time of day), even when the user did not name a specific destination.
 
 If the context contains mode: "confirm_context_required", the user gave an ambiguous reply (e.g., "maybe") to a confirmation prompt. Ask them to clarify with a friendly follow-up question. Set action to null.`;
 
@@ -287,21 +305,57 @@ function parseCognitiveResponse(raw: string): CognitiveResponse {
     const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return fallback;
 
-    const parsed = JSON.parse(jsonMatch[0]);
-    if (!parsed.reply) return fallback;
-
-    const validated = CognitiveResponseSchema.safeParse(parsed);
-
-    if (!validated.success) {
-      logger.error(`[CognitiveVoiceService] Invalid AI schema: ${validated.error.message}`);
-      return fallback;
+    // Model sometimes emits slightly-malformed JSON (empty values, trailing
+    // commas). Repair and retry before giving up so we don't lose the `action`.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let parsed: Record<string, any>;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      parsed = JSON.parse(repairJson(jsonMatch[0]));
+      logger.warn("[CognitiveVoiceService] Recovered malformed JSON via repair pass.");
     }
 
-    const data = validated.data;
+    if (!parsed || typeof parsed !== "object" || !parsed.reply) return fallback;
+
+    // Prefer strict validation, but if it fails, salvage the useful fields
+    // (especially `action`) with safe defaults rather than discarding
+    // navigation entirely and replying with the canned fallback.
+    const validated = CognitiveResponseSchema.safeParse(parsed);
+    const data: CognitiveResponse = validated.success
+      ? (validated.data as CognitiveResponse)
+      : {
+          reply: String(parsed.reply),
+          intent: parsed.intent ?? { primary: "none", secondary: null, confidence: 0 },
+          emotion: parsed.emotion ?? "neutral",
+          action: parsed.action ?? null,
+          followUpQuestion: parsed.followUpQuestion ?? null,
+          requiresConfirmation: Boolean(parsed.requiresConfirmation),
+          suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+          memoryUpdates:
+            parsed.memoryUpdates && typeof parsed.memoryUpdates === "object"
+              ? parsed.memoryUpdates
+              : {},
+          uiHints:
+            parsed.uiHints && typeof parsed.uiHints === "object"
+              ? parsed.uiHints
+              : { overlay: null, focus: null },
+          events: Array.isArray(parsed.events) ? parsed.events : [],
+          raw,
+        };
+
+    if (!validated.success) {
+      logger.warn(
+        `[CognitiveVoiceService] Schema mismatch — salvaged fields (action preserved: ${Boolean(
+          data.action
+        )}): ${validated.error.message}`
+      );
+    }
+
     data.raw = raw;
     data.reply = data.reply.replace(/[*_~`#]/g, "").trim();
 
-    return data as CognitiveResponse;
+    return data;
   } catch (err) {
     logger.warn(
       `[CognitiveVoiceService] Failed to parse cognitive response: ${(err as Error).message}`
