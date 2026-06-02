@@ -21,6 +21,9 @@ import {
 import logger from "../../utils/logger";
 import { parsePagination } from "../../helpers/pagination.helper";
 import { notifyCompanion } from "../../utils/socket.util";
+import { mapService } from "./map.service";
+import { weatherService } from "./weather.service";
+import { computeRisks, buildTags } from "../../utils/weather.util";
 
 // ─── Mock skin-analysis loader (dev) ────────────────────────────────────────
 
@@ -201,7 +204,7 @@ function buildSkinPrompt(vision: ReturnType<typeof parsePerfectCorpEntry>): stri
   );
 }
 
-async function buildSkinCatalogContext(): Promise<string> {
+export async function buildSkinCatalogContext(): Promise<string> {
   try {
     const catalog = await prisma.cosmeticProduct.findMany({
       take: 50,
@@ -312,6 +315,195 @@ async function askChatWonderForSkinProducts(
     }
   } catch (err) {
     logger.warn(`[SkinAnalysis] ChatWonder call failed: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+// ─── Destination weather resolver ────────────────────────────────────────────
+// Extracts location names from a user input string, geocodes each one,
+// fetches live weather, and merges into a single worst-case WeatherContext.
+
+export async function resolveDestinationWeather(
+  input: string
+): Promise<WeatherContext | undefined> {
+  try {
+    const matches = [
+      ...input.matchAll(/\b(?:at|in|to)\s+([A-Z][^,.\n!?]+?)(?=\s+for\b|\s+and\b|\s*,|\s*\.|$)/gi),
+    ];
+    const locationNames = [...new Set(matches.map((m) => m[1].trim()).filter(Boolean))];
+    if (!locationNames.length) return undefined;
+
+    logger.info(`[resolveDestinationWeather] Detected: ${locationNames.join(", ")}`);
+
+    const risks: Array<WeatherContext & { _tags: string[] }> = [];
+
+    for (const name of locationNames) {
+      try {
+        const features = await mapService.search(name);
+        if (!features.length) continue;
+        const [lng, lat] = features[0].center;
+        const w = await weatherService.getWeather(lat, lng);
+        const obs = {
+          temperature: w.temperature,
+          humidity: w.humidity,
+          uvIndex: w.uvIndex,
+          precipitationProb: w.precipitationProb,
+          windSpeed: w.windspeed,
+        };
+        const r = computeRisks(obs);
+        const tags = buildTags(obs);
+        risks.push({
+          oilRisk: r.oilRisk,
+          drynessRisk: r.drynessRisk,
+          uvRisk: r.uvRisk,
+          smudgeRisk: r.smudgeRisk,
+          sweatRisk: r.sweatRisk,
+          tags,
+          _tags: tags,
+        });
+        logger.info(
+          `[resolveDestinationWeather] ${name}: ${Math.round(w.temperature)}°C ` +
+            `oilRisk=${r.oilRisk} uvRisk=${r.uvRisk} sweatRisk=${r.sweatRisk}`
+        );
+      } catch (e) {
+        logger.warn(`[resolveDestinationWeather] Skipped "${name}": ${(e as Error).message}`);
+      }
+    }
+
+    if (!risks.length) return undefined;
+
+    // Take worst-case (max) across all destinations so products cover the full day
+    return {
+      oilRisk: Math.max(...risks.map((r) => r.oilRisk ?? 0)),
+      drynessRisk: Math.max(...risks.map((r) => r.drynessRisk ?? 0)),
+      uvRisk: Math.max(...risks.map((r) => r.uvRisk ?? 0)),
+      smudgeRisk: Math.max(...risks.map((r) => r.smudgeRisk ?? 0)),
+      sweatRisk: Math.max(...risks.map((r) => r.sweatRisk ?? 0)),
+      tags: [...new Set(risks.flatMap((r) => r._tags))],
+    };
+  } catch (err) {
+    logger.warn(`[resolveDestinationWeather] Failed: ${(err as Error).message}`);
+    return undefined;
+  }
+}
+
+// ─── Rule-engine fallback for chat-wonder/stream ─────────────────────────────
+// Called when ChatWonder's own catalogue is unavailable and sets is empty.
+// Parses the raw skin_analysis payload from the request, runs rankProducts,
+// and returns a single set compatible with the chat-wonder complete event.
+
+export async function buildFallbackCosmeticsSet(
+  skinPayload: Record<string, unknown>,
+  weather?: WeatherContext
+): Promise<Record<string, unknown> | null> {
+  try {
+    const output =
+      (skinPayload.output as Array<{ type: string; ui_score?: number; score?: number }>) ?? [];
+
+    const entry: PerfectCorpEntry = {
+      success: true,
+      overallScore: (skinPayload.overallScore as number) ?? undefined,
+      skinAge: (skinPayload.skinAge as number) ?? undefined,
+      output,
+    };
+    const vision = parsePerfectCorpEntry(entry);
+    const weatherCtx = weather;
+
+    const catalog = await prisma.cosmeticProduct.findMany({
+      select: {
+        id: true,
+        type: true,
+        tags: true,
+        spf: true,
+        waterproof: true,
+        transferProof: true,
+        hydrating: true,
+        oilFree: true,
+        finish: true,
+        name: true,
+        brand: true,
+        category: true,
+        fileUrl: { select: { fileUrl: true, thumbnailUrl: true } },
+      },
+    });
+
+    const ranked = rankProducts(
+      {
+        skinType: vision.skinType,
+        hydrationPct: vision.hydrationPct,
+        oilinessPct: vision.oilinessPct,
+        concerns: vision.concerns,
+        weather: weatherCtx,
+      },
+      catalog as ProductForScoring[]
+    );
+
+    if (!ranked.length) return null;
+
+    const productMap = new Map(catalog.map((p) => [p.id, p]));
+
+    const skinTypeLabels: Record<string, string> = {
+      OILY: "oily",
+      DRY: "dry",
+      COMBINATION: "combination",
+      SENSITIVE: "sensitive",
+      NORMAL: "normal",
+    };
+    const SKIN_TYPES = new Set(["OILY", "DRY", "COMBINATION", "SENSITIVE", "NORMAL"]);
+
+    const recommendations = ranked.slice(0, 5).map((r, i) => {
+      const p = productMap.get(r.productId);
+      // Convert raw scoring signals into a human-readable reason
+      const signals = [...new Set(r.reason)]
+        .filter((s) => !SKIN_TYPES.has(s.toUpperCase()))
+        .map((s) => s.replace(/_/g, " ").toLowerCase())
+        .filter(Boolean);
+      const readableReason = signals.length
+        ? `Helps with ${signals.slice(0, 3).join(", ")}.`
+        : `Recommended for your skin profile.`;
+      return {
+        id: r.productId,
+        name: p?.name ?? "Product",
+        description: readableReason,
+        type: p?.type ?? "Skincare",
+        reason: readableReason,
+        imageUrl: p?.fileUrl?.fileUrl ?? p?.fileUrl?.thumbnailUrl ?? null,
+        score: r.score,
+        rank: i + 1,
+        resolved: true,
+      };
+    });
+
+    const vibeMap: Record<string, string> = {
+      OILY: "Matte & Clear",
+      DRY: "Deep Hydration",
+      COMBINATION: "Balanced Glow",
+      SENSITIVE: "Calm & Soothe",
+      NORMAL: "Healthy Glow",
+    };
+
+    const concerns = vision.concerns
+      .filter((c) => c !== "General maintenance")
+      .slice(0, 2)
+      .join(" and ")
+      .toLowerCase();
+    const weatherNote = weatherCtx ? " suited for the weather at your destinations" : "";
+    const message =
+      `Here are your personalized skincare picks for ${skinTypeLabels[vision.skinType] ?? "your"} skin` +
+      (concerns ? `, targeting ${concerns}` : "") +
+      (weatherNote ? `,${weatherNote}` : "") +
+      ".";
+
+    return {
+      set_number: 1,
+      weather: null,
+      vibe: vibeMap[vision.skinType] ?? "Healthy Glow",
+      trend_note: `Personalized for your ${skinTypeLabels[vision.skinType] ?? ""} skin.`,
+      recommendations,
+      message,
+    };
+  } catch (err) {
+    logger.warn(`[buildFallbackCosmeticsSet] Failed: ${(err as Error).message}`);
     return null;
   }
 }
