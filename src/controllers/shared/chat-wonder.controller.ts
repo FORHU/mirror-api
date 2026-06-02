@@ -159,18 +159,8 @@ export default class ChatWonderController {
       const userMessage = await ChatWonderService.saveUserMessage(userId, conversationId, input);
 
       // 4. (Removed buildUserContext since AI has direct access)
-
-      // 5. Generate strict JSON enforcement prompt to act as the "persona"
-      const gender = await ChatWonderService.getUserGender(userId);
-      let personaPrompt: string | undefined = undefined; 
-      // ChatWonderService.getPersonaPrompt(input, gender);
-
-      // For [outfits] intent: append the live outfit catalog so ChatWonder
-      // can reference real DB ids and imageUrls instead of inventing them.
-      // if (personaPrompt && input.includes("[outfits]")) {
-      //   const outfitCatalog = await buildOutfitCatalog(userId);
-      //   personaPrompt += outfitCatalog;
-      // }
+      // 5. Persona Prompt and Outfit Catalog Injection have been removed.
+      const personaPrompt: string | undefined = undefined;
 
       // 6. Set SSE headers
       res.setHeader("Content-Type", "text/event-stream");
