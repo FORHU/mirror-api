@@ -199,6 +199,7 @@ export default class ChatWonderController {
             // Resolve `sets` — branch on intent:
             // [outfits] → validate outfitId and hydrate from DB outfit records
             // everything else → resolve individual garment/cosmetic ids
+            const gender = await ChatWonderService.getUserGender(userId);
             const resolvedSets = input.includes("[outfits]")
               ? await resolveSetOutfits(parsed.sets as Record<string, unknown>[])
               : await resolveSetProducts(parsed.sets, gender);
