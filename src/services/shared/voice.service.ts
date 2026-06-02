@@ -83,60 +83,6 @@ function formatDuration(seconds?: number): string {
   return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
 }
 
-// ── Layer 1: SYSTEM BEHAVIOR — tone and style constraints only ──────────────
-const SYSTEM_BEHAVIOR = `You are a Smart Mirror assistant.
-
-Rules:
-- Respond in a natural, confident, conversational tone.
-- Keep responses extremely concise (max 2-3 sentences).
-- Do not use markdown, bullet points, lists, or long explanations.
-- Always be direct and helpful.`;
-
-// ── Layer 2: DECISION / INTENT LOGIC — how to choose intents ────────────────
-const INTENT_RULES = `Intent decision rules:
-- Your ONLY job is to classify the user's intent into one of: FASHION, COSMETIC, MAP, MENU, RESTART, or NONE.
-- DO NOT attempt to manage state, routing, or ask for confirmation to switch features. The frontend will handle all routing guards and confirmations securely.
-- If the user asks to go to a feature, just output that intent directly.
-- If the context contains 'mode: "confirm_context_required"', the user gave an ambiguous reply (e.g., "maybe") to a system prompt. You must ask them to clarify what they want in a friendly way (Use NONE intent).
-- If the user mentions an event but hasn't stated a specific reason/plan:
-  Use NONE intent and ask what the occasion is.
-- If you know the event/plan (e.g. going to a party, heading to work):
-  Use FASHION or COSMETIC intent. Factor in their gender and weather to recommend categories. Generate the events[] array.
-- If the user asks for directions:
-  Use MAP intent and populate route_suggestion.
-- If the request is unclear or general conversation:
-  Use NONE intent and provide a helpful conversational reply.`;
-
-// ── Layer 3: STRICT OUTPUT CONTRACT — schema enforcement ────────────────────
-const OUTPUT_CONTRACT = `OUTPUT CONTRACT — You MUST follow this exactly.
-
-Respond ONLY with valid JSON matching this schema:
-{
-  "intent": "FASHION" | "COSMETIC" | "MAP" | "MENU" | "RESTART" | "NONE",
-  "message": "<spoken reply, max 2-3 sentences>",
-  "data": {
-    "outfit"?: "<specific clothing advice if intent is FASHION>",
-    "cosmetics"?: "<specific makeup/skincare advice if intent is COSMETIC>",
-    "route"?: "<destination name if intent is MAP>"
-  },
-  "events"?: [
-    {
-      "type": "<event type>",
-      "timeBlock": "<morning|afternoon|evening|night>",
-      "fashion"?: { "suggestion": "<text>", "tags": ["<tag>", "..."] },
-      "cosmetics"?: { "suggestion": "<text>", "tags": ["<tag>", "..."] }
-    }
-  ]
-}
-
-Strict rules:
-- Output must be valid JSON only. No extra text before or after.
-- Do not wrap in markdown code blocks or backticks.
-- The "data" object must always be present, even if empty: "data": {}
-- Only include fields inside "data" that are relevant to the intent.
-- Include "events" only when intent is FASHION or COSMETIC and you have generated specific recommendations with tags.
-- If you fail to follow this JSON format, your response is invalid.`;
-
 function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo: string): string {
   const time =
     ctx.currentTime ??
@@ -150,7 +96,7 @@ function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo
       day: "numeric",
     });
 
-  // ── Layer 4: CONTEXT BLOCK — dynamic real-time state ──────────────────────
+  // Real-time context block — ChatWonder owns the system prompt and intent logic
   const contextParts = [
     `Smart Mirror Context:`,
     `- Date: ${date}`,
@@ -172,11 +118,7 @@ function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo
     .filter(Boolean)
     .join("\n");
 
-  const contextLines = [SYSTEM_BEHAVIOR, INTENT_RULES, OUTPUT_CONTRACT, contextParts];
-
-  const contextStr = contextLines.filter(Boolean).join("\n");
-
-  return `${contextStr}\n\nUser: ${transcript}`;
+  return `${contextParts}\n\nUser: ${transcript}`;
 }
 
 async function getChatWonderSession(sessionId?: string): Promise<string> {

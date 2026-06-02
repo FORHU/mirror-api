@@ -83,7 +83,7 @@ export interface CognitiveResponse {
 // SYSTEM PROMPT LAYERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SYSTEM_BEHAVIOR = `You are the cognitive orchestration engine of an advanced multimodal AI assistant embedded inside a Smart Mirror.
+const _REMOVED_SYSTEM_BEHAVIOR = `You are the cognitive orchestration engine of an advanced multimodal AI assistant embedded inside a Smart Mirror.
 
 Your role is NOT just to chat.
 Your role is to:
@@ -106,7 +106,7 @@ Rules:
 - Prefer maintaining conversational continuity.
 - Be adaptive to ambiguity.`;
 
-const INTENT_RULES = `Intent and Action decision rules:
+const _INTENT_RULES = `Intent and Action decision rules:
 
 Navigation Actions (use when user wants to go somewhere in the app):
 - "navigate" → app screen navigation. payload must include "route": one of "/", "/select-gender", "/authentication", "/ai-recommendation-fashion", "/ai-recommendation-cosmetic", "/map", "/overview", "/virtual-mirror"
@@ -189,7 +189,7 @@ Recommendation Guard (Cosmetics):
 
 If the context contains mode: "confirm_context_required", the user gave an ambiguous reply (e.g., "maybe") to a confirmation prompt. Ask them to clarify with a friendly follow-up question. Set action to null.`;
 
-const OUTPUT_CONTRACT = `OUTPUT CONTRACT — You MUST follow this exactly.
+const _OUTPUT_CONTRACT = `OUTPUT CONTRACT — You MUST follow this exactly.
 
 Respond ONLY with valid JSON matching this schema:
 {
@@ -295,9 +295,7 @@ function buildCognitiveQuery(transcript: string, ctx: VoiceContext, weatherInfo:
     .filter(Boolean)
     .join("\n");
 
-  return [SYSTEM_BEHAVIOR, INTENT_RULES, OUTPUT_CONTRACT, contextParts, `\nUser: ${transcript}`]
-    .filter(Boolean)
-    .join("\n\n");
+  return `${contextParts}\n\nUser: ${transcript}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
