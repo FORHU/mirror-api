@@ -299,7 +299,15 @@ function parseCognitiveResponse(raw: string): CognitiveResponse {
     const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return fallback;
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    // AI sometimes omits values for optional fields, e.g. `"key":,` or `"key":  }`
+    // Patch these before parsing so JSON.parse doesn't throw.
+    const sanitized = jsonMatch[0]
+      .replace(/:(\s*),/g, ": null,")              // "key":,      → "key": null,
+      .replace(/:(\s*)([\}\]])/g, ": null$2")      // "key":}      → "key": null}
+      .replace(/:(\s*)\.(\d)/g, ": 0.$2")          // "key": .9    → "key": 0.9
+      .replace(/:(\s*)\.([\s,\}\]])/g, ": 0$2");   // "key": .     → "key": 0
+
+    const parsed = JSON.parse(sanitized);
     if (!parsed.reply) return fallback;
 
     const validated = CognitiveResponseSchema.safeParse(parsed);
