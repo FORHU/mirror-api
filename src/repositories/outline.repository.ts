@@ -50,6 +50,13 @@ export default class OutlineRepo {
     });
   }
 
+  static async updateStatusByConversationId(conversationId: string, status: string) {
+    return prisma.userOutline.update({
+      where: { conversationId },
+      data: { status },
+    });
+  }
+
   static async delete(id: string) {
     return prisma.userOutline.delete({
       where: { id },

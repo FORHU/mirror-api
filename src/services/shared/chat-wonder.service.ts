@@ -3,6 +3,8 @@ import logger from "../../utils/logger";
 import CacheUtil from "../../utils/cache.util";
 import axios from "axios";
 import ChatRepository from "../../repositories/chat.repository";
+import OutlineRepo from "../../repositories/outline.repository";
+import UserRepository from "../../repositories/user.repository";
 
 export default class ChatWonderService {
   /**
@@ -201,5 +203,14 @@ CRITICAL ENUM RULES - YOU MUST ONLY USE THESE EXACT VALUES FOR FASHION:
       message,
       role: "AI",
     });
+  }
+
+  static async finalizeOutlineByConversationId(conversationId: string) {
+    return OutlineRepo.updateStatusByConversationId(conversationId, "FINALIZED");
+  }
+
+  static async getUserGender(userId: string) {
+    const user = await UserRepository.findGenderById(userId);
+    return user?.gender ?? "FEMALE";
   }
 }

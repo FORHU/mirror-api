@@ -276,11 +276,10 @@ async function askChatWonderForSkinProducts(
 
     let fullResponse = "";
 
-    await streamChat(
-      prompt,
+    await streamChat({
+      userInput: prompt,
       sessionId,
-      undefined,
-      {
+      callbacks: {
         onChunk: (chunk) => {
           fullResponse += chunk;
         },
@@ -291,8 +290,8 @@ async function askChatWonderForSkinProducts(
           logger.warn(`[SkinAnalysis] ChatWonder stream error: ${err.message}`);
         },
       },
-      documentContext
-    );
+      documentContext,
+    });
 
     if (!fullResponse) {
       logger.warn("[SkinAnalysis] ChatWonder returned empty response");

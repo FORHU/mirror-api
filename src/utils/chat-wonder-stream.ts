@@ -13,23 +13,39 @@ interface StreamMessage {
 
 export interface StreamCallbacks {
   onChunk: (chunk: string) => void;
-  onComplete: () => void;
-  onError: (error: Error) => void;
+  onComplete: () => void | Promise<void>;
+  onError: (error: Error) => void | Promise<void>;
 }
 
-export async function streamChat(
-  userInput: string,
-  sessionId: string,
-  persona: string | undefined,
-  callbacks: StreamCallbacks,
-  documentContext: string = "",
-  userHistorySelect: string = "",
-  weather: Record<string, unknown> = {}
-): Promise<void> {
+export interface StreamChatOptions {
+  userInput: string;
+  sessionId: string;
+  persona?: string;
+  callbacks: StreamCallbacks;
+  documentContext?: string;
+  userHistorySelect?: string;
+  weather?: Record<string, unknown>;
+}
+
+export async function streamChat(options: StreamChatOptions): Promise<void> {
+  const {
+    userInput,
+    sessionId,
+    persona,
+    callbacks,
+    documentContext = "",
+    userHistorySelect = "",
+    weather = {},
+  } = options;
+
   return new Promise((resolve, reject) => {
     if (!CHAT_WONDER_API_URL) {
       const error = new Error("CHAT_WONDER_API_URL is not defined in config");
-      callbacks.onError(error);
+      Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
+        logger.warn(
+          `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
+        );
+      });
       return reject(error);
     }
 
@@ -37,11 +53,11 @@ export async function streamChat(
     const safeComplete = () => {
       if (completed) return;
       completed = true;
-      try {
-        callbacks.onComplete();
-      } catch (e) {
-        // Ignore if already completed
-      }
+      Promise.resolve(callbacks.onComplete()).catch((callbackError) => {
+        logger.warn(
+          `[CHAT-WONDER-STREAM] onComplete callback failed: ${(callbackError as Error).message}`
+        );
+      });
     };
 
     const wsUrl = CHAT_WONDER_API_URL.replace("http://", "ws://").replace("https://", "wss://");
@@ -95,7 +111,11 @@ export async function streamChat(
         if (raw.startsWith("[Error]")) {
           logger.error(`[CHAT-WONDER-STREAM] Error: ${raw}`);
           const error = new Error(raw);
-          callbacks.onError(error);
+          Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
+            logger.warn(
+              `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
+            );
+          });
           ws.close();
           reject(error);
           return;
@@ -135,7 +155,11 @@ export async function streamChat(
 
         case "error":
           logger.error(`[CHAT-WONDER-STREAM] Error: ${msg.message}`);
-          callbacks.onError(new Error(msg.message));
+          Promise.resolve(callbacks.onError(new Error(msg.message))).catch((callbackError) => {
+            logger.warn(
+              `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
+            );
+          });
           ws.close();
           reject(new Error(msg.message));
           break;
@@ -152,7 +176,11 @@ export async function streamChat(
 
     ws.on("error", (error) => {
       logger.error(`[CHAT-WONDER-STREAM] WebSocket error: ${error.message}`);
-      callbacks.onError(error);
+      Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
+        logger.warn(
+          `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
+        );
+      });
       reject(error);
     });
 

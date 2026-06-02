@@ -244,11 +244,11 @@ async function askChatWonder(
   );
   let raw = "";
   try {
-    await streamChat(
-      query,
-      sid,
-      "mirror",
-      {
+    await streamChat({
+      userInput: query,
+      sessionId: sid,
+      persona: "mirror",
+      callbacks: {
         onChunk: (chunk) => {
           raw += chunk;
         },
@@ -260,8 +260,8 @@ async function askChatWonder(
         },
       },
       documentContext,
-      userHistorySelect
-    );
+      userHistorySelect,
+    });
   } catch (err) {
     logger.error(`[VoiceService] ChatWonder failed: ${(err as Error).message}`);
     return {
