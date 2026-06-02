@@ -263,7 +263,7 @@ export default class ChatWonderController {
           onError: async (err: Error) => {
             logger.error(`[ChatWonderController] Stream error: ${err.message}`);
             if (err.message.includes("Unknown session")) {
-               await CacheUtil.del(`chat:sessionId:${userId}`);
+              await CacheUtil.del(`chat:sessionId:${userId}`);
               logger.info(
                 `[ChatWonderController] Stale session cleared for user ${userId}. Pre-warming fresh session...`
               );

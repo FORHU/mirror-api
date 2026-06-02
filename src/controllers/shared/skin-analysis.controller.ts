@@ -38,7 +38,7 @@ export default class SkinAnalysisController {
     }
   }
 
-  static async create(req: Request, res: Response, next: NextFunction) {
+  static async create(req: Request, res: Response) {
     const userId = (req as AuthenticatedRequest).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
