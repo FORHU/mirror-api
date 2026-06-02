@@ -131,13 +131,14 @@ async function validateCosmeticId(
   usedIds: Set<string>
 ): Promise<CosmeticMatch | null> {
   if (!rec.id || usedIds.has(rec.id)) return null;
+  const normalizedRecType = typeof rec.type === "string" ? rec.type.toUpperCase().replace(/\s+/g, "_") : undefined;
   try {
     const c = await prisma.cosmeticProduct.findUnique({
       where: { id: rec.id },
       select: { id: true, name: true, type: true, fileUrl: { select: { fileUrl: true } } },
     });
     if (!c) return null;
-    if (rec.type && c.type && String(c.type) !== rec.type) return null;
+    if (normalizedRecType && c.type && String(c.type) !== normalizedRecType) return null;
     return { id: c.id, name: c.name, fileUrl: c.fileUrl };
   } catch {
     return null;
@@ -149,7 +150,7 @@ async function findCosmetic(
   rec: SetRecommendation,
   usedIds: Set<string>
 ): Promise<CosmeticMatch | null> {
-  const type = typeof rec.type === "string" ? rec.type : undefined;
+  const type = typeof rec.type === "string" ? rec.type.toUpperCase().replace(/\s+/g, "_") : undefined;
   if (!type) return null;
 
   const where: Record<string, unknown> = { type };
@@ -231,10 +232,13 @@ export async function resolveSetProducts(
         unresolved++;
       }
     }
+
+    // Filter out unresolved placeholders so they don't break the frontend UI with fake images/ids
+    set.recommendations = set.recommendations.filter(r => r.resolved);
   }
 
   logger.info(
-    `[resolveSetProducts] ${total} recs — kept ${kept}, repaired ${repaired}, unresolved ${unresolved}`
+    `[resolveSetProducts] ${total} recs — kept ${kept}, repaired ${repaired}, unresolved ${unresolved} (filtered out)`
   );
   return sets;
 }
