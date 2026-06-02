@@ -131,7 +131,8 @@ async function validateCosmeticId(
   usedIds: Set<string>
 ): Promise<CosmeticMatch | null> {
   if (!rec.id || usedIds.has(rec.id)) return null;
-  const normalizedRecType = typeof rec.type === "string" ? rec.type.toUpperCase().replace(/\s+/g, "_") : undefined;
+  const normalizedRecType =
+    typeof rec.type === "string" ? rec.type.toUpperCase().replace(/\s+/g, "_") : undefined;
   try {
     const c = await prisma.cosmeticProduct.findUnique({
       where: { id: rec.id },
@@ -150,7 +151,8 @@ async function findCosmetic(
   rec: SetRecommendation,
   usedIds: Set<string>
 ): Promise<CosmeticMatch | null> {
-  const type = typeof rec.type === "string" ? rec.type.toUpperCase().replace(/\s+/g, "_") : undefined;
+  const type =
+    typeof rec.type === "string" ? rec.type.toUpperCase().replace(/\s+/g, "_") : undefined;
   if (!type) return null;
 
   const where: Record<string, unknown> = { type };
@@ -234,7 +236,7 @@ export async function resolveSetProducts(
     }
 
     // Filter out unresolved placeholders so they don't break the frontend UI with fake images/ids
-    set.recommendations = set.recommendations.filter(r => r.resolved);
+    set.recommendations = set.recommendations.filter((r) => r.resolved);
   }
 
   logger.info(
