@@ -9,6 +9,7 @@ import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
 import { resolveSetProducts } from "../../utils/resolve-set-garments.util";
 import { buildOutfitCatalog, resolveSetOutfits } from "../../utils/chat-wonder-outfits.util";
 import { emitToKiosk } from "../../utils/socket.util";
+import { buildSkinCatalogContext, buildFallbackCosmeticsSet, resolveDestinationWeather } from "../../services/shared/skin-analysis.service";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
 import CacheUtil from "../../utils/cache.util";
@@ -187,7 +188,10 @@ export default class ChatWonderController {
       const callbacks: StreamCallbacks = {
         onChunk: (chunk: string) => {
           fullResponse += chunk;
-          writeSseEvent({ type: "chunk", content: chunk });
+          // Don't forward internal ChatWonder metadata chunks to the client
+          if (!chunk.startsWith("[COSMETICS_DATA]") && chunk !== "[DONE]") {
+            writeSseEvent({ type: "chunk", content: chunk });
+          }
         },
         onComplete: async () => {
           try {
@@ -208,9 +212,27 @@ export default class ChatWonderController {
             // Resolve `sets` — branch on intent:
             // [outfits] → validate outfitId and hydrate from DB outfit records
             // everything else → resolve individual garment/cosmetic ids
-            const resolvedSets = input.includes("[outfits]")
+            let resolvedSets = input.includes("[outfits]")
               ? await resolveSetOutfits(parsed.sets as Record<string, unknown>[])
               : await resolveSetProducts(parsed.sets, gender);
+
+            // Fallback: if ChatWonder returned empty sets for a cosmetics request
+            // (e.g. their catalogue is unavailable), run our own rule engine using
+            // the skin_analysis payload and weather from the request body.
+            let fallbackMessage: string | null = null;
+            if (resolvedSets.length === 0 && input.includes("[cosmetics]") && value.skin_analysis) {
+              const destWeather = await resolveDestinationWeather(input);
+              const fallbackSet = await buildFallbackCosmeticsSet(
+                value.skin_analysis as Record<string, unknown>,
+                destWeather
+              );
+              if (fallbackSet) {
+                fallbackMessage = (fallbackSet.message as string) ?? null;
+                const { message: _, ...setWithoutMessage } = fallbackSet as Record<string, unknown>;
+                resolvedSets = [setWithoutMessage];
+                logger.info("[ChatWonderController] Using rule-engine fallback for cosmetics sets");
+              }
+            }
 
             // Check if user input contains finalization keywords to save/finalize the plan draft
             const isFinalization =
@@ -238,7 +260,7 @@ export default class ChatWonderController {
 
             writeSseEvent({
               type: "complete",
-              message: parsed.message,
+              message: fallbackMessage ?? parsed.message,
               outfit_suggestion: parsed.outfit_suggestion,
               mood: parsed.mood,
               cosmetics_suggestion: parsed.cosmetics_suggestion,
@@ -289,13 +311,17 @@ export default class ChatWonderController {
         },
       };
 
-      // 7. Stream from external ChatWonder API
+      // 7. Build catalogue context for cosmetics requests, then stream
+      const documentContext = input.includes("[cosmetics]")
+        ? await buildSkinCatalogContext()
+        : "";
+
       await streamChat({
         userInput: input,
         sessionId: sessionId as string,
         persona: personaPrompt,
         callbacks,
-        documentContext: "",
+        documentContext,
         userHistorySelect: "",
         weather: frontendWeather,
       });
