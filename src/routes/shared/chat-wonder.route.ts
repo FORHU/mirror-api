@@ -26,4 +26,14 @@ router.post("/stream", authenticate, ChatWonderController.streamChat);
  */
 router.post("/raw", authenticate, ChatWonderController.streamRaw);
 
+/**
+ * @route POST /api/mirror/chat-wonder/message
+ * @desc Buffered, non-streaming twin of /stream. Same behavior (persistence,
+ *       finalization, kiosk emits, session recovery, gender + weather) but
+ *       returns a single JSON payload with the full parsed response instead
+ *       of SSE.
+ * @access Private
+ */
+router.post("/message", authenticate, ChatWonderController.chat);
+
 export default router;

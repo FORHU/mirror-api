@@ -3,7 +3,10 @@ import Joi from "joi";
 import ChatWonderService from "../../services/shared/chat-wonder.service";
 import { streamChat, type StreamCallbacks } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
-import { parseChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
+import {
+  parseChatWonderResponse,
+  extractChatWonderDataBlock,
+} from "../../utils/parse-chatWonder-response.util";
 import { emitToKiosk } from "../../utils/socket.util";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
@@ -176,7 +179,11 @@ export default class ChatWonderController {
           writeSseEvent({ type: "raw_chunk", content: chunk });
           // Display stream: drop internal ChatWonder metadata chunks so the chat
           // bubble never renders them.
-          if (!chunk.startsWith("[COSMETICS_DATA]") && !chunk.startsWith("[GARMENT_DATA]") && chunk !== "[DONE]") {
+          if (
+            !chunk.startsWith("[COSMETICS_DATA]") &&
+            !chunk.startsWith("[GARMENT_DATA]") &&
+            chunk !== "[DONE]"
+          ) {
             writeSseEvent({ type: "chunk", content: chunk });
           }
         },
@@ -185,7 +192,7 @@ export default class ChatWonderController {
             // Clean up the response
             const { cleaned } = stripSourcesPrefix(fullResponse);
             const parsed = parseChatWonderResponse(cleaned);
-            console.log("[ChatWonderController] Cleaned response:", cleaned);
+            logger.debug(`[ChatWonderController] Cleaned response: ${cleaned}`);
             // Check if user input contains finalization keywords to save/finalize the plan draft
             const isFinalization =
               /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
@@ -276,6 +283,173 @@ export default class ChatWonderController {
       if (!res.headersSent) {
         responseError(res, 500, (err as Error).message || "Internal server error");
       }
+    }
+  }
+
+  /**
+   * Buffered, non-streaming twin of `streamChat`. Behaves identically
+   * (conversation persistence, finalization keywords, kiosk emits,
+   * session-expired recovery, gender + weather context) but buffers the whole
+   * ChatWonder response and answers with a single `application/json` payload
+   * instead of SSE.
+   *
+   * Because nothing is written until the response completes, every error path
+   * returns a real HTTP status (e.g. `session_expired` → 409) rather than an
+   * in-band SSE `error` event.
+   *
+   * The body is `{ message, intent, garment_data, cosmetics_data, metadata }`:
+   * `message` is the plain display text and `garment_data`/`cosmetics_data` are
+   * the parsed `[GARMENT_DATA]`/`[COSMETICS_DATA]` blocks (null when absent) — a
+   * deliberately richer contract than `/stream`'s `complete` event.
+   */
+  static async chat(req: Request, res: Response) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) {
+      return responseError(res, 401, "Unauthorized");
+    }
+
+    const schema = Joi.object({
+      input: Joi.string().min(1).max(5000).optional(),
+      user_input: Joi.string().min(1).max(5000).optional(),
+      conversationId: Joi.string().optional(),
+      session_id: Joi.string().optional(),
+      type: Joi.string().optional(),
+      weather: Joi.object().optional(),
+      skin_analysis: Joi.object().optional(),
+      kioskId: Joi.string().optional(),
+    }).or("input", "user_input"); // Require at least one of these
+
+    const { error, value } = schema.validate(req.body, { allowUnknown: true });
+    if (error) {
+      return responseError(res, 400, error.message);
+    }
+
+    const input = value.input || value.user_input;
+    const inputConversationId = value.conversationId;
+    const kioskId = value.kioskId;
+    const frontendWeather = value.weather;
+
+    try {
+      const gender = await ChatWonderService.getUserGender(userId);
+
+      // 1. Ensure conversation exists
+      const conversationId = await ChatWonderService.ensureConversation(
+        userId,
+        input.substring(0, 50),
+        inputConversationId
+      );
+
+      // 2. Generate/Retrieve session ID
+      const sessionId = await ChatWonderService.generateChatSessionId(userId);
+
+      // 3. Save user message
+      const userMessage = await ChatWonderService.saveUserMessage(userId, conversationId, input);
+
+      // 4. Buffer the full ChatWonder response (no SSE).
+      let fullResponse = "";
+      let streamError: Error | null = null;
+      await streamChat({
+        userInput: `${input}. The current weather context is: ${JSON.stringify(frontendWeather || {})}.`,
+        sessionId: sessionId as string,
+        callbacks: {
+          onChunk: (chunk: string) => {
+            fullResponse += chunk;
+          },
+          onComplete: () => {
+            /* buffered — we respond once the stream completes */
+          },
+          onError: (err: Error) => {
+            // Capture and re-throw after the stream settles so the catch block
+            // below can map it to a real HTTP status.
+            streamError = err;
+            logger.error(`[ChatWonderController.chat] Stream error: ${err.message}`);
+          },
+        },
+        weather: frontendWeather,
+        gender,
+      });
+
+      if (streamError) {
+        throw streamError;
+      }
+
+      // 5. Clean + parse the buffered response.
+      const { cleaned } = stripSourcesPrefix(fullResponse);
+      const parsed = parseChatWonderResponse(cleaned);
+
+      // The structured payloads ChatWonder appends as [GARMENT_DATA] /
+      // [COSMETICS_DATA] blocks, parsed into JSON objects (null when absent).
+      const garment_data = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
+      const cosmetics_data = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
+
+      // Plain display text, without the joined `[ garments ]/[ cosmetics ]/[ map ]`
+      // markers — the structured data lives in *_data above.
+      const message = parsed.message.split(/\n\n\[ (?:garments|cosmetics|map) \]/)[0].trim();
+
+      // 6. Finalization keywords save/finalize the plan draft.
+      const isFinalization =
+        /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
+          input
+        );
+
+      if (isFinalization) {
+        await ChatWonderService.finalizeOutlineByConversationId(conversationId);
+        logger.info(
+          `[ChatWonderController.chat] Finalized UserOutline status for conversation: ${conversationId}`
+        );
+
+        if (kioskId) {
+          emitToKiosk(kioskId, "itinerary_locked", { conversationId });
+          logger.info(`[ChatWonderController.chat] Emitted itinerary_locked to kiosk: ${kioskId}`);
+        }
+      }
+
+      // 7. Save AI response to history (the joined display string, so the chat
+      // bubble still renders the suggestions inline).
+      const aiMessage = await ChatWonderService.saveAIMessage(
+        userId,
+        conversationId,
+        parsed.message
+      );
+
+      return res.json({
+        status: "success",
+        data: {
+          message,
+          intent: parsed.intent,
+          // Structured, fully-parsed payloads (null when not present).
+          garment_data,
+          cosmetics_data,
+          metadata: {
+            conversationId,
+            userMessageId: userMessage.id,
+            aiMessageId: aiMessage.id,
+          },
+        },
+        message: "OK",
+      });
+    } catch (err) {
+      const message = (err as Error).message || "Internal server error";
+      logger.error(`[ChatWonderController.chat] ${message}`);
+
+      // Session-expired recovery: clear the stale session, pre-warm a fresh one,
+      // and return a clean 409 so the client can resend.
+      if (message.includes("Unknown session")) {
+        await CacheUtil.del(`chat:sessionId:${userId}`);
+        logger.info(
+          `[ChatWonderController.chat] Stale session cleared for user ${userId}. Pre-warming fresh session...`
+        );
+
+        ChatWonderService.generateChatSessionId(userId, true)
+          .then((id) => logger.info(`[ChatWonderController.chat] Fresh session pre-warmed: ${id}`))
+          .catch((e) => logger.warn(`[ChatWonderController.chat] Pre-warm failed: ${e.message}`));
+
+        return responseError(res, 409, "Session expired. Please resend your message.", {
+          code: "session_expired",
+        });
+      }
+
+      return responseError(res, 500, message);
     }
   }
 }

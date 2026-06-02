@@ -60,7 +60,11 @@ export interface VoiceContext {
   language?: string;
 }
 
-function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo: string): string {
+function buildChatWonderQuery(
+  transcript: string,
+  _ctx: VoiceContext,
+  _weatherInfo: string
+): string {
   // Prompts removed as requested. We can just send the raw transcript.
   return transcript;
 }
@@ -109,7 +113,6 @@ async function askChatWonder(
   // Catalog is no longer injected into the prompt (saved tokens + keeps our
   // product data on our side). Cosmetic recommendations are matched to real
   // CosmeticProduct rows by attributes after parsing — see resolveSetProducts.
-  const documentContext = "";
   const [sid, userHistorySelect] = await Promise.all([
     getChatWonderSession(ctx.sessionId),
     buildConversationHistory(ctx.userOutlineId),

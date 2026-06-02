@@ -469,7 +469,6 @@ export const cognitiveVoiceService = {
             return "";
           })
       : Promise.resolve(""));
-    const documentContext = "";
 
     logger.info(
       `[CognitiveVoiceService] Using session: ${sid} | history turns: ${userHistorySelect ? userHistorySelect.split("\n").length : 0}`

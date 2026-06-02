@@ -148,6 +148,44 @@ function buildFromParsed(
 }
 
 /**
+ * Extract and parse a ChatWonder data block into a JSON object.
+ *
+ * ChatWonder appends structured payloads to the response as marker-prefixed
+ * blocks, e.g. `…message text…[GARMENT_DATA]{ "success": true, "sets": […] }[DONE]`.
+ * This pulls out the JSON that follows the given marker (bounded by the next
+ * marker, if any) and parses it — running the same `repairJson` pass as
+ * `parseChatWonderResponse` so malformed model JSON still survives. Returns
+ * `null` when the block is absent or no JSON can be recovered.
+ */
+export function extractChatWonderDataBlock(
+  rawResponse: string,
+  block: "GARMENT_DATA" | "COSMETICS_DATA"
+): Record<string, unknown> | null {
+  const marker = `[${block}]`;
+  const idx = rawResponse.indexOf(marker);
+  if (idx === -1) return null;
+
+  // Take everything after the marker, but stop at the next data/terminator
+  // marker so adjacent blocks don't bleed into this one.
+  const after = rawResponse.slice(idx + marker.length);
+  const stop = after.search(/\[(?:GARMENT_DATA|COSMETICS_DATA|DONE)\]/);
+  const segment = stop === -1 ? after : after.slice(0, stop);
+
+  const jsonMatch = segment.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    try {
+      return JSON.parse(repairJson(jsonMatch[0]));
+    } catch {
+      return null;
+    }
+  }
+}
+
+/**
  * Parse ChatWonder response (handles both JSON and markdown formats)
  */
 export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedResponse {
