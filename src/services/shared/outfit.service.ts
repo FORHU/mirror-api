@@ -38,7 +38,7 @@ export default class OutfitService {
       effectiveUserId,
       page,
       limit,
-      {},
+      { includeSystem: systemOnly !== "true" }, // include system outfits unless viewing system-only
       globalSearch || searchOutfit,
       searchOutfitItems
     );
@@ -56,7 +56,10 @@ export default class OutfitService {
     query: Record<string, string | undefined> = {}
   ) {
     const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
-    const result = await OutfitRepo.findByUserId(userId, page, limit, { fileProvider: "EXTERNAL" });
+    const result = await OutfitRepo.findByUserId(userId, page, limit, {
+      fileProvider: "EXTERNAL",
+      includeSystem: true,
+    });
     return { ...result, sortBy, sortOrder, search, filters };
   }
 
@@ -71,6 +74,7 @@ export default class OutfitService {
     const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
     const result = await OutfitRepo.findByUserId(userId, page, limit, {
       fileProviderNot: "EXTERNAL",
+      includeSystem: true,
     });
     return { ...result, sortBy, sortOrder, search, filters };
   }

@@ -6,7 +6,7 @@ export default class OutfitRepo {
     userId?: string | null,
     page: number = 1,
     limit: number = 20,
-    filters: { fileProvider?: string; fileProviderNot?: string } = {},
+    filters: { fileProvider?: string; fileProviderNot?: string; includeSystem?: boolean } = {},
     searchOutfit?: string,
     searchOutfitItems?: string
   ) {
@@ -14,7 +14,12 @@ export default class OutfitRepo {
 
     const where: Prisma.OutfitWhereInput = {};
     if (userId !== undefined) {
-      where.userId = userId;
+      if (filters.includeSystem) {
+        // Return the user's own outfits + system outfits (userId = null) together
+        where.OR = [{ userId }, { userId: null }];
+      } else {
+        where.userId = userId;
+      }
     }
     if (filters.fileProvider) {
       where.file = { provider: filters.fileProvider };
