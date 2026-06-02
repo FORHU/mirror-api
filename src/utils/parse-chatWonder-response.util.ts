@@ -120,7 +120,7 @@ function buildFromParsed(
     intent = "MAP";
   }
 
-  let finalMessage = parsed.message ? parsed.message.replace(/[*_~`#]/g, "").trim() : "";
+  let finalMessage = parsed.message ? parsed.message.trim() : "";
 
   // Join the specialized suggestions into the main message block for the UI
   if (outfitSuggestion && !finalMessage.includes(outfitSuggestion)) {
@@ -155,7 +155,11 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
     const trimmed = rawResponse.trim();
 
     // 1. Try to find and parse JSON
-    const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+    // Strip trailing [GARMENT_DATA] or [COSMETICS_DATA] blocks before greedy regex
+    let cleanForJson = trimmed.replace(/\[GARMENT_DATA\][\s\S]*$/, "");
+    cleanForJson = cleanForJson.replace(/\[COSMETICS_DATA\][\s\S]*$/, "");
+
+    const jsonMatch = cleanForJson.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let parsed: Record<string, any> | null = null;
@@ -196,11 +200,11 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
     }
 
     // 2. Fallback to raw text if JSON fails
-    let fallbackText = trimmed.replace(/\[Sources\][\s\S]*$/, "");
+    const fallbackText = trimmed.replace(/\[Sources\][\s\S]*$/, "");
     // Strip any raw JSON blocks that might have leaked and failed parsing
-    fallbackText = fallbackText.replace(/\{[\s\S]*\}/g, "");
+    // fallbackText = fallbackText.replace(/\{[\s\S]*\}/g, "");
     // Strip common markdown characters that Polly would read out loud
-    fallbackText = fallbackText.replace(/[*_~`#]/g, "").trim();
+    // fallbackText = fallbackText.replace(/[*_~`#]/g, "").trim();
 
     return {
       intent: "NONE" as AIIntent,

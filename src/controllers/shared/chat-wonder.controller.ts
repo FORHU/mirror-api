@@ -4,16 +4,7 @@ import ChatWonderService from "../../services/shared/chat-wonder.service";
 import { streamChat, type StreamCallbacks } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
 import { parseChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
-import { resolveItineraryEvents } from "../../utils/chat-wonder-events.util";
-import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
-import { resolveSetProducts } from "../../utils/resolve-set-garments.util";
-import { buildOutfitCatalog, resolveSetOutfits } from "../../utils/chat-wonder-outfits.util";
 import { emitToKiosk } from "../../utils/socket.util";
-import {
-  buildSkinCatalogContext,
-  buildFallbackCosmeticsSet,
-  resolveDestinationWeather,
-} from "../../services/shared/skin-analysis.service";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
 import CacheUtil from "../../utils/cache.util";
@@ -77,7 +68,6 @@ export default class ChatWonderController {
       await streamChat({
         userInput: input,
         sessionId: sessionId as string,
-        persona: undefined, // no persona — exact passthrough, nothing appended to the input
         callbacks: {
           onChunk: (chunk) => {
             raw += chunk;
@@ -89,8 +79,6 @@ export default class ChatWonderController {
             logger.error(`[ChatWonderController.streamRaw] Stream error: ${err.message}`);
           },
         },
-        documentContext: "", // no document context
-        userHistorySelect: "", // no history
         weather,
       });
 
@@ -123,6 +111,7 @@ export default class ChatWonderController {
    */
   static async streamChat(req: Request, res: Response) {
     const userId = (req as Request & { user?: { id: string } }).user?.id;
+    const gender = await ChatWonderService.getUserGender(userId as string);
 
     if (!userId) {
       return responseError(res, 401, "Unauthorized");
@@ -165,7 +154,6 @@ export default class ChatWonderController {
 
       // 4. (Removed buildUserContext since AI has direct access)
       // 5. Persona Prompt and Outfit Catalog Injection have been removed.
-      const personaPrompt: string | undefined = undefined;
 
       // 6. Set SSE headers
       res.setHeader("Content-Type", "text/event-stream");
@@ -184,7 +172,7 @@ export default class ChatWonderController {
         onChunk: (chunk: string) => {
           fullResponse += chunk;
           // Don't forward internal ChatWonder metadata chunks to the client
-          if (!chunk.startsWith("[COSMETICS_DATA]") && chunk !== "[DONE]") {
+          if (!chunk.startsWith("[COSMETICS_DATA]") && !chunk.startsWith("[GARMENT_DATA]") && chunk !== "[DONE]") {
             writeSseEvent({ type: "chunk", content: chunk });
           }
         },
@@ -193,48 +181,13 @@ export default class ChatWonderController {
             // Clean up the response
             const { cleaned } = stripSourcesPrefix(fullResponse);
             const parsed = parseChatWonderResponse(cleaned);
-
-            // Enrich the itinerary events with resolved physical database products
-            let enrichedEvents = await resolveItineraryEvents(
-              userId,
-              parsed.events,
-              conversationId
-            );
-
-            // Enrich the itinerary events with resolved physical map coordinates
-            enrichedEvents = await resolveItineraryLocations(enrichedEvents);
-
-            // Resolve `sets` — branch on intent:
-            // [outfits] → validate outfitId and hydrate from DB outfit records
-            // everything else → resolve individual garment/cosmetic ids
-            const gender = await ChatWonderService.getUserGender(userId);
-            let resolvedSets = input.includes("[outfits]")
-              ? await resolveSetOutfits(parsed.sets as Record<string, unknown>[])
-              : await resolveSetProducts(parsed.sets, gender);
-
-            // Fallback: if ChatWonder returned empty sets for a cosmetics request
-            // (e.g. their catalogue is unavailable), run our own rule engine using
-            // the skin_analysis payload and weather from the request body.
-            let fallbackMessage: string | null = null;
-            if (resolvedSets.length === 0 && input.includes("[cosmetics]") && value.skin_analysis) {
-              const destWeather = await resolveDestinationWeather(input);
-              const fallbackSet = await buildFallbackCosmeticsSet(
-                value.skin_analysis as Record<string, unknown>,
-                destWeather
-              );
-              if (fallbackSet) {
-                fallbackMessage = (fallbackSet.message as string) ?? null;
-                const { message: _, ...setWithoutMessage } = fallbackSet as Record<string, unknown>;
-                resolvedSets = [setWithoutMessage];
-                logger.info("[ChatWonderController] Using rule-engine fallback for cosmetics sets");
-              }
-            }
-
+            console.log("[ChatWonderController] Cleaned response:", cleaned);
             // Check if user input contains finalization keywords to save/finalize the plan draft
             const isFinalization =
               /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
                 input
               );
+
             if (isFinalization) {
               await ChatWonderService.finalizeOutlineByConversationId(conversationId);
               logger.info(
@@ -256,15 +209,7 @@ export default class ChatWonderController {
 
             writeSseEvent({
               type: "complete",
-              message: fallbackMessage ?? parsed.message,
-              outfit_suggestion: parsed.outfit_suggestion,
-              mood: parsed.mood,
-              cosmetics_suggestion: parsed.cosmetics_suggestion,
-              route_suggestion: parsed.route_suggestion,
-              images: parsed.images,
-              events: enrichedEvents,
-              sets: resolvedSets,
-              raw_chatwonder_response: cleaned, // Kept so frontend can still see the exact raw text
+              raw_chatwonder_response: cleaned,
               metadata: {
                 conversationId,
                 userMessageId: userMessage.id,
@@ -308,17 +253,15 @@ export default class ChatWonderController {
         },
       };
 
-      // 7. Build catalogue context for cosmetics requests, then stream
-      const documentContext = input.includes("[cosmetics]") ? await buildSkinCatalogContext() : "";
+      const builtInput = `${input}. The current weather context is: ${JSON.stringify(frontendWeather || {})}.`;
 
+      // 7. Stream from external ChatWonder API
       await streamChat({
-        userInput: input,
+        userInput: builtInput,
         sessionId: sessionId as string,
-        persona: personaPrompt,
         callbacks,
-        documentContext,
-        userHistorySelect: "",
         weather: frontendWeather,
+        gender,
       });
     } catch (err) {
       logger.error(`[ChatWonderController] Controller error: ${(err as Error).message}`);

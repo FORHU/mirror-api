@@ -293,7 +293,6 @@ async function askChatWonderForSkinProducts(
           logger.warn(`[SkinAnalysis] ChatWonder stream error: ${err.message}`);
         },
       },
-      documentContext,
     });
 
     if (!fullResponse) {

@@ -485,7 +485,6 @@ export const cognitiveVoiceService = {
         await streamChat({
           userInput: query,
           sessionId: streamSid,
-          persona: "mirror",
           callbacks: {
             onChunk: (chunk) => {
               raw += chunk;
@@ -500,8 +499,6 @@ export const cognitiveVoiceService = {
               }
             },
           },
-          documentContext,
-          userHistorySelect,
         });
       } catch (err) {
         const msg = (err as Error).message;
