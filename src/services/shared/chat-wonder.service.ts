@@ -14,10 +14,25 @@ export default class ChatWonderService {
     if (input.includes("[garments]")) {
       return `You are a Fashion AI. Respond ONLY with VALID JSON matching exactly this schema, with no markdown formatting.
 
-CRITICAL ENUM RULES - YOU MUST ONLY USE THESE EXACT VALUES:
+CRITICAL ENUM RULES — YOU MUST ONLY USE THESE EXACT VALUES (no other values accepted):
 - fittingSlot: "HeadGarment", "Glasses", "Earrings", "UpperGarment", "LowerGarment", "FullGarment", "FootGarment", "LeftHandAccessory", "RightHandAccessory", "NeckAccessory", "WaistAccessory"
 - garmentType: "Hat", "Beanie", "Cap", "Headband", "Shirt", "TShirt", "Polo", "Blouse", "Hoodie", "Sweater", "Jacket", "Coat", "Blazer", "Pants", "Jeans", "Shorts", "Skirt", "Dress", "Jumpsuit", "Romper", "Suit", "Shoes", "Sneakers", "Sandals", "Boots", "Heels", "Socks", "Watch", "Belt", "Sunglasses", "Bag", "Backpack", "Necklace", "Bracelet", "Ring", "Earrings", "Scarf", "Gloves"
 - category: "Streetwear", "Casual", "Formal", "Business", "SmartCasual", "Sportswear", "Activewear", "Athleisure", "Winterwear", "Summerwear", "Rainwear", "Springwear", "Autumnwear", "Vintage", "Minimalist", "Luxury", "AvantGarde"
+
+FITTING SLOT MAPPING — ALWAYS map garment types to the correct slot:
+- Hats / Beanies / Caps / Headbands → "HeadGarment"
+- Sunglasses → "Glasses"
+- Earrings → "Earrings"
+- Shirts / TShirts / Polos / Blouses / Hoodies / Sweaters / Jackets / Coats / Blazers → "UpperGarment"
+- Pants / Jeans / Shorts / Skirts → "LowerGarment"
+- Dresses / Jumpsuits / Rompers / Suits → "FullGarment"
+- Shoes / Sneakers / Sandals / Boots / Heels / Socks → "FootGarment"
+- Watches / Bracelets / Rings → "LeftHandAccessory" or "RightHandAccessory"
+- Bags / Backpacks → "LeftHandAccessory" (NEVER use "Bag" as a fittingSlot value)
+- Necklaces / Scarves → "NeckAccessory"
+- Belts → "WaistAccessory"
+
+ID & IMAGE RULE: If you don't have a real database id, set "id" to "" (empty string). Do NOT invent fake ids like "001". Same for "imageUrl" — leave it as "" if unknown.
 
 WEATHER RULE:
 If the user travels to new locations with different climates, provide an array of estimated weather objects for each location. If the location is the same or weather is unchanged, you MUST set 'weather' to null.
@@ -37,14 +52,14 @@ If the user mentions a new event or location that is not part of their current c
       "trend_note": "A modern twist.",
       "recommendations": [
         {
-          "id": "db_id",
+          "id": "",
           "name": "Item Name",
           "description": "Item description",
           "fittingSlot": "UpperGarment",
           "garmentType": ["Blazer"],
           "category": ["Business"],
           "reason": "Why it fits.",
-          "imageUrl": "url_here"
+          "imageUrl": ""
         }
       ]
     }

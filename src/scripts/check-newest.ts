@@ -1,55 +1,70 @@
-/* eslint-disable no-console */
-import { PrismaClient } from "@prisma/client";
+/**
+ * check-garments-raw.ts
+ * ─────────────────────
+ * Fires the [garments] persona directly against ChatWonder and logs
+ * the full raw response so you can inspect exactly what the AI returns.
+ *
+ * Usage:
+ *   npx ts-node --files src/scripts/check-garments-raw.ts
+ */
 
-const prisma = new PrismaClient();
+import ChatWonderService from "../services/shared/chat-wonder.service";
+import { streamChat } from "../utils/chat-wonder-stream";
+import { parseChatWonderResponse } from "../utils/parse-chatWonder-response.util";
+
+const TEST_INPUT = "[garments] suggest me a casual outfit for today";
+const TEST_GENDER = "FEMALE";
 
 async function main() {
-  console.log("Checking database for newly created outfits...");
+  console.log("🔍  Requesting session from ChatWonder...");
+  const sessionId = await ChatWonderService.generateChatSessionId("debug-user", true);
+  console.log("   Session ID:", sessionId);
 
-  // Total count
-  const count = await prisma.outfit.count({
-    where: { isDeleted: false },
-  });
-  console.log(`Total active outfits in DB: ${count}\n`);
+  const persona = ChatWonderService.getPersonaPrompt(TEST_INPUT, TEST_GENDER);
+  console.log("\n📋  Persona being sent (first 300 chars):");
+  console.log(persona?.slice(0, 300) + "...\n");
 
-  // Get top 5 most recently created
-  const newest = await prisma.outfit.findMany({
-    where: { isDeleted: false },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-    include: {
-      file: true,
-      items: {
-        include: {
-          garment: true,
-        },
+  let raw = "";
+  console.log("📡  Streaming from ChatWonder...\n");
+
+  await streamChat({
+    userInput: TEST_INPUT,
+    sessionId: sessionId as string,
+    persona,
+    documentContext: "",
+    userHistorySelect: "",
+    weather: {},
+    callbacks: {
+      onChunk: (chunk) => {
+        raw += chunk;
+        process.stdout.write(".");
+      },
+      onComplete: () => {
+        console.log("\n\n✅  Stream complete.\n");
+      },
+      onError: (err) => {
+        console.error("\n❌  Stream error:", err.message);
       },
     },
   });
 
-  if (newest.length === 0) {
-    console.log("No outfits found in the database.");
-    return;
-  }
+  console.log("━━━━━━━━━━━━━━━━  RAW RESPONSE  ━━━━━━━━━━━━━━━━");
+  console.log(raw);
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-  console.log("=== Top 5 Newest Outfits ===");
-  newest.forEach((outfit, index) => {
-    console.log(`\n[${index + 1}] Outfit: "${outfit.name}"`);
-    console.log(`    ID: ${outfit.id}`);
-    console.log(`    Created At: ${outfit.createdAt.toISOString()}`);
-    console.log(`    Design Type: ${outfit.designType}`);
-    console.log(`    File URL: ${outfit.file?.fileUrl}`);
-    console.log(`    Garments (${outfit.items.length}):`);
-    outfit.items.forEach((item) => {
-      console.log(`      - [${item.slot}] ${item.garment?.name} (ID: ${item.garmentId})`);
-    });
-  });
+  // Also show the parsed version
+  const parsed = parseChatWonderResponse(raw);
+  console.log("📦  PARSED  →  intent:", parsed.intent);
+  console.log("   message:", parsed.message?.slice(0, 100));
+  console.log("   sets:", parsed.sets?.length ?? 0, "set(s)");
+
+  if (parsed.sets?.length) {
+    console.log("\n🗂️  SETS DETAIL:");
+    console.log(JSON.stringify(parsed.sets, null, 2));
+  }
 }
 
-main()
-  .catch((err) => {
-    console.error("Error executing script:", err);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

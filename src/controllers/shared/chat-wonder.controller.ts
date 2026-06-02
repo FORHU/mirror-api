@@ -7,6 +7,7 @@ import { parseChatWonderResponse } from "../../utils/parse-chatWonder-response.u
 import { resolveItineraryEvents } from "../../utils/chat-wonder-events.util";
 import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
 import { resolveSetProducts } from "../../utils/resolve-set-garments.util";
+import { buildOutfitCatalog, resolveSetOutfits } from "../../utils/chat-wonder-outfits.util";
 import { emitToKiosk } from "../../utils/socket.util";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
@@ -101,6 +102,13 @@ export default class ChatWonderController {
       return res.json({ status: "success", data: { raw, parsed }, message: "OK" });
     } catch (err) {
       logger.error(`[ChatWonderController.streamRaw] ${(err as Error).message}`);
+      
+      // Auto-clear the stale session from Redis so the next request gets a fresh one
+      if ((err as Error).message.includes("Unknown session")) {
+        await CacheUtil.del(`chat:sessionId:${userId}`);
+        logger.info(`[ChatWonderController.streamRaw] Stale session cleared for user ${userId}.`);
+      }
+      
       return responseError(res, 500, (err as Error).message || "Internal server error");
     }
   }
@@ -154,7 +162,14 @@ export default class ChatWonderController {
 
       // 5. Generate strict JSON enforcement prompt to act as the "persona"
       const gender = await ChatWonderService.getUserGender(userId);
-      const personaPrompt = ChatWonderService.getPersonaPrompt(input, gender);
+      let personaPrompt = ChatWonderService.getPersonaPrompt(input, gender);
+
+      // For [outfits] intent: append the live outfit catalog so ChatWonder
+      // can reference real DB ids and imageUrls instead of inventing them.
+      if (personaPrompt && input.includes("[outfits]")) {
+        const outfitCatalog = await buildOutfitCatalog(userId);
+        personaPrompt += outfitCatalog;
+      }
 
       // 6. Set SSE headers
       res.setHeader("Content-Type", "text/event-stream");
@@ -190,10 +205,12 @@ export default class ChatWonderController {
             // Enrich the itinerary events with resolved physical map coordinates
             enrichedEvents = await resolveItineraryLocations(enrichedEvents);
 
-            // Resolve `sets` placeholder ids/imageUrls to real DB records
-            // (garments + cosmetics) by attribute match — no catalog injected
-            // into the prompt, so our data never leaves the system.
-            const resolvedSets = await resolveSetProducts(parsed.sets, gender);
+            // Resolve `sets` — branch on intent:
+            // [outfits] → validate outfitId and hydrate from DB outfit records
+            // everything else → resolve individual garment/cosmetic ids
+            const resolvedSets = input.includes("[outfits]")
+              ? await resolveSetOutfits(parsed.sets as Record<string, unknown>[])
+              : await resolveSetProducts(parsed.sets, gender);
 
             // Check if user input contains finalization keywords to save/finalize the plan draft
             const isFinalization =
