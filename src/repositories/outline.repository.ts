@@ -1,4 +1,5 @@
 import { prisma } from "../utils/prisma";
+import { OUTLINE_STATUS } from "@prisma/client";
 
 export default class OutlineRepo {
   static async findById(id: string) {
@@ -47,6 +48,13 @@ export default class OutlineRepo {
     return prisma.userOutline.update({
       where: { id },
       data,
+    });
+  }
+
+  static async updateStatusByConversationId(conversationId: string, status: OUTLINE_STATUS) {
+    return prisma.userOutline.update({
+      where: { conversationId },
+      data: { status },
     });
   }
 

@@ -484,11 +484,11 @@ export const cognitiveVoiceService = {
       raw = "";
       let sessionExpired = false;
       try {
-        await streamChat(
-          query,
-          streamSid,
-          "mirror",
-          {
+        await streamChat({
+          userInput: query,
+          sessionId: streamSid,
+          persona: "mirror",
+          callbacks: {
             onChunk: (chunk) => {
               raw += chunk;
             },
@@ -503,8 +503,8 @@ export const cognitiveVoiceService = {
             },
           },
           documentContext,
-          userHistorySelect
-        );
+          userHistorySelect,
+        });
       } catch (err) {
         const msg = (err as Error).message;
         logger.error(`[CognitiveVoiceService] Stream failed: ${msg}`);

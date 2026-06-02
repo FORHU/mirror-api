@@ -12,6 +12,16 @@ export default class UserRepository {
   }
 
   /**
+   * Find user gender by ID
+   */
+  static async findGenderById(id: string) {
+    return prisma.user.findFirst({
+      where: { id, isDeleted: false },
+      select: { gender: true },
+    });
+  }
+
+  /**
    * Find a user by email
    */
   static async findByEmail(email: string) {
