@@ -26,17 +26,14 @@ import {
   CHAT_WONDER_API_URL,
 } from "../../config";
 import { weatherService } from "./weather.service";
-import { mapService } from "./map.service";
 import { prisma } from "../../utils/prisma";
 import { streamChat } from "../../utils/chat-wonder-stream";
 import {
   parseChatWonderResponse,
   type ChatWonderParsedResponse,
 } from "../../utils/parse-chatWonder-response.util";
-import { resolveItineraryEvents } from "../../utils/chat-wonder-events.util";
 import logger from "../../utils/logger";
 import ChatRepository from "../../repositories/chat.repository";
-import WeatherSnapshotService from "./weather-snapshot.service";
 import fs from "fs";
 import path from "path";
 
@@ -63,7 +60,11 @@ export interface VoiceContext {
   language?: string;
 }
 
-function buildChatWonderQuery(transcript: string, ctx: VoiceContext, weatherInfo: string): string {
+function buildChatWonderQuery(
+  transcript: string,
+  _ctx: VoiceContext,
+  _weatherInfo: string
+): string {
   // Prompts removed as requested. We can just send the raw transcript.
   return transcript;
 }
@@ -112,7 +113,6 @@ async function askChatWonder(
   // Catalog is no longer injected into the prompt (saved tokens + keeps our
   // product data on our side). Cosmetic recommendations are matched to real
   // CosmeticProduct rows by attributes after parsing — see resolveSetProducts.
-  const documentContext = "";
   const [sid, userHistorySelect] = await Promise.all([
     getChatWonderSession(ctx.sessionId),
     buildConversationHistory(ctx.userOutlineId),
@@ -136,7 +136,6 @@ async function askChatWonder(
     await streamChat({
       userInput: query,
       sessionId: sid,
-      persona: "mirror",
       callbacks: {
         onChunk: (chunk) => {
           raw += chunk;
@@ -148,8 +147,6 @@ async function askChatWonder(
           logger.error(`[VoiceService] ChatWonder stream error: ${err.message}`);
         },
       },
-      documentContext,
-      userHistorySelect,
     });
   } catch (err) {
     logger.error(`[VoiceService] ChatWonder failed: ${(err as Error).message}`);

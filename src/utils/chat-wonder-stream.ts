@@ -1,7 +1,7 @@
 import WebSocket from "ws";
 import { CHAT_WONDER_API_URL } from "../config";
 import logger from "./logger";
-import { PromptBuilder } from "../ai/prompt/prompt.builder";
+// import { PromptBuilder } from "../ai/prompt/prompt.builder";
 
 interface StreamMessage {
   type?: string;
@@ -20,23 +20,13 @@ export interface StreamCallbacks {
 export interface StreamChatOptions {
   userInput: string;
   sessionId: string;
-  persona?: string;
   callbacks: StreamCallbacks;
-  documentContext?: string;
-  userHistorySelect?: string;
   weather?: Record<string, unknown>;
+  gender?: string;
 }
 
 export async function streamChat(options: StreamChatOptions): Promise<void> {
-  const {
-    userInput,
-    sessionId,
-    persona,
-    callbacks,
-    documentContext = "",
-    userHistorySelect = "",
-    weather = {},
-  } = options;
+  const { userInput, sessionId, callbacks, weather = {}, gender = "MALE" } = options;
 
   return new Promise((resolve, reject) => {
     if (!CHAT_WONDER_API_URL) {
@@ -70,20 +60,19 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     ws.on("open", () => {
       logger.info("[CHAT-WONDER-STREAM] WebSocket connected");
 
-      const builtPrompt = PromptBuilder.build({
-        input: userInput,
-        context: {
-          weather,
-          document_context: documentContext,
-        },
-        history: userHistorySelect,
-      });
+      //   const builtPrompt = PromptBuilder.build({
+      //     input: userInput,
+      //     context: {
+      //       weather,
+      //       document_context: documentContext,
+      //     },
+      //     history: userHistorySelect,
+      //   });
 
       const payload = {
         session_id: sessionId,
-        system: builtPrompt.system,
-        user_input: builtPrompt.user,
-        context: builtPrompt.context,
+        user_input: `${userInput} - i am ${gender}`,
+        weather,
       };
       logger.info(
         `[CHAT-WONDER-STREAM] user payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "..." })}`

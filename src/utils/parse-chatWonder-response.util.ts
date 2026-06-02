@@ -120,7 +120,7 @@ function buildFromParsed(
     intent = "MAP";
   }
 
-  let finalMessage = parsed.message ? parsed.message.replace(/[*_~`#]/g, "").trim() : "";
+  let finalMessage = parsed.message ? parsed.message.trim() : "";
 
   // Join the specialized suggestions into the main message block for the UI
   if (outfitSuggestion && !finalMessage.includes(outfitSuggestion)) {
@@ -148,6 +148,44 @@ function buildFromParsed(
 }
 
 /**
+ * Extract and parse a ChatWonder data block into a JSON object.
+ *
+ * ChatWonder appends structured payloads to the response as marker-prefixed
+ * blocks, e.g. `…message text…[GARMENT_DATA]{ "success": true, "sets": […] }[DONE]`.
+ * This pulls out the JSON that follows the given marker (bounded by the next
+ * marker, if any) and parses it — running the same `repairJson` pass as
+ * `parseChatWonderResponse` so malformed model JSON still survives. Returns
+ * `null` when the block is absent or no JSON can be recovered.
+ */
+export function extractChatWonderDataBlock(
+  rawResponse: string,
+  block: "GARMENT_DATA" | "COSMETICS_DATA"
+): Record<string, unknown> | null {
+  const marker = `[${block}]`;
+  const idx = rawResponse.indexOf(marker);
+  if (idx === -1) return null;
+
+  // Take everything after the marker, but stop at the next data/terminator
+  // marker so adjacent blocks don't bleed into this one.
+  const after = rawResponse.slice(idx + marker.length);
+  const stop = after.search(/\[(?:GARMENT_DATA|COSMETICS_DATA|DONE)\]/);
+  const segment = stop === -1 ? after : after.slice(0, stop);
+
+  const jsonMatch = segment.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    try {
+      return JSON.parse(repairJson(jsonMatch[0]));
+    } catch {
+      return null;
+    }
+  }
+}
+
+/**
  * Parse ChatWonder response (handles both JSON and markdown formats)
  */
 export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedResponse {
@@ -155,7 +193,11 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
     const trimmed = rawResponse.trim();
 
     // 1. Try to find and parse JSON
-    const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+    // Strip trailing [GARMENT_DATA] or [COSMETICS_DATA] blocks before greedy regex
+    let cleanForJson = trimmed.replace(/\[GARMENT_DATA\][\s\S]*$/, "");
+    cleanForJson = cleanForJson.replace(/\[COSMETICS_DATA\][\s\S]*$/, "");
+
+    const jsonMatch = cleanForJson.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let parsed: Record<string, any> | null = null;
@@ -196,11 +238,11 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
     }
 
     // 2. Fallback to raw text if JSON fails
-    let fallbackText = trimmed.replace(/\[Sources\][\s\S]*$/, "");
+    const fallbackText = trimmed.replace(/\[Sources\][\s\S]*$/, "");
     // Strip any raw JSON blocks that might have leaked and failed parsing
-    fallbackText = fallbackText.replace(/\{[\s\S]*\}/g, "");
+    // fallbackText = fallbackText.replace(/\{[\s\S]*\}/g, "");
     // Strip common markdown characters that Polly would read out loud
-    fallbackText = fallbackText.replace(/[*_~`#]/g, "").trim();
+    // fallbackText = fallbackText.replace(/[*_~`#]/g, "").trim();
 
     return {
       intent: "NONE" as AIIntent,
