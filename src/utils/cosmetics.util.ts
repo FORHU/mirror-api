@@ -118,7 +118,7 @@ const SKIN_TYPE_PREF: Record<
   DRY: { hydrating: 15, finish: "DEWY" },
   OILY: { oilFree: 15, finish: "MATTE" },
   COMBINATION: { hydrating: 8, oilFree: 8 },
-  NORMAL: {},
+  NORMAL: { hydrating: 12 }, // normal skin still benefits from hydration; ensures products score above MIN_SCORE
   SENSITIVE: { hydrating: 10 },
 };
 

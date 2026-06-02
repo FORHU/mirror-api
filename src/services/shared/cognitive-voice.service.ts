@@ -69,6 +69,7 @@ export interface CognitiveResponse {
   intent: CognitiveIntentBlock;
   emotion: CognitiveEmotion;
   action: CognitiveAction | null;
+  secondaryAction?: CognitiveAction | null;
   followUpQuestion: string | null;
   requiresConfirmation: boolean;
   suggestions: string[];
@@ -152,6 +153,7 @@ Gender Guard:
 - If "- User gender:" is ABSENT and the user asks for FASHION or COSMETICS, you MUST set action to "navigate" with route "/select-gender" and tell them to select a gender.
 - EXTREMELY IMPORTANT: If the user asks for anything related to MAPS, LOCATIONS, or DIRECTIONS, IGNORE gender entirely (known or not). You MUST immediately issue a map action (use "maps_show_route" to give directions). NEVER ask for their gender when dealing with maps.
 
+<<<<<<< HEAD
 Gender Capture Rule:
 - When the user STATES or SELECTS their gender — e.g. "male", "I'm male", "I am a man", "I'm a guy", "female", "I'm female", "I am a woman", "I'm a girl" — you MUST emit action "select_gender" with payload.gender set to EXACTLY "MALE" or "FEMALE" (uppercase). Confirm warmly and briefly (e.g. "Got it!").
 - After the user provides their gender, NEVER ask for it again in the same reply. Treat the gender as captured.
@@ -159,18 +161,31 @@ Gender Capture Rule:
 
 Recommendation Guard (Fashion & Cosmetics):
 - Before navigating to /ai-recommendation-fashion or /ai-recommendation-cosmetic, you MUST know the user's intended destination, event, or venue (e.g., "the office", "a party", "the park").
+=======
+Recommendation Guard (Fashion):
+- Before navigating to /ai-recommendation-fashion, you MUST know the user's intended destination, event, or venue (e.g., "the office", "a party", "the park").
+>>>>>>> 29733870c0ca00933080c3c813e227bacb718134
 - If the venue/location is UNKNOWN, DO NOT navigate. Set action to "none", and ask the user where they are going.
-- For Fashion: If the venue is known, but the user hasn't specified if they want a single [ garment ] or a full [ outfit ], ask them to clarify before navigating.
-- Once the venue (and garment/outfit choice for fashion) is KNOWN:
-  1. Set the action type to "navigate" with the respective route. For Fashion, you MUST include "suggestion": "garment" or "suggestion": "outfit" in the action payload.
+- If the venue is known, but the user hasn't specified if they want a single [ garment ] or a full [ outfit ], ask them to clarify before navigating.
+- Once the venue AND garment/outfit choice is KNOWN:
+  1. Set the action type to "navigate" with route "/ai-recommendation-fashion". You MUST include "suggestion": "garment" or "suggestion": "outfit" in the action payload.
   2. You MUST populate the "events" array with itinerary event objects for EACH destination (if the user discusses a multi-event day) tailored to the venue and weather.
 
+<<<<<<< HEAD
 Direct Launch Rule (Main Menu — OVERRIDES the Recommendation Guard):
 - "/authentication" is the main menu / launchpad. When "- Current screen:" is "/authentication" and the user asks for FASHION, COSMETICS, or MAPS, you MUST navigate DIRECTLY to that feature and provide recommendations. Do NOT interrogate for a venue first — the venue requirement above does NOT apply when launching from "/authentication".
 - GENDER IS A HARD PRECONDITION for Fashion and Cosmetics. If gender is UNKNOWN, you MUST navigate to "/select-gender" first and NEVER to "/ai-recommendation-fashion" or "/ai-recommendation-cosmetic". This applies even on the main menu — "direct launch" does NOT bypass gender.
 - ONLY when gender is KNOWN: Fashion → navigate "/ai-recommendation-fashion" (if no garment/outfit preference was stated, default to "suggestion": "outfit"); Cosmetics → navigate "/ai-recommendation-cosmetic".
 - Maps/directions → emit "maps_show_route" if a destination is given, otherwise navigate "/map". Maps ignore gender.
 - Populate the "events" array with recommendation events based on whatever context is available (weather, time of day), even when the user did not name a specific destination.
+=======
+Recommendation Guard (Cosmetics):
+- /ai-recommendation-cosmetic IS the skin analysis page. It always captures the user's face first, then recommends products based on their skin. There is no separate skin analysis step.
+- Whenever the user asks for cosmetic product recommendations, skincare advice, or skin analysis — for ANY reason — navigate IMMEDIATELY to /ai-recommendation-cosmetic. Do NOT ask for a venue, event, or destination first.
+- Your "reply" MUST always mention that the skin will be analyzed first (e.g. "I'll scan your skin first and then recommend the best products for you."). Never say just "cosmetic recommendation page" — always reference the skin analysis step.
+- If the user ALSO mentions a place or destination (e.g. "and get the location", "I'm going to SM Baguio"), set "action" to navigate to /ai-recommendation-cosmetic AND set "secondaryAction" to "maps_show_route" with the named destination. Both happen at once.
+- Never block cosmetic navigation to wait for any additional info. Proceed immediately.
+>>>>>>> 29733870c0ca00933080c3c813e227bacb718134
 
 If the context contains mode: "confirm_context_required", the user gave an ambiguous reply (e.g., "maybe") to a confirmation prompt. Ask them to clarify with a friendly follow-up question. Set action to null.`;
 
@@ -187,12 +202,16 @@ Respond ONLY with valid JSON matching this schema:
   "emotion": "neutral" | "excited" | "urgent" | "curious" | "relaxed" | "frustrated",
   "action": {
     "type": "<action type>",
-    "payload": { 
+    "payload": {
       "route": "<optional route>",
       "destination": "<optional destination>",
       "suggestion": "<garment or outfit (for fashion)>",
       "gender": "<optional gender>"
     }
+  } | null,
+  "secondaryAction": {
+    "type": "<secondary action type, e.g. maps_show_route>",
+    "payload": { "destination": "<optional destination>" }
   } | null,
   "followUpQuestion": "<optional clarifying question or null>",
   "requiresConfirmation": false | true,
@@ -459,30 +478,57 @@ export const cognitiveVoiceService = {
     );
 
     let raw = "";
-    try {
-      await streamChat(
-        query,
-        sid,
-        "mirror",
-        {
-          onChunk: (chunk) => {
-            raw += chunk;
+    let activeSid = sid;
+
+    const doStream = async (streamSid: string): Promise<boolean> => {
+      raw = "";
+      let sessionExpired = false;
+      try {
+        await streamChat(
+          query,
+          streamSid,
+          "mirror",
+          {
+            onChunk: (chunk) => {
+              raw += chunk;
+            },
+            onComplete: () => {
+              /* stream complete */
+            },
+            onError: (err) => {
+              logger.error(`[CognitiveVoiceService] Stream error: ${err.message}`);
+              if (err.message.toLowerCase().includes("unknown session")) {
+                sessionExpired = true;
+              }
+            },
           },
-          onComplete: () => {
-            /* stream complete */
-          },
-          onError: (err) => {
-            logger.error(`[CognitiveVoiceService] Stream error: ${err.message}`);
-          },
-        },
-        documentContext,
-        userHistorySelect
-      );
-    } catch (err) {
-      logger.error(`[CognitiveVoiceService] Stream failed: ${(err as Error).message}`);
+          documentContext,
+          userHistorySelect
+        );
+      } catch (err) {
+        const msg = (err as Error).message;
+        logger.error(`[CognitiveVoiceService] Stream failed: ${msg}`);
+        if (msg.toLowerCase().includes("unknown session")) {
+          sessionExpired = true;
+        }
+      }
+      return sessionExpired;
+    };
+
+    const sessionExpired = await doStream(activeSid);
+
+    if (sessionExpired) {
+      logger.warn("[CognitiveVoiceService] Session expired, fetching new session and retrying...");
+      const freshSid = await getSession(undefined, chatWonderApiUrl);
+      if (freshSid) {
+        activeSid = freshSid;
+        await doStream(activeSid);
+      } else {
+        logger.error("[CognitiveVoiceService] Could not obtain a fresh session for retry");
+      }
     }
 
     logger.debug(`[CognitiveVoiceService] Raw response:\n${raw}`);
-    return { response: parseCognitiveResponse(raw), sessionId: sid };
+    return { response: parseCognitiveResponse(raw), sessionId: activeSid };
   },
 };

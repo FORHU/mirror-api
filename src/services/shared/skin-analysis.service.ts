@@ -20,6 +20,7 @@ import {
 } from "../../config";
 import logger from "../../utils/logger";
 import { parsePagination } from "../../helpers/pagination.helper";
+import { notifyCompanion } from "../../utils/socket.util";
 
 // ─── Mock skin-analysis loader (dev) ────────────────────────────────────────
 
@@ -475,7 +476,12 @@ export default class SkinAnalysisService {
       }))
     );
 
-    // 6. Link this SkinAnalysis to the user's active/latest UserOutline (if user is logged in)
+    // 6. Push result to FE via Socket.io before any further DB work
+    if (userId) {
+      notifyCompanion(userId, "skin_analysis_complete", created);
+    }
+
+    // 7. Link this SkinAnalysis to the user's active/latest UserOutline (if user is logged in)
     if (userId) {
       let outline = await prisma.userOutline.findFirst({
         where: { userId },

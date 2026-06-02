@@ -10,7 +10,7 @@ export const CognitiveResponseSchema = z.object({
   emotion: z.enum(["neutral", "excited", "urgent", "curious", "relaxed", "frustrated"]),
   action: z.any().nullable(),
   followUpQuestion: z.string().nullable(),
-  requiresConfirmation: z.boolean(),
+  requiresConfirmation: z.boolean().catch(false),
   suggestions: z.array(z.string()).optional().default([]),
   memoryUpdates: z.record(z.string(), z.any()).optional().default({}),
   uiHints: z.object({
