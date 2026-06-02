@@ -208,9 +208,7 @@ export default class ChatWonderController {
 
               if (kioskId) {
                 emitToKiosk(kioskId, "itinerary_locked", { conversationId });
-                logger.info(
-                  `[ChatWonderController] Emitted itinerary_locked to kiosk: ${kioskId}`
-                );
+                logger.info(`[ChatWonderController] Emitted itinerary_locked to kiosk: ${kioskId}`);
               }
             }
 
@@ -239,9 +237,7 @@ export default class ChatWonderController {
             });
             res.end();
           } catch (err) {
-            logger.error(
-              `[ChatWonderController] Error saving response: ${(err as Error).message}`
-            );
+            logger.error(`[ChatWonderController] Error saving response: ${(err as Error).message}`);
             writeSseEvent({ type: "error", message: "Failed to save response" });
             res.end();
           }
