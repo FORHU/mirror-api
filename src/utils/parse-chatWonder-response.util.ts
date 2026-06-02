@@ -90,6 +90,30 @@ function repairJson(input: string): string {
 }
 
 /**
+ * The trailing metadata blocks ChatWonder appends after the prose. Anything from
+ * the first such marker onward is structured data, not user-facing message text.
+ */
+const DATA_BLOCK_TAIL = /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|DONE)\][\s\S]*$/;
+
+/**
+ * The per-set markdown breakdown ChatWonder writes after the conversational
+ * intro (`## Set 1 — …`, `## Set  — …`). Every field in it is duplicated in the
+ * structured GARMENT_DATA block, so it's redundant in the message. Targets the
+ * literal word "Set" only — single-outfit responses use other headings
+ * (e.g. `### Outfit Composition`) and must be left intact.
+ */
+const SET_BREAKDOWN_TAIL = /\n*#{1,6}\s*Set\b[\s\S]*$/i;
+
+/**
+ * Reduce a raw response to the user-facing message: drop the trailing data
+ * blocks and the redundant per-set breakdown. Does NOT trim, so callers that
+ * stream incrementally can track emitted length; trim at the final use site.
+ */
+export function cutToMessage(text: string): string {
+  return text.replace(DATA_BLOCK_TAIL, "").replace(SET_BREAKDOWN_TAIL, "");
+}
+
+/**
  * Build the structured response from a successfully-parsed object.
  */
 function buildFromParsed(
@@ -120,7 +144,7 @@ function buildFromParsed(
     intent = "MAP";
   }
 
-  let finalMessage = parsed.message ? parsed.message.trim() : "";
+  let finalMessage = parsed.message ? cutToMessage(parsed.message).trim() : "";
 
   // Join the specialized suggestions into the main message block for the UI
   if (outfitSuggestion && !finalMessage.includes(outfitSuggestion)) {
@@ -237,12 +261,11 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
       }
     }
 
-    // 2. Fallback to raw text if JSON fails
-    const fallbackText = trimmed.replace(/\[Sources\][\s\S]*$/, "");
-    // Strip any raw JSON blocks that might have leaked and failed parsing
-    // fallbackText = fallbackText.replace(/\{[\s\S]*\}/g, "");
-    // Strip common markdown characters that Polly would read out loud
-    // fallbackText = fallbackText.replace(/[*_~`#]/g, "").trim();
+    // 2. Fallback to raw text if JSON fails.
+    // Cut at the first metadata marker so the structured blocks ChatWonder
+    // appends ([GARMENT_DATA]/[COSMETICS_DATA]/[DONE]/[Sources]) never bleed
+    // into the user-facing message.
+    const fallbackText = cutToMessage(trimmed).trim();
 
     return {
       intent: "NONE" as AIIntent,

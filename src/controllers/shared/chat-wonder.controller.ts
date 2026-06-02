@@ -6,6 +6,7 @@ import { stripSourcesPrefix } from "../../utils/source-metadata.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
+  cutToMessage,
 } from "../../utils/parse-chatWonder-response.util";
 import { emitToKiosk } from "../../utils/socket.util";
 import logger from "../../utils/logger";
@@ -171,20 +172,43 @@ export default class ChatWonderController {
         responseWithFlush.flush?.();
       };
 
+      // Tracks how much clean prose we've already streamed to the display channel.
+      // ChatWonder appends `[GARMENT_DATA]{…}` / `[COSMETICS_DATA]{…}` / `[DONE]`
+      // blocks and a per-set `## Set …` breakdown AFTER the conversational intro,
+      // streamed token-by-token. `cutToMessage` removes both; we run it on the
+      // cumulative buffer and emit only the new portion, so the display matches
+      // the authoritative `parsed.message`.
+      let displayedLen = 0;
+      const cleanDisplayPrefix = (full: string): string => {
+        let display = cutToMessage(full);
+        // Hold back a possibly-incomplete trailing data marker (unclosed `[…`)
+        // so a half-arrived `[GARMENT_DATA]` never flickers in.
+        const lastOpen = display.lastIndexOf("[");
+        if (lastOpen !== -1 && !display.slice(lastOpen).includes("]")) {
+          display = display.slice(0, lastOpen);
+        }
+        // Hold back an in-progress heading line: until its text is complete we
+        // can't tell a `## Set` (cut) from a kept heading like `### Outfit …`.
+        const lastNL = display.lastIndexOf("\n");
+        const lastLine = display.slice(lastNL + 1).trimStart();
+        if (/^#{1,6}(\s|$)/.test(lastLine)) {
+          display = lastNL === -1 ? "" : display.slice(0, lastNL);
+        }
+        return display;
+      };
+
       const callbacks: StreamCallbacks = {
         onChunk: (chunk: string) => {
           fullResponse += chunk;
           // Mirror EVERY chunk verbatim on a separate event so a raw consumer can
           // concatenate all `raw_chunk` events to reconstruct the exact byte stream.
           writeSseEvent({ type: "raw_chunk", content: chunk });
-          // Display stream: drop internal ChatWonder metadata chunks so the chat
-          // bubble never renders them.
-          if (
-            !chunk.startsWith("[COSMETICS_DATA]") &&
-            !chunk.startsWith("[GARMENT_DATA]") &&
-            chunk !== "[DONE]"
-          ) {
-            writeSseEvent({ type: "chunk", content: chunk });
+          // Display stream: forward only the clean prose, never the trailing
+          // metadata blocks.
+          const display = cleanDisplayPrefix(fullResponse);
+          if (display.length > displayedLen) {
+            writeSseEvent({ type: "chunk", content: display.slice(displayedLen) });
+            displayedLen = display.length;
           }
         },
         onComplete: async () => {
@@ -218,8 +242,18 @@ export default class ChatWonderController {
               parsed.message
             );
 
+            // Surface the trailing structured blocks as parsed JSON for the client.
+            const garment = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
+            const cosmetics = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
+
             writeSseEvent({
               type: "complete",
+              // Authoritative clean prose (marker blocks stripped). Use this as the
+              // display message; the streamed `chunk` events build the same text.
+              message: parsed.message,
+              // Parsed structured payloads (null when ChatWonder didn't send them).
+              garment,
+              cosmetics,
               // Literal, untouched bytes as received from ChatWonder.
               raw: fullResponse,
               // NOTE: despite the name, this is `cleaned` (post stripSourcesPrefix),
