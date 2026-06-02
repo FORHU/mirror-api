@@ -72,7 +72,6 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
       const builtPrompt = PromptBuilder.build({
         input: userInput,
-        persona,
         context: {
           weather,
           document_context: documentContext,
