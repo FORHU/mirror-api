@@ -171,7 +171,11 @@ export default class ChatWonderController {
       const callbacks: StreamCallbacks = {
         onChunk: (chunk: string) => {
           fullResponse += chunk;
-          // Don't forward internal ChatWonder metadata chunks to the client
+          // Mirror EVERY chunk verbatim on a separate event so a raw consumer can
+          // concatenate all `raw_chunk` events to reconstruct the exact byte stream.
+          writeSseEvent({ type: "raw_chunk", content: chunk });
+          // Display stream: drop internal ChatWonder metadata chunks so the chat
+          // bubble never renders them.
           if (!chunk.startsWith("[COSMETICS_DATA]") && !chunk.startsWith("[GARMENT_DATA]") && chunk !== "[DONE]") {
             writeSseEvent({ type: "chunk", content: chunk });
           }
@@ -209,6 +213,10 @@ export default class ChatWonderController {
 
             writeSseEvent({
               type: "complete",
+              // Literal, untouched bytes as received from ChatWonder.
+              raw: fullResponse,
+              // NOTE: despite the name, this is `cleaned` (post stripSourcesPrefix),
+              // kept for backward compatibility with existing clients.
               raw_chatwonder_response: cleaned,
               metadata: {
                 conversationId,
