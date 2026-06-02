@@ -37,7 +37,7 @@
     "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
     "winston": "^3.11.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.161",
@@ -57,6 +57,6 @@
     "nodemon": "^3.1.11",
     "prettier": "^3.0.3",
     "ts-node": "^10.9.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
   }
 }
