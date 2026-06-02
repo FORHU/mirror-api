@@ -74,6 +74,80 @@ export interface ChatWonderParsedResponse {
 }
 
 /**
+ * Repair common LLM JSON defects so structured data survives a slip.
+ * Handles empty values (`"key":,` / `"key": }`) and trailing commas, which
+ * are the failure modes we see from the model (e.g. `"success":,`,
+ * `"set_number": ,`).
+ */
+function repairJson(input: string): string {
+  return (
+    input
+      // "key": ,  /  "key": }  /  "key": ]  -> empty value becomes null
+      .replace(/(:\s*)(?=[,}\]])/g, "$1null")
+      // trailing comma before a closing brace/bracket
+      .replace(/,(\s*[}\]])/g, "$1")
+  );
+}
+
+/**
+ * Build the structured response from a successfully-parsed object.
+ */
+function buildFromParsed(
+  parsed: Record<string, any>,
+  rawResponse: string
+): ChatWonderParsedResponse {
+  // Support both new { data: { outfit, cosmetics, route } } and old flat fields
+  const data = parsed.data ?? {};
+  const outfitSuggestion =
+    data.outfit ?? parsed.outfit_suggestion ?? parsed.outfitSuggestion ?? null;
+  const cosmeticsSuggestion =
+    data.cosmetics ?? parsed.cosmetics_suggestion ?? parsed.cosmeticsSuggestion ?? null;
+  const routeSuggestion =
+    data.route ?? parsed.route_suggestion ?? parsed.routeSuggestion ?? null;
+
+  // Derive strict intent enum
+  let intent: AIIntent = "NONE";
+  if (parsed.intent) {
+    const upper = String(parsed.intent).toUpperCase();
+    if (["FASHION", "COSMETIC", "MAP", "MENU", "RESTART", "NONE"].includes(upper)) {
+      intent = upper as AIIntent;
+    }
+  } else if (outfitSuggestion) {
+    intent = "FASHION";
+  } else if (cosmeticsSuggestion) {
+    intent = "COSMETIC";
+  } else if (routeSuggestion) {
+    intent = "MAP";
+  }
+
+  let finalMessage = parsed.message ? parsed.message.replace(/[*_~`#]/g, "").trim() : "";
+
+  // Join the specialized suggestions into the main message block for the UI
+  if (outfitSuggestion && !finalMessage.includes(outfitSuggestion)) {
+    finalMessage += `\n\n[ garments ] ${outfitSuggestion}`;
+  }
+  if (cosmeticsSuggestion && !finalMessage.includes(cosmeticsSuggestion)) {
+    finalMessage += `\n\n[ cosmetics ] ${cosmeticsSuggestion}`;
+  }
+  if (routeSuggestion && !finalMessage.includes(routeSuggestion)) {
+    finalMessage += `\n\n[ map ] ${routeSuggestion}`;
+  }
+
+  return {
+    intent,
+    message: finalMessage.trim(),
+    outfit_suggestion: outfitSuggestion,
+    mood: parsed.mood ?? null,
+    cosmetics_suggestion: cosmeticsSuggestion,
+    route_suggestion: routeSuggestion,
+    images: Array.isArray(parsed.images) ? parsed.images : [],
+    events: Array.isArray(parsed.events) ? parsed.events : [],
+    sets: Array.isArray(parsed.sets) ? parsed.sets : [],
+    raw: rawResponse,
+  };
+}
+
+/**
  * Parse ChatWonder response (handles both JSON and markdown formats)
  */
 export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedResponse {
@@ -83,79 +157,40 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
     // 1. Try to find and parse JSON
     const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
+      let parsed: Record<string, any> | null = null;
       try {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.message || parsed.sets || parsed.success) {
-          // Support both new { data: { outfit, cosmetics, route } } and old flat fields
-          const data = parsed.data ?? {};
-          const outfitSuggestion =
-            data.outfit ?? parsed.outfit_suggestion ?? parsed.outfitSuggestion ?? null;
-          const cosmeticsSuggestion =
-            data.cosmetics ?? parsed.cosmetics_suggestion ?? parsed.cosmeticsSuggestion ?? null;
-          const routeSuggestion =
-            data.route ?? parsed.route_suggestion ?? parsed.routeSuggestion ?? null;
-
-          // Derive strict intent enum
-          let intent: AIIntent = "NONE";
-          if (parsed.intent) {
-            const upper = String(parsed.intent).toUpperCase();
-            if (["FASHION", "COSMETIC", "MAP", "MENU", "RESTART", "NONE"].includes(upper)) {
-              intent = upper as AIIntent;
-            }
-          } else if (outfitSuggestion) {
-            intent = "FASHION";
-          } else if (cosmeticsSuggestion) {
-            intent = "COSMETIC";
-          } else if (routeSuggestion) {
-            intent = "MAP";
-          }
-
-          let finalMessage = parsed.message ? parsed.message.replace(/[*_~`#]/g, "").trim() : "";
-
-          // Join the specialized suggestions into the main message block for the UI
-          if (outfitSuggestion && !finalMessage.includes(outfitSuggestion)) {
-            finalMessage += `\n\n[ garments ] ${outfitSuggestion}`;
-          }
-          if (cosmeticsSuggestion && !finalMessage.includes(cosmeticsSuggestion)) {
-            finalMessage += `\n\n[ cosmetics ] ${cosmeticsSuggestion}`;
-          }
-          if (routeSuggestion && !finalMessage.includes(routeSuggestion)) {
-            finalMessage += `\n\n[ map ] ${routeSuggestion}`;
-          }
-
-          return {
-            intent,
-            message: finalMessage.trim(),
-            outfit_suggestion: outfitSuggestion,
-            mood: parsed.mood ?? null,
-            cosmetics_suggestion: cosmeticsSuggestion,
-            route_suggestion: routeSuggestion,
-            images: Array.isArray(parsed.images) ? parsed.images : [],
-            events: Array.isArray(parsed.events) ? parsed.events : [],
-            sets: Array.isArray(parsed.sets) ? parsed.sets : [],
-            raw: rawResponse,
-          };
-        }
+        parsed = JSON.parse(jsonMatch[0]);
       } catch (err) {
-        logger.warn(
-          `[Parser] JSON parse failed, falling back to markdown. Raw response was: ${rawResponse}`
-        );
-        // Attempt to salvage the "message" field if JSON is slightly malformed
-        const msgMatch = jsonMatch[0].match(/"message"\s*:\s*"([^"]+)"/);
-        if (msgMatch && msgMatch[1]) {
-          return {
-            intent: "NONE" as AIIntent,
-            message: msgMatch[1].replace(/\\n/g, "\n"),
-            outfit_suggestion: null,
-            mood: null,
-            cosmetics_suggestion: null,
-            route_suggestion: null,
-            images: [],
-            events: [],
-            sets: [],
-            raw: rawResponse,
-          };
+        // Model emitted slightly-malformed JSON (empty values, trailing commas).
+        // Repair and retry before giving up so we don't lose `sets`/suggestions.
+        try {
+          parsed = JSON.parse(repairJson(jsonMatch[0]));
+          logger.warn(`[Parser] Recovered malformed JSON via repair pass.`);
+        } catch (repairErr) {
+          logger.warn(
+            `[Parser] JSON parse failed (even after repair), falling back to markdown. Raw response was: ${rawResponse}`
+          );
+          // Last resort: salvage just the "message" field.
+          const msgMatch = jsonMatch[0].match(/"message"\s*:\s*"([^"]+)"/);
+          if (msgMatch && msgMatch[1]) {
+            return {
+              intent: "NONE" as AIIntent,
+              message: msgMatch[1].replace(/\\n/g, "\n"),
+              outfit_suggestion: null,
+              mood: null,
+              cosmetics_suggestion: null,
+              route_suggestion: null,
+              images: [],
+              events: [],
+              sets: [],
+              raw: rawResponse,
+            };
+          }
         }
+      }
+
+      if (parsed && (parsed.message || parsed.sets || parsed.success)) {
+        return buildFromParsed(parsed, rawResponse);
       }
     }
 
