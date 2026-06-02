@@ -102,7 +102,7 @@ export default class ChatWonderController {
       return res.json({ status: "success", data: { raw, parsed }, message: "OK" });
     } catch (err) {
       logger.error(`[ChatWonderController.streamRaw] ${(err as Error).message}`);
-      
+
       // Auto-clear the stale session from Redis so the next request gets a fresh one
       if ((err as Error).message.includes("Unknown session")) {
         await CacheUtil.del(`chat:sessionId:${userId}`);
@@ -162,14 +162,15 @@ export default class ChatWonderController {
 
       // 5. Generate strict JSON enforcement prompt to act as the "persona"
       const gender = await ChatWonderService.getUserGender(userId);
-      let personaPrompt = ChatWonderService.getPersonaPrompt(input, gender);
+      let personaPrompt: string | undefined = undefined; 
+      // ChatWonderService.getPersonaPrompt(input, gender);
 
       // For [outfits] intent: append the live outfit catalog so ChatWonder
       // can reference real DB ids and imageUrls instead of inventing them.
-      if (personaPrompt && input.includes("[outfits]")) {
-        const outfitCatalog = await buildOutfitCatalog(userId);
-        personaPrompt += outfitCatalog;
-      }
+      // if (personaPrompt && input.includes("[outfits]")) {
+      //   const outfitCatalog = await buildOutfitCatalog(userId);
+      //   personaPrompt += outfitCatalog;
+      // }
 
       // 6. Set SSE headers
       res.setHeader("Content-Type", "text/event-stream");
@@ -246,6 +247,7 @@ export default class ChatWonderController {
               images: parsed.images,
               events: enrichedEvents,
               sets: resolvedSets,
+              raw_chatwonder_response: cleaned, // Kept so frontend can still see the exact raw text
               metadata: {
                 conversationId,
                 userMessageId: userMessage.id,

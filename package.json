@@ -10,8 +10,8 @@
     "start": "node ./dist/server.js",
     "lint": "eslint src/**/*.ts --fix",
     "db:setup": "npx prisma generate && npx prisma migrate dev",
-    "outfits:generate": "ts-node src/scripts/generate-outfits.ts",
     "format": "npm run lint && prettier --write \"src/**/*.ts\""
+  },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.1053.0",
     "@aws-sdk/client-polly": "^3.1047.0",
