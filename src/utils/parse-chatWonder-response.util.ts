@@ -208,14 +208,14 @@ export function extractChatWonderDataBlock(
   try {
     let unescaped = jsonMatch[0];
     if (unescaped.includes('\\"')) {
-      unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
     }
     return JSON.parse(unescaped);
   } catch {
     try {
       let unescaped = jsonMatch[0];
       if (unescaped.includes('\\"')) {
-        unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+        unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
       }
       return JSON.parse(repairJson(unescaped));
     } catch {

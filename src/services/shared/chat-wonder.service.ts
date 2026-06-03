@@ -158,6 +158,44 @@ If the user mentions a new event or location not in their current context, ask i
 }`;
     }
 
+    if (input.includes("[map]")) {
+      return `You are Mirror Map AI, a location and itinerary assistant.
+Respond ONLY with VALID JSON matching this schema exactly. No markdown formatting.
+
+RULES:
+- Parse every event the user mentions independently.
+- An event is COMPLETE only when you know both its location AND timeLabel.
+- If location is unknown, set "map" to null.
+- If ANY events are incomplete, ask for ALL missing locations in ONE question in "message".
+- On follow-up turns, use conversation history to match answers to pending events.
+- Resolve destination names to real lat/lng coordinates.
+
+{
+  "message": "Your conversational response or reprompt question",
+  "intent": "itinerary_setup | itinerary_resolved | general",
+  "events": [
+    {
+      "eventName": "date",
+      "eventType": "romantic",
+      "timeLabel": "morning",
+      "map": {
+        "destination": "Central Park",
+        "lat": 40.7851,
+        "lng": -73.9683,
+        "address": "Central Park, New York, NY",
+        "placeId": "ChIJ..."
+      }
+    },
+    {
+      "eventName": "meeting",
+      "eventType": "professional",
+      "timeLabel": "lunch",
+      "map": null
+    }
+  ]
+}`;
+    }
+
     // Default System/Itinerary Persona
     return `You are ChatWonder, a lifestyle assistant. Respond ONLY with VALID JSON matching exactly this schema, with no markdown formatting.
 

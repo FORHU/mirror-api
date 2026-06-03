@@ -142,11 +142,12 @@ export default class ChatWonderController {
    */
   static async streamChat(req: Request, res: Response) {
     const userId = (req as Request & { user?: { id: string } }).user?.id;
-    const gender = await ChatWonderService.getUserGender(userId as string);
 
     if (!userId) {
       return responseError(res, 401, "Unauthorized");
     }
+
+    const gender = await ChatWonderService.getUserGender(userId);
 
     const schema = Joi.object({
       input: Joi.string().min(1).max(5000).optional(),
@@ -159,6 +160,15 @@ export default class ChatWonderController {
       skin_analysis: Joi.object().optional(),
       kioskId: Joi.string().optional(),
       sitemap_context: Joi.array().items(Joi.string()).optional(),
+      history: Joi.array()
+        .items(
+          Joi.object({
+            role: Joi.string().valid("user", "assistant").required(),
+            content: Joi.string().required(),
+          })
+        )
+        .max(10)
+        .optional(),
     }).or("input", "user_input"); // Require at least one of these
 
     const { error, value } = schema.validate(req.body, { allowUnknown: true });
@@ -172,6 +182,7 @@ export default class ChatWonderController {
     const frontendWeather = value.weather;
     const frontendLocation = value.location;
     const sitemapContext = value.sitemap_context;
+    const history = (value.history ?? []).slice(-10);
 
     try {
       // 1. Ensure conversation exists
@@ -349,6 +360,7 @@ export default class ChatWonderController {
         weather: frontendWeather,
         gender,
         sitemapContext,
+        history,
       });
     } catch (err) {
       logger.error(`[ChatWonderController] Controller error: ${(err as Error).message}`);
@@ -393,6 +405,15 @@ export default class ChatWonderController {
       voice: Joi.boolean().optional(), // opt-in: synthesize TTS audio for the reply
       lang: Joi.string().optional(), // TTS language (e.g. "en-US", "fr-FR", "ko-KR")
       sitemap_context: Joi.array().items(Joi.string()).optional(),
+      history: Joi.array()
+        .items(
+          Joi.object({
+            role: Joi.string().valid("user", "assistant").required(),
+            content: Joi.string().required(),
+          })
+        )
+        .max(10)
+        .optional(),
     }).or("input", "user_input"); // Require at least one of these
 
     const { error, value } = schema.validate(req.body, { allowUnknown: true });
@@ -408,6 +429,7 @@ export default class ChatWonderController {
     const wantsVoice = value.voice === true;
     const ttsLang = value.lang || "en-US";
     const sitemapContext = value.sitemap_context;
+    const history = (value.history ?? []).slice(-10);
 
     try {
       const gender = await ChatWonderService.getUserGender(userId);
@@ -448,6 +470,7 @@ export default class ChatWonderController {
         weather: frontendWeather,
         gender,
         sitemapContext,
+        history,
       });
 
       if (streamError) {
@@ -470,7 +493,7 @@ export default class ChatWonderController {
       // markers or the appended `[MAPS_DATA]` / `[NAV_DATA]` blocks — the structured
       // data lives in *_data above.
       const message = parsed.message
-        .split(/\n\n\[ (?:garments|cosmetics|map) \]/)[0]
+        .split(/\n\n\[\s*(?:garments|cosmetics|map)\s*\]/)[0]
         .split("[MAPS_DATA]")[0]
         .split("[NAV_DATA]")[0]
         .trim();
