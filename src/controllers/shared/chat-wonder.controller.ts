@@ -289,6 +289,8 @@ export default class ChatWonderController {
               cosmetics,
               maps,
               nav,
+              events: parsed.events,
+              sets: parsed.sets,
               // Literal, untouched bytes as received from ChatWonder.
               raw: fullResponse,
               // NOTE: despite the name, this is `cleaned` (post stripSourcesPrefix),
@@ -525,6 +527,8 @@ export default class ChatWonderController {
           maps_data,
           // Navigation decision (target_url, confidence, …) for [nav] requests.
           nav_data,
+          events: parsed.events,
+          sets: parsed.sets,
           metadata: {
             conversationId,
             userMessageId: userMessage.id,

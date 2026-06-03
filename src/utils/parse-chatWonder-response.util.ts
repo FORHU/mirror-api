@@ -206,10 +206,18 @@ export function extractChatWonderDataBlock(
   if (!jsonMatch) return null;
 
   try {
-    return JSON.parse(jsonMatch[0]);
+    let unescaped = jsonMatch[0];
+    if (unescaped.includes('\\"')) {
+      unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    }
+    return JSON.parse(unescaped);
   } catch {
     try {
-      return JSON.parse(repairJson(jsonMatch[0]));
+      let unescaped = jsonMatch[0];
+      if (unescaped.includes('\\"')) {
+        unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      }
+      return JSON.parse(repairJson(unescaped));
     } catch {
       return null;
     }
