@@ -17,7 +17,6 @@ import { responseSuccess } from "../../helpers/response.helper";
 import { pageFromRepo } from "../../helpers/pagination.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
-const unauthorizedError = () => ({ status: 401, message: "Authentication required" });
 
 const itemSchema = Joi.object({
   garmentId: Joi.string().required(),
@@ -312,8 +311,7 @@ export default class OutfitController {
    */
   static async evaluate(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as Request & { user?: { id: string } }).user?.id;
-      if (!userId) return next(unauthorizedError());
+      const userId = (req as Request & { user: { id: string } }).user.id;
 
       const cleaned = OutfitController.prepareBody(req.body);
       const { error, value } = evaluateSchema.validate(cleaned);
@@ -423,8 +421,7 @@ export default class OutfitController {
    */
   static async compose(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as Request & { user?: { id: string } }).user?.id;
-      if (!userId) return next(unauthorizedError());
+      const userId = (req as Request & { user: { id: string } }).user.id;
 
       const schema = Joi.object({
         prompt: Joi.string().min(2).max(500).required(),
@@ -463,8 +460,7 @@ export default class OutfitController {
    */
   static async evaluateHybrid(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as Request & { user?: { id: string } }).user?.id;
-      if (!userId) return next(unauthorizedError());
+      const userId = (req as Request & { user: { id: string } }).user.id;
 
       const cleaned = OutfitController.prepareBody(req.body);
       const { error, value } = evaluateHybridSchema.validate(cleaned);
@@ -550,8 +546,7 @@ export default class OutfitController {
    */
   static async recommend(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as Request & { user?: { id: string } }).user?.id;
-      if (!userId) return next(unauthorizedError());
+      const userId = (req as Request & { user: { id: string } }).user.id;
 
       const schema = Joi.object({
         category: Joi.string()

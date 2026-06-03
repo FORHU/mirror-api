@@ -236,8 +236,7 @@ export default class GarmentController {
    */
   static async evaluate(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as Request & { user?: { id: string } }).user?.id;
-      if (!userId) return next({ status: 401, message: "Authentication required" });
+      const userId = (req as Request & { user: { id: string } }).user.id;
 
       const imageUrl = req.body?.imageUrl;
       const kioskId = req.body?.kioskId;

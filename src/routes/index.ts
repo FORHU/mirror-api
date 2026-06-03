@@ -55,11 +55,6 @@ router.use("/mirror/auth", mirrorAuthRoute);
 router.use("/mirror/users", mirrorUserRoute);
 router.use("/mirror/generation", mirrorGenerationRoute);
 
-// Remote endpoints (companion/kiosk clients call /api/remote/*) — alias the
-// shared garment/outfit routers so existing frontends resolve without changes.
-router.use("/remote/garments", mirrorGarmentRoute);
-router.use("/remote/outfits", mirrorOutfitRoute);
-
 // External endpoints (3rd party access)
 router.use("/external/garments", authenticateApiKey, externalGarmentRoute);
 router.use("/external/outfits", authenticateApiKey, externalOutfitRoute);
