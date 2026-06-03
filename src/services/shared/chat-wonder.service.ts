@@ -274,4 +274,12 @@ CRITICAL ENUM RULES - YOU MUST ONLY USE THESE EXACT VALUES FOR FASHION:
     const user = await UserRepository.findGenderById(userId);
     return user?.gender ?? "FEMALE";
   }
+
+  /**
+   * Clears the user's stored gender (sets it to null). Used on "restart" so the
+   * app re-asks gender for the next person at the mirror.
+   */
+  static async clearUserGender(userId: string) {
+    return UserRepository.update(userId, { gender: null });
+  }
 }

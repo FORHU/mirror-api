@@ -23,10 +23,19 @@ export interface StreamChatOptions {
   callbacks: StreamCallbacks;
   weather?: Record<string, unknown>;
   gender?: string;
+  /** App routes ChatWonder may navigate to (for `[nav]` requests). */
+  sitemapContext?: string[];
 }
 
 export async function streamChat(options: StreamChatOptions): Promise<void> {
-  const { userInput, sessionId, callbacks, weather = {}, gender = "MALE" } = options;
+  const {
+    userInput,
+    sessionId,
+    callbacks,
+    weather = {},
+    gender = "MALE",
+    sitemapContext,
+  } = options;
 
   return new Promise((resolve, reject) => {
     if (!CHAT_WONDER_API_URL) {
@@ -73,6 +82,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         session_id: sessionId,
         user_input: `${userInput} - i am ${gender}`,
         weather,
+        ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
       };
       logger.info(
         `[CHAT-WONDER-STREAM] user payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "..." })}`

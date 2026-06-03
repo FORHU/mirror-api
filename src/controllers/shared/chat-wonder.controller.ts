@@ -9,6 +9,7 @@ import {
   cutToMessage,
 } from "../../utils/parse-chatWonder-response.util";
 import { emitToKiosk } from "../../utils/socket.util";
+import { voiceService } from "../../services/shared/voice.service";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
 import CacheUtil from "../../utils/cache.util";
@@ -29,6 +30,32 @@ export default class ChatWonderController {
       return res.json({ status: "success", data: { sessionId } });
     } catch (err) {
       logger.error(`[ChatWonderController] getSessionId error: ${(err as Error).message}`);
+      return responseError(res, 500, (err as Error).message || "Internal server error");
+    }
+  }
+
+  /**
+   * RESTART — full reset for the next person at the mirror:
+   *   1. Null the user's stored gender (app will re-ask).
+   *   2. Force a brand-new ChatWonder session (clears conversation history).
+   * Does NOT touch the itinerary — that's the refresh/reset-outline flow.
+   */
+  static async restart(req: Request, res: Response) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) {
+      return responseError(res, 401, "Unauthorized");
+    }
+
+    try {
+      await ChatWonderService.clearUserGender(userId);
+      const sessionId = await ChatWonderService.generateChatSessionId(userId, true);
+      return res.json({
+        status: "success",
+        data: { sessionId, gender: null },
+        message: "Restarted",
+      });
+    } catch (err) {
+      logger.error(`[ChatWonderController] restart error: ${(err as Error).message}`);
       return responseError(res, 500, (err as Error).message || "Internal server error");
     }
   }
@@ -128,8 +155,10 @@ export default class ChatWonderController {
       session_id: Joi.string().optional(),
       type: Joi.string().optional(),
       weather: Joi.object().optional(),
+      location: Joi.object().optional(),
       skin_analysis: Joi.object().optional(),
       kioskId: Joi.string().optional(),
+      sitemap_context: Joi.array().items(Joi.string()).optional(),
     }).or("input", "user_input"); // Require at least one of these
 
     const { error, value } = schema.validate(req.body, { allowUnknown: true });
@@ -141,6 +170,8 @@ export default class ChatWonderController {
     const inputConversationId = value.conversationId; // Note: session_id is a different Forhu AI concept, we keep conversationId logic
     const kioskId = value.kioskId;
     const frontendWeather = value.weather;
+    const frontendLocation = value.location;
+    const sitemapContext = value.sitemap_context;
 
     try {
       // 1. Ensure conversation exists
@@ -245,6 +276,8 @@ export default class ChatWonderController {
             // Surface the trailing structured blocks as parsed JSON for the client.
             const garment = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
             const cosmetics = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
+            const maps = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
+            const nav = extractChatWonderDataBlock(fullResponse, "NAV_DATA");
 
             writeSseEvent({
               type: "complete",
@@ -254,6 +287,8 @@ export default class ChatWonderController {
               // Parsed structured payloads (null when ChatWonder didn't send them).
               garment,
               cosmetics,
+              maps,
+              nav,
               // Literal, untouched bytes as received from ChatWonder.
               raw: fullResponse,
               // NOTE: despite the name, this is `cleaned` (post stripSourcesPrefix),
@@ -302,7 +337,7 @@ export default class ChatWonderController {
         },
       };
 
-      const builtInput = `${input}. The current weather context is: ${JSON.stringify(frontendWeather || {})}.`;
+      const builtInput = `${input}. The current weather context is: ${JSON.stringify(frontendWeather || {})}. The user's current location is: ${JSON.stringify(frontendLocation || {})}.`;
 
       // 7. Stream from external ChatWonder API
       await streamChat({
@@ -311,6 +346,7 @@ export default class ChatWonderController {
         callbacks,
         weather: frontendWeather,
         gender,
+        sitemapContext,
       });
     } catch (err) {
       logger.error(`[ChatWonderController] Controller error: ${(err as Error).message}`);
@@ -349,8 +385,12 @@ export default class ChatWonderController {
       session_id: Joi.string().optional(),
       type: Joi.string().optional(),
       weather: Joi.object().optional(),
+      location: Joi.object().optional(),
       skin_analysis: Joi.object().optional(),
       kioskId: Joi.string().optional(),
+      voice: Joi.boolean().optional(), // opt-in: synthesize TTS audio for the reply
+      lang: Joi.string().optional(), // TTS language (e.g. "en-US", "fr-FR", "ko-KR")
+      sitemap_context: Joi.array().items(Joi.string()).optional(),
     }).or("input", "user_input"); // Require at least one of these
 
     const { error, value } = schema.validate(req.body, { allowUnknown: true });
@@ -362,6 +402,10 @@ export default class ChatWonderController {
     const inputConversationId = value.conversationId;
     const kioskId = value.kioskId;
     const frontendWeather = value.weather;
+    const frontendLocation = value.location;
+    const wantsVoice = value.voice === true;
+    const ttsLang = value.lang || "en-US";
+    const sitemapContext = value.sitemap_context;
 
     try {
       const gender = await ChatWonderService.getUserGender(userId);
@@ -383,7 +427,7 @@ export default class ChatWonderController {
       let fullResponse = "";
       let streamError: Error | null = null;
       await streamChat({
-        userInput: `${input}. The current weather context is: ${JSON.stringify(frontendWeather || {})}.`,
+        userInput: `${input}. The current weather context is: ${JSON.stringify(frontendWeather || {})}. The user's current location is: ${JSON.stringify(frontendLocation || {})}.`,
         sessionId: sessionId as string,
         callbacks: {
           onChunk: (chunk: string) => {
@@ -401,6 +445,7 @@ export default class ChatWonderController {
         },
         weather: frontendWeather,
         gender,
+        sitemapContext,
       });
 
       if (streamError) {
@@ -415,10 +460,18 @@ export default class ChatWonderController {
       // [COSMETICS_DATA] blocks, parsed into JSON objects (null when absent).
       const garment_data = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
       const cosmetics_data = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
+      const maps_data = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
+      // Navigation decision for `[nav]` requests, e.g. { target_url, confidence, … }.
+      const nav_data = extractChatWonderDataBlock(fullResponse, "NAV_DATA");
 
       // Plain display text, without the joined `[ garments ]/[ cosmetics ]/[ map ]`
-      // markers — the structured data lives in *_data above.
-      const message = parsed.message.split(/\n\n\[ (?:garments|cosmetics|map) \]/)[0].trim();
+      // markers or the appended `[MAPS_DATA]` / `[NAV_DATA]` blocks — the structured
+      // data lives in *_data above.
+      const message = parsed.message
+        .split(/\n\n\[ (?:garments|cosmetics|map) \]/)[0]
+        .split("[MAPS_DATA]")[0]
+        .split("[NAV_DATA]")[0]
+        .trim();
 
       // 6. Finalization keywords save/finalize the plan draft.
       const isFinalization =
@@ -446,14 +499,32 @@ export default class ChatWonderController {
         parsed.message
       );
 
+      // 8. Optional TTS: speak the clean display text when the client opts in
+      // with `voice: true`. Non-fatal — a synthesis failure still returns the
+      // text reply, just with `audioBase64: null`.
+      let audioBase64: string | null = null;
+      if (wantsVoice && message) {
+        try {
+          const audio = await voiceService.tts(message, ttsLang);
+          audioBase64 = audio.toString("base64");
+        } catch (ttsErr) {
+          logger.warn(`[ChatWonderController.chat] TTS failed: ${(ttsErr as Error).message}`);
+        }
+      }
+
       return res.json({
         status: "success",
         data: {
           message,
+          // Base64 MP3 of the spoken reply (null when not requested or on failure).
+          audioBase64,
           intent: parsed.intent,
           // Structured, fully-parsed payloads (null when not present).
           garment_data,
           cosmetics_data,
+          maps_data,
+          // Navigation decision (target_url, confidence, …) for [nav] requests.
+          nav_data,
           metadata: {
             conversationId,
             userMessageId: userMessage.id,

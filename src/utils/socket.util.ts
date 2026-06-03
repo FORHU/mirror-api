@@ -34,11 +34,15 @@ export const initSocketServer = async (httpServer: HttpServer) => {
 
 /**
  * Helper to emit events to a specific kiosk room
+ *
+ * TEMP (kiosk removed 2026-06-03): kiosk frontend is gone and the companion
+ * app does not use websockets, so these emits go to nobody. Disabled for now
+ * rather than deleted — restore the body if kiosk/websocket delivery returns.
  */
-export const emitToKiosk = (kioskId: string, event: string, data: unknown) => {
-  if (io) {
-    io.to(kioskId).emit(event, data);
-  }
+export const emitToKiosk = (_kioskId: string, _event: string, _data: unknown) => {
+  // if (io) {
+  //   io.to(kioskId).emit(event, data);
+  // }
 };
 
 /**

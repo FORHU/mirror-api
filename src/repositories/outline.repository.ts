@@ -63,4 +63,16 @@ export default class OutlineRepo {
       where: { id },
     });
   }
+
+  /**
+   * Soft-deletes all of a user's active (non-deleted) outlines by stamping
+   * `deletedAt`. After this, `getActive` (which filters on `!deletedAt`) returns
+   * null — i.e. the itinerary is reset. Returns the number of outlines cleared.
+   */
+  static async softDeleteAllByUserId(userId: string) {
+    return prisma.userOutline.updateMany({
+      where: { userId, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+  }
 }

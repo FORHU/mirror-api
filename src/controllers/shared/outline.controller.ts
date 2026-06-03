@@ -66,4 +66,20 @@ export default class OutlineController {
       next(err);
     }
   }
+
+  /**
+   * RESET — clears the user's itinerary by soft-deleting all active outlines.
+   * Used on page refresh so the user starts with a clean itinerary.
+   */
+  static async reset(req: Request, res: Response, next: NextFunction) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) return responseError(res, 401, "Unauthorized");
+
+    try {
+      const result = await OutlineRepo.softDeleteAllByUserId(userId);
+      return responseSuccess(res, 200, { cleared: result.count }, "Itinerary reset");
+    } catch (err) {
+      next(err);
+    }
+  }
 }

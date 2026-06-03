@@ -12,6 +12,14 @@ const router = express.Router();
 router.get("/session-id", authenticate, ChatWonderController.getSessionId);
 
 /**
+ * @route POST /api/mirror/chat-wonder/restart
+ * @desc Full restart: null the user's gender + force a new ChatWonder session.
+ *       Does not clear the itinerary (see POST /api/mirror/outlines/reset).
+ * @access Private
+ */
+router.post("/restart", authenticate, ChatWonderController.restart);
+
+/**
  * @route POST /api/v1/chat-wonder/stream
  * @desc Stream chat responses using SSE
  * @access Private
