@@ -3,6 +3,7 @@ import Joi from "joi";
 import ChatWonderService from "../../services/shared/chat-wonder.service";
 import { streamChat, type StreamCallbacks } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
+import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
@@ -261,6 +262,9 @@ export default class ChatWonderController {
             // Clean up the response
             const { cleaned } = stripSourcesPrefix(fullResponse);
             const parsed = parseChatWonderResponse(cleaned);
+            if (parsed.events.length > 0) {
+              parsed.events = await resolveItineraryLocations(parsed.events);
+            }
             logger.debug(`[ChatWonderController] Cleaned response: ${cleaned}`);
             // Check if user input contains finalization keywords to save/finalize the plan draft
             const isFinalization =
@@ -486,6 +490,9 @@ export default class ChatWonderController {
       // 5. Clean + parse the buffered response.
       const { cleaned } = stripSourcesPrefix(fullResponse);
       const parsed = parseChatWonderResponse(cleaned);
+      if (parsed.events.length > 0) {
+        parsed.events = await resolveItineraryLocations(parsed.events);
+      }
 
       // The structured payloads ChatWonder appends as [GARMENT_DATA] /
       // [COSMETICS_DATA] blocks, parsed into JSON objects (null when absent).
@@ -499,7 +506,7 @@ export default class ChatWonderController {
       // markers or the appended `[MAPS_DATA]` / `[NAV_DATA]` blocks — the structured
       // data lives in *_data above.
       const message = parsed.message
-        .split(/\n\n\[\s*(?:garments|cosmetics|map)\s*\]/)[0]
+        .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
         .split("[MAPS_DATA]")[0]
         .split("[NAV_DATA]")[0]
         .trim();
