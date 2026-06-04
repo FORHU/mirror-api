@@ -94,7 +94,7 @@ function repairJson(input: string): string {
  * the first such marker onward is structured data, not user-facing message text.
  */
 const DATA_BLOCK_TAIL =
-  /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|DONE)\][\s\S]*$/;
+  /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|DONE|NEARBY_PLACES)\][\s\S]*$/;
 
 /**
  * The per-set markdown breakdown ChatWonder writes after the conversational
@@ -134,8 +134,9 @@ function buildFromParsed(
   let intent: AIIntent = "NONE";
   if (parsed.intent) {
     const upper = String(parsed.intent).toUpperCase();
-    if (["FASHION", "COSMETIC", "MAP", "MENU", "RESTART", "NONE"].includes(upper)) {
-      intent = upper as AIIntent;
+    const normalized = upper === "POI_RECOMMENDATION" ? "MAP" : upper;
+    if (["FASHION", "COSMETIC", "MAP", "MENU", "RESTART", "NONE"].includes(normalized)) {
+      intent = normalized as AIIntent;
     }
   } else if (outfitSuggestion) {
     intent = "FASHION";

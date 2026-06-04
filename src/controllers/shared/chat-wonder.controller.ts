@@ -10,9 +10,36 @@ import {
 } from "../../utils/parse-chatWonder-response.util";
 import { emitToKiosk } from "../../utils/socket.util";
 import { voiceService } from "../../services/shared/voice.service";
+import { googlePlacesService } from "../../services/shared/google-places.service";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
 import CacheUtil from "../../utils/cache.util";
+
+async function buildPoiContext(
+  input: string,
+  location: { lat?: number; lng?: number } | null | undefined
+): Promise<string> {
+  if (!input.includes("[map]") || !location?.lat || !location?.lng) return "";
+  try {
+    const pois = await googlePlacesService.nearbyPOIs(location.lat, location.lng, 1000);
+    if (!pois.length) return "";
+    const compact = pois.slice(0, 10).map((p) => ({
+      name: p.name,
+      category: p.category,
+      address: p.address,
+      distance: p.distance,
+      rating: p.rating,
+      openNow: p.openNow,
+      lat: p.lat,
+      lng: p.lng,
+      placeId: p.placeId,
+    }));
+    return ` [NEARBY_PLACES]${JSON.stringify(compact)}[/NEARBY_PLACES]`;
+  } catch (err) {
+    logger.warn(`[ChatWonderController] POI fetch skipped: ${(err as Error).message}`);
+    return "";
+  }
+}
 
 export default class ChatWonderController {
   /**
@@ -156,7 +183,10 @@ export default class ChatWonderController {
       session_id: Joi.string().optional(),
       type: Joi.string().optional(),
       weather: Joi.object().optional(),
-      location: Joi.object().optional(),
+      location: Joi.object({
+        lat: Joi.number().min(-90).max(90).required(),
+        lng: Joi.number().min(-180).max(180).required(),
+      }).optional(),
       skin_analysis: Joi.object().optional(),
       kioskId: Joi.string().optional(),
       sitemap_context: Joi.array().items(Joi.string()).optional(),
@@ -350,7 +380,8 @@ export default class ChatWonderController {
         },
       };
 
-      const builtInput = `${input}. The current weather context is: ${JSON.stringify(frontendWeather || {})}. The user's current location is: ${JSON.stringify(frontendLocation || {})}.`;
+      const poiContext = await buildPoiContext(input, frontendLocation);
+      const builtInput = `${input}${poiContext}. The current weather context is: ${JSON.stringify(frontendWeather || {})}. The user's current location is: ${JSON.stringify(frontendLocation || {})}.`;
 
       // 7. Stream from external ChatWonder API
       await streamChat({
@@ -399,7 +430,10 @@ export default class ChatWonderController {
       session_id: Joi.string().optional(),
       type: Joi.string().optional(),
       weather: Joi.object().optional(),
-      location: Joi.object().optional(),
+      location: Joi.object({
+        lat: Joi.number().min(-90).max(90).required(),
+        lng: Joi.number().min(-180).max(180).required(),
+      }).optional(),
       skin_analysis: Joi.object().optional(),
       kioskId: Joi.string().optional(),
       voice: Joi.boolean().optional(), // opt-in: synthesize TTS audio for the reply
@@ -448,10 +482,11 @@ export default class ChatWonderController {
       const userMessage = await ChatWonderService.saveUserMessage(userId, conversationId, input);
 
       // 4. Buffer the full ChatWonder response (no SSE).
+      const poiContext = await buildPoiContext(input, frontendLocation);
       let fullResponse = "";
       let streamError: Error | null = null;
       await streamChat({
-        userInput: `${input}. The current weather context is: ${JSON.stringify(frontendWeather || {})}. The user's current location is: ${JSON.stringify(frontendLocation || {})}.`,
+        userInput: `${input}${poiContext}. The current weather context is: ${JSON.stringify(frontendWeather || {})}. The user's current location is: ${JSON.stringify(frontendLocation || {})}.`,
         sessionId: sessionId as string,
         callbacks: {
           onChunk: (chunk: string) => {
