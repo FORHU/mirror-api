@@ -299,8 +299,17 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
     // into the user-facing message.
     const fallbackText = cutToMessage(trimmed).trim();
 
+    let intent: AIIntent = "NONE";
+    if (trimmed.includes("[GARMENT_DATA]")) {
+      intent = "FASHION";
+    } else if (trimmed.includes("[COSMETICS_DATA]")) {
+      intent = "COSMETIC";
+    } else if (trimmed.includes("[MAPS_DATA]")) {
+      intent = "MAP";
+    }
+
     return {
-      intent: "NONE" as AIIntent,
+      intent,
       message: fallbackText || rawResponse,
       outfit_suggestion: null,
       mood: null,
