@@ -158,7 +158,7 @@ If the user mentions a new event or location not in their current context, ask i
 }`;
     }
 
-    if (input.includes("[map]")) {
+    if (input.includes("[maps]")) {
       return `You are Mirror Map AI, a location and itinerary assistant.
 Respond ONLY with VALID JSON matching this schema exactly. No markdown formatting.
 
