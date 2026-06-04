@@ -160,6 +160,16 @@ function buildFromParsed(
     intent = "MAP";
   }
 
+  if (intent === "NONE") {
+    if (rawResponse.includes("[GARMENT_DATA]")) {
+      intent = "FASHION";
+    } else if (rawResponse.includes("[COSMETICS_DATA]")) {
+      intent = "COSMETIC";
+    } else if (rawResponse.includes("[MAPS_DATA]")) {
+      intent = "MAP";
+    }
+  }
+
   let finalMessage = parsed.message ? cutToMessage(parsed.message).trim() : "";
 
   // Join the specialized suggestions into the main message block for the UI
@@ -272,8 +282,17 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
           // Last resort: salvage just the "message" field.
           const msgMatch = jsonMatch[0].match(/"message"\s*:\s*"([^"]+)"/);
           if (msgMatch && msgMatch[1]) {
+            let intent: AIIntent = "NONE";
+            if (rawResponse.includes("[GARMENT_DATA]")) {
+              intent = "FASHION";
+            } else if (rawResponse.includes("[COSMETICS_DATA]")) {
+              intent = "COSMETIC";
+            } else if (rawResponse.includes("[MAPS_DATA]")) {
+              intent = "MAP";
+            }
+
             return {
-              intent: "NONE" as AIIntent,
+              intent,
               message: msgMatch[1].replace(/\\n/g, "\n"),
               outfit_suggestion: null,
               mood: null,
