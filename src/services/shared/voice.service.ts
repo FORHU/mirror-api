@@ -198,12 +198,8 @@ async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> 
 
   try {
     const cmd = new StartStreamTranscriptionCommand({
-      IdentifyLanguage: true,
-      // Candidate languages: English (US/UK), French (Paris)
-      // fil-PH is not supported in streaming IdentifyLanguage mode
-      LanguageOptions: "en-US,en-GB,fr-FR",
-      // Use the client-supplied language as a tiebreaker when confidence is low
-      PreferredLanguage: language as "en-US",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      LanguageCode: language as any,
       MediaEncoding: "pcm",
       MediaSampleRateHertz: 16000,
       AudioStream: audioStream(),
