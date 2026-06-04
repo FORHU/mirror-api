@@ -95,7 +95,8 @@ function repairJson(input: string): string {
       // trailing comma before a closing brace/bracket
       .replace(/,(\s*[}\]])/g, "$1")
   );
-}1
+}
+1;
 
 /**
  * The trailing metadata blocks ChatWonder appends after the prose. Anything from
