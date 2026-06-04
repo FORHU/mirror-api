@@ -57,7 +57,15 @@ export interface ChatWonderEvent {
   map: RoutePlan;
 }
 
-export type AIIntent = "FASHION" | "COSMETIC" | "MAP" | "MENU" | "RESTART" | "NONE";
+export type AIIntent =
+  | "FASHION"
+  | "COSMETIC"
+  | "MAP"
+  | "MENU"
+  | "RESTART"
+  | "NONE"
+  | "itinerary_setup"
+  | "itinerary_resolved";
 
 export interface ChatWonderParsedResponse {
   intent: AIIntent;
@@ -87,14 +95,14 @@ function repairJson(input: string): string {
       // trailing comma before a closing brace/bracket
       .replace(/,(\s*[}\]])/g, "$1")
   );
-}
+}1
 
 /**
  * The trailing metadata blocks ChatWonder appends after the prose. Anything from
  * the first such marker onward is structured data, not user-facing message text.
  */
 const DATA_BLOCK_TAIL =
-  /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|DONE|NEARBY_PLACES)\][\s\S]*$/;
+  /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|DONE)\][\s\S]*$/;
 
 /**
  * The per-set markdown breakdown ChatWonder writes after the conversational
@@ -133,10 +141,15 @@ function buildFromParsed(
   // Derive strict intent enum
   let intent: AIIntent = "NONE";
   if (parsed.intent) {
-    const upper = String(parsed.intent).toUpperCase();
-    const normalized = upper === "POI_RECOMMENDATION" ? "MAP" : upper;
-    if (["FASHION", "COSMETIC", "MAP", "MENU", "RESTART", "NONE"].includes(normalized)) {
-      intent = normalized as AIIntent;
+    const raw = String(parsed.intent).toLowerCase();
+    const upper = raw.toUpperCase();
+    // Pass itinerary sub-intents through as lowercase so the client can gate on them.
+    if (raw === "itinerary_setup" || raw === "itinerary_resolved") {
+      intent = raw as AIIntent;
+    } else if (["FASHION", "COSMETIC", "MAP", "MENU", "RESTART", "NONE"].includes(upper)) {
+      intent = upper as AIIntent;
+    } else if (["poi_recommendation", "general"].includes(raw)) {
+      intent = "MAP";
     }
   } else if (outfitSuggestion) {
     intent = "FASHION";

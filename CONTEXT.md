@@ -18,10 +18,7 @@ A bracket-enclosed token added to the user's input (e.g. `[map]`, `[garments]`, 
 The server-side layer that handles navigation: geocoding (`mapService` via Mapbox), turn-by-turn directions (Mapbox for cars, ORS for motorcycle/bicycle/walking), and itinerary location resolution (`resolveItineraryLocations`). Does **not** overlap with ChatWonder — the routing pipeline is the navigation engine; ChatWonder is the conversation layer.
 
 ## POI (Point of Interest)
-A nearby place (restaurant, café, park, etc.) returned by the Google Places API via `googlePlacesService.nearbyPOIs`. POI **discovery** is always done by Google Places. POI **narration and recommendation** (picking the best ones, explaining why) is done by ChatWonder using the `[NEARBY_PLACES]` context block.
-
-## NEARBY_PLACES Block
-A server-injected context block appended to the user's message when a `[map]` request arrives with a valid `location`. Format: `[NEARBY_PLACES]{JSON array of PlacePOI}[/NEARBY_PLACES]`. Triggers MODE C in the `[map]` persona, causing ChatWonder to recommend from the list rather than invent places.
+A nearby place (restaurant, café, park, etc.) surfaced on the map. For **named-destination queries** (itinerary stops, "find a restaurant at X"), ChatWonder discovers and searches POIs internally via its own Google Places integration and returns them in `[MAPS_DATA]` blocks. The server-side `googlePlacesService.nearbyPOIs` is used separately for the mirror-app map UI (the `/mirror/map/nearby-pois` endpoint), not for ChatWonder chat requests.
 
 ## Itinerary
 An ordered set of time-labelled stops the user plans to visit. Built conversationally through ChatWonder's MODE A (`itinerary_setup` → `itinerary_resolved`). Once resolved, locations are geocoded server-side by `resolveItineraryLocations`.
