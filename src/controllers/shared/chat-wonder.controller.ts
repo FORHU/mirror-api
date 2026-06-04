@@ -297,12 +297,25 @@ export default class ChatWonderController {
             const maps = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
             const nav = extractChatWonderDataBlock(fullResponse, "NAV_DATA");
 
+            // Strip out the inline UI markers that buildFromParsed appends
+            const finalDisplayMessage = parsed.message
+              .split(/\n\n\[\s*(?:garments|cosmetics|map)\s*\]/)[0]
+              .split("[MAPS_DATA]")[0]
+              .split("[NAV_DATA]")[0]
+              .trim();
+
             writeSseEvent({
               type: "complete",
               // Authoritative clean prose (marker blocks stripped). Use this as the
               // display message; the streamed `chunk` events build the same text.
-              message: parsed.message,
+              message: finalDisplayMessage,
+              intent: parsed.intent,
               // Parsed structured payloads (null when ChatWonder didn't send them).
+              garment_data: garment,
+              cosmetics_data: cosmetics,
+              maps_data: maps,
+              nav_data: nav,
+              // Duplicate fields for backward compatibility with older clients
               garment,
               cosmetics,
               maps,
@@ -466,7 +479,9 @@ export default class ChatWonderController {
         callbacks: {
           onChunk: (chunk: string) => {
             fullResponse += chunk;
+                    console.log("-----------", chunk);
           },
+  
           onComplete: () => {
             /* buffered — we respond once the stream completes */
           },
@@ -493,7 +508,6 @@ export default class ChatWonderController {
       if (parsed.events.length > 0) {
         parsed.events = await resolveItineraryLocations(parsed.events);
       }
-
       // The structured payloads ChatWonder appends as [GARMENT_DATA] /
       // [COSMETICS_DATA] blocks, parsed into JSON objects (null when absent).
       const garment_data = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
