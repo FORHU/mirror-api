@@ -1,17 +1,16 @@
 import { Router } from "express";
-import { authenticate } from "../../middleware/auth.middleware";
 import CosmeticProductController from "../../controllers/shared/cosmetic-product.controller";
 import { handleSingleUpload } from "../../middleware/upload.middleware";
 
 const router = Router();
 
-// Catalog endpoints. Listing/show are authenticated by default so we don't
-// repeat the outfit-leak pattern; a future kiosk-only public catalog path
-// can branch from here.
-router.get("/", authenticate, CosmeticProductController.index);
-router.get("/:id", authenticate, CosmeticProductController.show);
-router.post("/", authenticate, handleSingleUpload, CosmeticProductController.create);
-router.patch("/:id", authenticate, handleSingleUpload, CosmeticProductController.update);
-router.delete("/:id", authenticate, CosmeticProductController.destroy);
+// Catalog endpoints, publicly accessible for administration — same pattern as
+// the garment routes. Add `authenticate` inline to any route that needs to be
+// gated (see garment.route.ts "/evaluate").
+router.get("/", CosmeticProductController.index);
+router.get("/:id", CosmeticProductController.show);
+router.post("/", handleSingleUpload, CosmeticProductController.create);
+router.patch("/:id", handleSingleUpload, CosmeticProductController.update);
+router.delete("/:id", CosmeticProductController.destroy);
 
 export default router;
