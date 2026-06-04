@@ -7,15 +7,23 @@ export const registerCompanionEvents = (socket: Socket) => {
    * Companion joins its personal user room so the backend can push
    * notifications back via notifyCompanion(userId, event, data).
    */
-  socket.on("register_user", (data: { userId: string }) => {
-    if (!data?.userId) {
-      logger.warn(`register_user called without userId from socket ${socket.id}`);
-      return;
+  socket.on(
+    "register_user",
+    async (
+      data: { userId: string },
+      ack?: (response: { status: "success" | "error"; userId?: string; message?: string }) => void
+    ) => {
+      if (!data?.userId) {
+        logger.warn(`register_user called without userId from socket ${socket.id}`);
+        ack?.({ status: "error", message: "Missing userId" });
+        return;
+      }
+      const room = `user:${data.userId}`;
+      await socket.join(room);
+      logger.info(`Socket ${socket.id} joined user room ${room}`);
+      ack?.({ status: "success", userId: data.userId });
     }
-    const room = `user:${data.userId}`;
-    socket.join(room);
-    logger.info(`Socket ${socket.id} joined user room ${room}`);
-  });
+  );
 
   /**
    * Companion joins the kiosk room so it can receive companion_notification

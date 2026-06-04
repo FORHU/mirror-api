@@ -207,6 +207,7 @@ function buildSkinPrompt(vision: ReturnType<typeof parsePerfectCorpEntry>): stri
 export async function buildSkinCatalogContext(): Promise<string> {
   try {
     const catalog = await prisma.cosmeticProduct.findMany({
+      where: { fileUrl: { is: { fileUrl: { not: "" } } } },
       take: 50,
       select: {
         id: true,
@@ -409,6 +410,7 @@ export async function buildFallbackCosmeticsSet(
     const weatherCtx = weather;
 
     const catalog = await prisma.cosmeticProduct.findMany({
+      where: { fileUrl: { is: { fileUrl: { not: "" } } } },
       select: {
         id: true,
         type: true,
@@ -586,6 +588,7 @@ export default class SkinAnalysisService {
 
     // 5. Load catalog and run rule engine (always runs — ChatWonder enriches on top)
     const catalog = await prisma.cosmeticProduct.findMany({
+      where: { fileUrl: { is: { fileUrl: { not: "" } } } },
       select: {
         id: true,
         type: true,
