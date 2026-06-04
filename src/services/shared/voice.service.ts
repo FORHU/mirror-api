@@ -209,7 +209,11 @@ async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> 
     if (!result) throw new Error("EMPTY_TRANSCRIPT");
     return result;
   } catch (err: unknown) {
-    logger.error(`[VoiceService] Transcription failed: ${(err as Error).message}`);
+    if ((err as Error).message === "EMPTY_TRANSCRIPT") {
+      logger.warn(`[VoiceService] Transcription resulted in empty transcript`);
+    } else {
+      logger.error(`[VoiceService] Transcription failed: ${(err as Error).message}`);
+    }
     throw err;
   }
 }
