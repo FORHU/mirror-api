@@ -10,6 +10,7 @@
     "start": "node ./dist/server.js",
     "lint": "eslint src/**/*.ts --fix",
     "db:setup": "npx prisma generate && npx prisma migrate dev",
+    "db:seed": "npx ts-node --files prisma/seed.ts",
     "format": "npm run lint && prettier --write \"src/**/*.ts\""
   },
   "dependencies": {
