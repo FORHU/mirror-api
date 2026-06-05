@@ -13,6 +13,7 @@ export default class VoiceController {
   static async transcribe(req: Request, res: Response, next: NextFunction) {
     const pcmBuffer = req.body as Buffer;
     const lang = (req.query.lang as string) || "en-US";
+    const provider = (req.query.provider as string) === "openai" ? "openai" : "aws";
 
     if (!Buffer.isBuffer(pcmBuffer) || pcmBuffer.length === 0) {
       return res.status(400).json({ error: "No audio data received" });
@@ -22,7 +23,7 @@ export default class VoiceController {
     }
 
     try {
-      const transcript = await voiceService.transcribeAudio(pcmBuffer, lang);
+      const transcript = await voiceService.transcribeAudio(pcmBuffer, lang, provider as "aws" | "openai");
       return res.json({ transcript });
     } catch (err) {
       if ((err as Error).message === "EMPTY_TRANSCRIPT") {

@@ -25,6 +25,8 @@ import {
   AWS_SECRET_ACCESS_KEY,
   CHAT_WONDER_API_URL,
 } from "../../config";
+import openai from "../../utils/openai/ai-request.util";
+import { toFile } from "openai";
 import { weatherService } from "./weather.service";
 import { prisma } from "../../utils/prisma";
 import { streamChat } from "../../utils/chat-wonder-stream";
@@ -168,6 +170,42 @@ const transcribeClient = new TranscribeStreamingClient({
   credentials: awsCredentials,
 });
 
+function pcmToWav(pcmBuffer: Buffer, sampleRate = 16000, channels = 1, bitDepth = 16): Buffer {
+  const byteRate = sampleRate * channels * (bitDepth / 8);
+  const blockAlign = channels * (bitDepth / 8);
+  const dataSize = pcmBuffer.length;
+  const wav = Buffer.alloc(44 + dataSize);
+  wav.write("RIFF", 0, "ascii");
+  wav.writeUInt32LE(36 + dataSize, 4);
+  wav.write("WAVE", 8, "ascii");
+  wav.write("fmt ", 12, "ascii");
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(channels, 22);
+  wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(byteRate, 28);
+  wav.writeUInt16LE(blockAlign, 32);
+  wav.writeUInt16LE(bitDepth, 34);
+  wav.write("data", 36, "ascii");
+  wav.writeUInt32LE(dataSize, 40);
+  pcmBuffer.copy(wav, 44);
+  return wav;
+}
+
+async function transcribeWithWhisper(pcmBuffer: Buffer, language: string): Promise<string> {
+  const wavBuffer = pcmToWav(pcmBuffer);
+  const langCode = language.split("-")[0]; // "en-US" -> "en"
+  const file = await toFile(wavBuffer, "audio.wav", { type: "audio/wav" });
+  const response = await openai.audio.transcriptions.create({
+    file,
+    model: "whisper-1",
+    language: langCode,
+  });
+  const text = response.text?.trim();
+  if (!text) throw new Error("EMPTY_TRANSCRIPT");
+  return text;
+}
+
 async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> {
   async function* audioStream() {
     const CHUNK = 32000;
@@ -305,8 +343,15 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
 }
 
 export const voiceService = {
-  transcribeAudio: async (pcmBuffer: Buffer, language: string = "en-US"): Promise<string> => {
-    const transcript = await transcribe(pcmBuffer, language);
+  transcribeAudio: async (
+    pcmBuffer: Buffer,
+    language: string = "en-US",
+    provider: "aws" | "openai" = "aws",
+  ): Promise<string> => {
+    const transcript =
+      provider === "openai"
+        ? await transcribeWithWhisper(pcmBuffer, language)
+        : await transcribe(pcmBuffer, language);
     if (!transcript) throw new Error("EMPTY_TRANSCRIPT");
     return transcript;
   },
