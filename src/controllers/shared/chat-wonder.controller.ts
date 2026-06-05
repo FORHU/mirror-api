@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import ChatWonderService from "../../services/shared/chat-wonder.service";
+import UserService from "../../services/shared/user.service";
 import { streamChat, type StreamCallbacks } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
 import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
@@ -298,7 +299,16 @@ export default class ChatWonderController {
             const garment = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
             const cosmetics = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
             const maps = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
-            const nav = extractChatWonderDataBlock(fullResponse, "NAV_DATA");
+            const stylist = extractChatWonderDataBlock(fullResponse, "STYLIST");
+            const genderUpdate = extractChatWonderDataBlock(fullResponse, "GENDER_UPDATE") as any;
+
+            if (genderUpdate && genderUpdate.gender) {
+              const newGender = String(genderUpdate.gender).toUpperCase();
+              if (["MALE", "FEMALE", "UNISEX"].includes(newGender)) {
+                await UserService.updateUser(userId, { gender: newGender as any });
+                logger.info(`[ChatWonderController] Caught GENDER_UPDATE: ${newGender}`);
+              }
+            }
 
             // Strip out the inline UI markers that buildFromParsed appends
             const finalDisplayMessage = parsed.message
@@ -317,12 +327,13 @@ export default class ChatWonderController {
               garment_data: garment,
               cosmetics_data: cosmetics,
               maps_data: maps,
-              nav_data: nav,
+              stylist_data: stylist,
+              gender_update: genderUpdate,
               // Duplicate fields for backward compatibility with older clients
               garment,
               cosmetics,
               maps,
-              nav,
+              stylist,
               events: parsed.events,
               sets: parsed.sets,
               // Literal, untouched bytes as received from ChatWonder.
@@ -527,8 +538,17 @@ export default class ChatWonderController {
       const garment_data = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
       const cosmetics_data = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
       const maps_data = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
-      // Navigation decision for `[nav]` requests, e.g. { target_url, confidence, … }.
-      const nav_data = extractChatWonderDataBlock(fullResponse, "NAV_DATA");
+      // Stylist payload for maps, fashion, cosmetics, and nav
+      const stylist_data = extractChatWonderDataBlock(fullResponse, "STYLIST");
+      const gender_data = extractChatWonderDataBlock(fullResponse, "GENDER_UPDATE") as any;
+
+      if (gender_data && gender_data.gender) {
+        const newGender = String(gender_data.gender).toUpperCase();
+        if (["MALE", "FEMALE", "UNISEX"].includes(newGender)) {
+          await UserService.updateUser(userId, { gender: newGender as any });
+          logger.info(`[ChatWonderController] Caught GENDER_UPDATE: ${newGender}`);
+        }
+      }
 
       // Plain display text, without the joined `[ garments ]/[ cosmetics ]/[ map ]`
       // markers or the appended `[MAPS_DATA]` / `[NAV_DATA]` blocks — the structured
@@ -536,7 +556,7 @@ export default class ChatWonderController {
       const message = parsed.message
         .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
         .split("[MAPS_DATA]")[0]
-        .split("[NAV_DATA]")[0]
+        .split("[STYLIST]")[0]
         .trim();
 
       // 6. Finalization keywords save/finalize the plan draft.
@@ -589,8 +609,9 @@ export default class ChatWonderController {
           garment_data,
           cosmetics_data,
           maps_data,
-          // Navigation decision (target_url, confidence, …) for [nav] requests.
-          nav_data,
+          // Navigation decision (target_url, confidence, …) for [stylist] requests.
+          stylist_data,
+          gender_update: gender_data,
           events: parsed.events,
           sets: parsed.sets,
           metadata: {

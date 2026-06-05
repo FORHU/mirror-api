@@ -209,7 +209,7 @@ function buildFromParsed(
  */
 export function extractChatWonderDataBlock(
   rawResponse: string,
-  block: "GARMENT_DATA" | "COSMETICS_DATA" | "MAPS_DATA" | "NAV_DATA"
+  block: "GARMENT_DATA" | "COSMETICS_DATA" | "MAPS_DATA" | "NAV_DATA" | "GENDER_UPDATE" | "STYLIST"
 ): Record<string, unknown> | unknown[] | null {
   const marker = `[${block}]`;
   const idx = rawResponse.indexOf(marker);
@@ -218,13 +218,18 @@ export function extractChatWonderDataBlock(
   // Take everything after the marker, but stop at the next data/terminator
   // marker so adjacent blocks don't bleed into this one.
   const after = rawResponse.slice(idx + marker.length);
-  const stop = after.search(/\[(?:GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|DONE)\]/);
+  const stop = after.search(/\[(?:GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|GENDER_UPDATE|STYLIST|DONE)\]/);
   const segment = stop === -1 ? after : after.slice(0, stop);
 
   // MAPS_DATA arrives as a top-level JSON array (`[{…}]`); GARMENT/COSMETICS as
   // an object (`{…}`). Match whichever bracket type the payload opens with so
   // the array's outer `[]` isn't lost.
   const trimmedSegment = segment.trim();
+
+  if (block === "GENDER_UPDATE") {
+    return { gender: trimmedSegment };
+  }
+
   const jsonMatch = trimmedSegment.startsWith("[")
     ? trimmedSegment.match(/\[[\s\S]*\]/)
     : trimmedSegment.match(/\{[\s\S]*\}/);
