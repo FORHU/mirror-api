@@ -185,7 +185,7 @@ export async function resolveSetProducts(
 ): Promise<RecommendationSet[]> {
   if (!Array.isArray(sets) || sets.length === 0) return sets ?? [];
 
-  const genderFilter = [gender, "UNISEX"]; // match requested gender or unisex items
+  const genderFilter = gender === "UNISEX" ? ["MALE", "FEMALE", "UNISEX"] : [gender, "UNISEX"];
   let kept = 0;
   let repaired = 0;
   let unresolved = 0;

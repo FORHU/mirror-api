@@ -7,8 +7,7 @@ import { buildPage } from "../../helpers/pagination.helper";
 const updateSchema = Joi.object({
   username: Joi.string().optional(),
   email: Joi.string().email().optional(),
-  gender: Joi.string().valid("MALE", "FEMALE").optional(),
-  userMeasurement: Joi.object().optional().allow(null),
+  gender: Joi.string().valid("MALE", "FEMALE", "UNISEX").optional(),
 });
 
 export default class UserController {
@@ -60,6 +59,24 @@ export default class UserController {
       }
 
       const user = await UserService.updateUser(userId, value);
+      return responseSuccess(res, 200, user);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Upsert user
+   */
+  static async upsertUser(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.params.id;
+      const { error, value } = updateSchema.validate(req.body);
+      if (error) {
+        throw { status: 400, message: error.message };
+      }
+
+      const user = await UserService.upsertUser(userId, value);
       return responseSuccess(res, 200, user);
     } catch (error) {
       next(error);

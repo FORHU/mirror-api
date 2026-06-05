@@ -22,7 +22,9 @@ import sharedGeocodeRoute from "./shared/geocode.route";
 // External Routes (3rd Party)
 import externalGarmentRoute from "./external/garment.route";
 import externalOutfitRoute from "./external/outfit.route";
+import externalUserRoute from "./shared/user.route";
 import externalCosmeticRoute from "./external/cosmetic.route";
+import externalOutlineRoute from "./external/outline.route";
 import { authenticateApiKey } from "../middleware/api-key.middleware";
 
 const router = express.Router();
@@ -60,5 +62,7 @@ router.use("/external/garments", authenticateApiKey, externalGarmentRoute);
 router.use("/external/outfits", authenticateApiKey, externalOutfitRoute);
 router.use("/external/cosmetics", authenticateApiKey, externalCosmeticRoute);
 router.use("/external/cosmetic-products", authenticateApiKey, externalCosmeticRoute);
+router.use("/external/user", authenticateApiKey, externalUserRoute);
+router.use("/external/outlines", authenticateApiKey, externalOutlineRoute);
 
 export default router;

@@ -8,10 +8,23 @@ export default class OutlineRepo {
     });
   }
 
+  static async findByIdWithEvents(id: string) {
+    return prisma.userOutline.findUnique({
+      where: { id },
+      include: { events: true },
+    });
+  }
+
   static async findByUserId(userId: string) {
     return prisma.userOutline.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
+    });
+  }
+
+  static async findByConversationId(conversationId: string) {
+    return prisma.userOutline.findUnique({
+      where: { conversationId },
     });
   }
 
@@ -38,6 +51,7 @@ export default class OutlineRepo {
   static async update(
     id: string,
     data: {
+      status?: OUTLINE_STATUS;
       userPrompt?: string[];
       location?: string;
       latitude?: number;

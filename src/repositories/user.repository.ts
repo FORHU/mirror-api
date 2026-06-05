@@ -82,4 +82,17 @@ export default class UserRepository {
       totalPages: Math.ceil(total / limit),
     };
   }
+
+  static async upsert(id: string, data: Prisma.UserUpdateInput) {
+    return prisma.user.upsert({
+      where: { id },
+      update: data,
+      create: {
+        id,
+        email: data.email as string,
+        username: data.username as string,
+        gender: data.gender as any,
+      },
+    });
+  }
 }

@@ -31,4 +31,11 @@ export default class UserService {
     const user = await this.getUser(id);
     return UserRepository.update(user.id, data);
   }
+
+  /**
+   * Upsert user
+   */
+  static async upsertUser(id: string, data: Prisma.UserUpdateInput) {
+    return UserRepository.upsert(id, data as any);
+  }
 }
