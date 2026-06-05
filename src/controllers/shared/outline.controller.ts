@@ -34,7 +34,7 @@ export default class OutlineController {
 
     try {
       const active = await OutlineRepo.findActiveWithOverview(userId);
-      return responseSuccess(res, 200, active);
+      return responseSuccess(res, 200, active ?? null);
     } catch (err) {
       next(err);
     }

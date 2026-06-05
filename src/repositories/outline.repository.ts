@@ -65,6 +65,14 @@ export default class OutlineRepo {
     });
   }
 
+  static async findActiveWithEvents(userId: string) {
+    return prisma.userOutline.findFirst({
+      where: { userId, deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      include: { events: true },
+    });
+  }
+
   static async findByConversationId(conversationId: string) {
     return prisma.userOutline.findUnique({
       where: { conversationId },
