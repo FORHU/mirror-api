@@ -198,7 +198,7 @@ async function transcribeWithWhisper(pcmBuffer: Buffer, language: string): Promi
   const file = await toFile(wavBuffer, "audio.wav", { type: "audio/wav" });
   const response = await openai.audio.transcriptions.create({
     file,
-    model: "whisper-1",
+    model: "gpt-4o-mini-transcribe",
     language: langCode,
   });
   const text = response.text?.trim();
