@@ -26,7 +26,6 @@ import {
   CHAT_WONDER_API_URL,
 } from "../../config";
 import openai from "../../utils/openai/ai-request.util";
-import { toFile } from "openai";
 import { weatherService } from "./weather.service";
 import { prisma } from "../../utils/prisma";
 import { streamChat } from "../../utils/chat-wonder-stream";
@@ -194,16 +193,21 @@ function pcmToWav(pcmBuffer: Buffer, sampleRate = 16000, channels = 1, bitDepth 
 
 async function transcribeWithWhisper(pcmBuffer: Buffer, language: string): Promise<string> {
   const wavBuffer = pcmToWav(pcmBuffer);
-  const langCode = language.split("-")[0]; // "en-US" -> "en"
-  const file = await toFile(wavBuffer, "audio.wav", { type: "audio/wav" });
-  const response = await openai.audio.transcriptions.create({
-    file,
-    model: "gpt-4o-mini-transcribe",
-    language: langCode,
-  });
-  const text = response.text?.trim();
-  if (!text) throw new Error("EMPTY_TRANSCRIPT");
-  return text;
+  const langCode = language.split("-")[0];
+  const tmpPath = path.join(require("os").tmpdir(), `voice-${Date.now()}.wav`);
+  fs.writeFileSync(tmpPath, wavBuffer);
+  try {
+    const response = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(tmpPath) as unknown as File,
+      model: "gpt-4o-mini-transcribe",
+      language: langCode,
+    });
+    const text = response.text?.trim();
+    if (!text) throw new Error("EMPTY_TRANSCRIPT");
+    return text;
+  } finally {
+    fs.unlinkSync(tmpPath);
+  }
 }
 
 async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> {
