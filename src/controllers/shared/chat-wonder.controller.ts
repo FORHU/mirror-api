@@ -14,6 +14,8 @@ import { voiceService } from "../../services/shared/voice.service";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
 import CacheUtil from "../../utils/cache.util";
+import { chatWonderBaseSchema, checkAndFinalizeOutline } from "../../helpers/chat-wonder.helper";
+import OutlineRepo from "../../repositories/outline.repository";
 
 export default class ChatWonderController {
   /**
@@ -371,41 +373,22 @@ export default class ChatWonderController {
         },
       };
 
-      let builtInput = input;
-      const contexts: string[] = [];
-      const lowerInput = input.toLowerCase();
+      const gender = await ChatWonderService.getUserGender(userId);
 
-      if (lowerInput.includes("[overview]")) {
-        if (frontendWeather) contexts.push(`The current weather context is: ${JSON.stringify(frontendWeather)}.`);
-        if (frontendLocation) contexts.push(`The user's current location is: ${JSON.stringify(frontendLocation)}.`);
-        if (skinAnalysis) contexts.push(`The user's skin analysis is: ${JSON.stringify(skinAnalysis)}.`);
-      } else {
-        if (lowerInput.includes("[garments]") || lowerInput.includes("[garment]") || lowerInput.includes("[outfits]")) {
-          if (frontendWeather) contexts.push(`The current weather context is: ${JSON.stringify(frontendWeather)}.`);
-          if (frontendLocation) contexts.push(`The user's current location is: ${JSON.stringify(frontendLocation)}.`);
-        }
-        if (lowerInput.includes("[maps]") || lowerInput.includes("[map]")) {
-          if (frontendLocation) contexts.push(`The user's current location is: ${JSON.stringify(frontendLocation)}.`);
-        }
-        if (lowerInput.includes("[cosmetics]")) {
-          if (frontendWeather) contexts.push(`The current weather context is: ${JSON.stringify(frontendWeather)}.`);
-          if (frontendLocation) contexts.push(`The user's current location is: ${JSON.stringify(frontendLocation)}.`);
-          if (skinAnalysis) contexts.push(`The user's skin analysis is: ${JSON.stringify(skinAnalysis)}.`);
-        }
-      }
-
-      const uniqueContexts = [...new Set(contexts)];
-      if (uniqueContexts.length > 0) {
-        builtInput = `${input}. ${uniqueContexts.join(" ")}`;
-      }
-
+      // Fetch outlineId if it exists
+      const outline = await ChatWonderService.ensureConversation(userId, input.substring(0, 50), inputConversationId).then(cid => OutlineRepo.findByConversationId(cid));
+      
       // 7. Stream from external ChatWonder API
       await streamChat({
-        userInput: builtInput,
+        userInput: input,
         sessionId: sessionId as string,
         callbacks,
+        userId,
+        outlineId: outline?.id,
         weather: frontendWeather,
-        gender,
+        location: frontendLocation,
+        skinAnalysis,
+        gender: gender || undefined,
         sitemapContext,
         history,
       });
@@ -501,43 +484,15 @@ export default class ChatWonderController {
       // 4. Buffer the full ChatWonder response (no SSE).
       let fullResponse = "";
       let streamError: Error | null = null;
-      let builtInput = input;
-      const contexts: string[] = [];
-      const lowerInput = input.toLowerCase();
 
-      if (lowerInput.includes("[overview]")) {
-        if (frontendWeather) contexts.push(`The current weather context is: ${JSON.stringify(frontendWeather)}.`);
-        if (frontendLocation) contexts.push(`The user's current location is: ${JSON.stringify(frontendLocation)}.`);
-        if (skinAnalysis) contexts.push(`The user's skin analysis is: ${JSON.stringify(skinAnalysis)}.`);
-      } else {
-        if (lowerInput.includes("[garments]") || lowerInput.includes("[garment]") || lowerInput.includes("[outfits]")) {
-          if (frontendWeather) contexts.push(`The current weather context is: ${JSON.stringify(frontendWeather)}.`);
-          if (frontendLocation) contexts.push(`The user's current location is: ${JSON.stringify(frontendLocation)}.`);
-        }
-        if (lowerInput.includes("[maps]") || lowerInput.includes("[map]")) {
-          if (frontendLocation) contexts.push(`The user's current location is: ${JSON.stringify(frontendLocation)}.`);
-        }
-        if (lowerInput.includes("[cosmetics]")) {
-          if (frontendWeather) contexts.push(`The current weather context is: ${JSON.stringify(frontendWeather)}.`);
-          if (frontendLocation) contexts.push(`The user's current location is: ${JSON.stringify(frontendLocation)}.`);
-          if (skinAnalysis) contexts.push(`The user's skin analysis is: ${JSON.stringify(skinAnalysis)}.`);
-        }
-      }
-
-      const uniqueContexts = [...new Set(contexts)];
-      if (uniqueContexts.length > 0) {
-        builtInput = `${input}. ${uniqueContexts.join(" ")}`;
-      }
-
+      // 4. Stream from external ChatWonder API
       await streamChat({
-        userInput: builtInput,
+        userInput: input,
         sessionId: sessionId as string,
         callbacks: {
           onChunk: (chunk: string) => {
             fullResponse += chunk;
-                    console.log("-----------", chunk);
           },
-  
           onComplete: () => {
             /* buffered — we respond once the stream completes */
           },
@@ -548,8 +503,11 @@ export default class ChatWonderController {
             logger.error(`[ChatWonderController.chat] Stream error: ${err.message}`);
           },
         },
+        userId,
         weather: frontendWeather,
-        gender,
+        location: frontendLocation,
+        skinAnalysis,
+        gender: gender || undefined,
         sitemapContext,
         history,
       });

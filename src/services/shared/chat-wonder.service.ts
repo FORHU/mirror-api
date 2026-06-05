@@ -317,7 +317,11 @@ CRITICAL ENUM RULES - YOU MUST ONLY USE THESE EXACT VALUES FOR FASHION:
 
   static async getUserGender(userId: string) {
     const user = await UserRepository.findGenderById(userId);
-    return user?.gender ?? "FEMALE";
+    return user?.gender ?? null;
+  }
+
+  static async updateUserGender(userId: string, gender: "MALE" | "FEMALE") {
+    return UserRepository.update(userId, { gender });
   }
 
   /**

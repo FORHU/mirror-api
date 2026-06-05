@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import OutlineRepo from "../../repositories/outline.repository";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
+import { notifyCompanion } from "../../utils/socket.util";
 
 const createSchema = Joi.object({
   userPrompt: Joi.array().items(Joi.string()).default([]),
@@ -55,6 +56,21 @@ export default class OutlineController {
     }
   }
 
+  /**
+   * EXTERNAL GET — used by 3rd party AI (ChatWonder) to read an outline via API Key.
+   * Does not require a user JWT session.
+   */
+  static async externalGetById(req: Request, res: Response, next: NextFunction) {
+    try {
+      // Find the outline including its events so the AI can see the itinerary
+      const outline = await OutlineRepo.findByIdWithEvents(req.params.id);
+      if (!outline) return responseError(res, 404, "Outline not found");
+      return responseSuccess(res, 200, outline);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async list(req: Request, res: Response, next: NextFunction) {
     const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
@@ -82,4 +98,5 @@ export default class OutlineController {
       next(err);
     }
   }
+
 }

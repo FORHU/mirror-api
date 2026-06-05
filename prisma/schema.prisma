@@ -400,6 +400,7 @@ enum GARMENT_GENDER {
 enum USER_GENDER {
   MALE
   FEMALE
+  UNISEX
 }
 
 /// Defines where on the body the garment or accessory is anchored.

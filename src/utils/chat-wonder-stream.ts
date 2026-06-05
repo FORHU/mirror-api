@@ -21,7 +21,11 @@ export interface StreamChatOptions {
   userInput: string;
   sessionId: string;
   callbacks: StreamCallbacks;
+  userId?: string;
+  outlineId?: string;
   weather?: Record<string, unknown>;
+  location?: Record<string, unknown>;
+  skinAnalysis?: Record<string, unknown>;
   gender?: string;
   /** App routes ChatWonder may navigate to (for `[nav]` requests). */
   sitemapContext?: string[];
@@ -33,7 +37,11 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     userInput,
     sessionId,
     callbacks,
+    userId,
+    outlineId,
     weather = {},
+    location,
+    skinAnalysis,
     gender = "MALE",
     sitemapContext,
     history,
@@ -83,7 +91,11 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
       const payload = {
         session_id: sessionId,
         user_input: `${userInput} - i am ${gender}`,
+        ...(userId ? { user_id: userId } : {}),
+        ...(outlineId ? { outline_id: outlineId } : {}),
         weather,
+        ...(location ? { location } : {}),
+        ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
         ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
         ...(history && history.length ? { history } : {}),
       };
