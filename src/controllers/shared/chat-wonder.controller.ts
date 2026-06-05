@@ -493,9 +493,51 @@ export default class ChatWonderController {
       // 3. Save user message
       const userMessage = await ChatWonderService.saveUserMessage(userId, conversationId, input);
 
-      // 4. Buffer the full ChatWonder response (no SSE).
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+
       let fullResponse = "";
-      let streamError: Error | null = null;
+      let sentenceBuffer = "";
+      let displayedLen = 0;
+      let ttsPromise = Promise.resolve();
+
+      const responseWithFlush = res as Response & { flush?: () => void };
+      const writeSseEvent = (payload: Record<string, unknown>) => {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+        responseWithFlush.flush?.();
+      };
+
+      const cleanDisplayPrefix = (full: string): string => {
+        let display = cutToMessage(full);
+        const lastOpen = display.lastIndexOf("[");
+        if (lastOpen !== -1 && !display.slice(lastOpen).includes("]")) {
+          display = display.slice(0, lastOpen);
+        }
+        const lastNL = display.lastIndexOf("\n");
+        const lastLine = display.slice(lastNL + 1).trimStart();
+        if (/^#{1,6}(\s|$)/.test(lastLine)) {
+          display = lastNL === -1 ? "" : display.slice(0, lastNL);
+        }
+        return display;
+      };
+
+      const processSentence = (text: string) => {
+        if (!text.trim()) return;
+        ttsPromise = ttsPromise.then(async () => {
+          let audioBase64: string | null = null;
+          if (wantsVoice) {
+            try {
+              const audio = await voiceService.tts(text, ttsLang);
+              audioBase64 = audio.toString("base64");
+            } catch (ttsErr) {
+              logger.warn(`[ChatWonderController.chat] TTS failed for chunk: ${(ttsErr as Error).message}`);
+            }
+          }
+          writeSseEvent({ type: "audio_chunk", text, audioBase64 });
+        });
+      };
 
       // 4. Stream from external ChatWonder API
       await streamChat({
@@ -504,15 +546,125 @@ export default class ChatWonderController {
         callbacks: {
           onChunk: (chunk: string) => {
             fullResponse += chunk;
+            const display = cleanDisplayPrefix(fullResponse);
+            if (display.length > displayedLen) {
+              const newText = display.slice(displayedLen);
+              displayedLen = display.length;
+              sentenceBuffer += newText;
+
+              let match;
+              // Extract completed sentences
+              while ((match = sentenceBuffer.match(/^([\s\S]*?[.!?]+[\s\n]+)([\s\S]*)$/))) {
+                processSentence(match[1]);
+                sentenceBuffer = match[2];
+              }
+            }
           },
-          onComplete: () => {
-            /* buffered — we respond once the stream completes */
+          onComplete: async () => {
+            try {
+              // Process any remaining text in buffer
+              if (sentenceBuffer.trim()) {
+                processSentence(sentenceBuffer);
+                sentenceBuffer = "";
+              }
+
+              // Wait for all queued TTS requests to finish
+              await ttsPromise;
+
+              // Clean + parse the buffered response.
+              const { cleaned } = stripSourcesPrefix(fullResponse);
+              const parsed = parseChatWonderResponse(cleaned);
+              if (parsed.events.length > 0) {
+                parsed.events = await resolveItineraryLocations(parsed.events);
+              }
+
+              // Extract structured payloads
+              const garment_data = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
+              const cosmetics_data = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
+              const maps_data = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
+              const stylist_data = extractChatWonderDataBlock(fullResponse, "STYLIST")
+                ?? extractChatWonderDataBlock(fullResponse, "NAV_DATA");
+              const gender_data = extractChatWonderDataBlock(fullResponse, "GENDER_UPDATE") as any;
+
+              if (gender_data && gender_data.gender) {
+                const newGender = String(gender_data.gender).toUpperCase();
+                if (["MALE", "FEMALE", "UNISEX"].includes(newGender)) {
+                  await UserService.updateUser(userId, { gender: newGender as any });
+                  logger.info(`[ChatWonderController] Caught GENDER_UPDATE: ${newGender}`);
+                }
+              }
+
+              const message = parsed.message
+                .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
+                .split(
+                  /\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE)\]/,
+                )[0]
+                .trim();
+
+              const isFinalization =
+                /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
+                  input
+                );
+
+              if (isFinalization) {
+                await ChatWonderService.finalizeOutlineByConversationId(conversationId);
+                if (kioskId) {
+                  emitToKiosk(kioskId, "itinerary_locked", { conversationId });
+                }
+              }
+
+              const aiMessage = await ChatWonderService.saveAIMessage(
+                userId,
+                conversationId,
+                parsed.message
+              );
+
+              writeSseEvent({
+                type: "complete",
+                message,
+                intent: parsed.intent,
+                garment_data,
+                cosmetics_data,
+                maps_data,
+                stylist_data,
+                gender_update: gender_data,
+                events: parsed.events,
+                sets: parsed.sets,
+                metadata: {
+                  conversationId,
+                  userMessageId: userMessage.id,
+                  aiMessageId: aiMessage.id,
+                },
+              });
+              res.end();
+            } catch (err) {
+              logger.error(`[ChatWonderController.chat] onComplete error: ${(err as Error).message}`);
+              writeSseEvent({ type: "error", message: "Failed to parse final response" });
+              res.end();
+            }
           },
-          onError: (err: Error) => {
-            // Capture and re-throw after the stream settles so the catch block
-            // below can map it to a real HTTP status.
-            streamError = err;
+          onError: async (err: Error) => {
             logger.error(`[ChatWonderController.chat] Stream error: ${err.message}`);
+            if (err.message.includes("Unknown session")) {
+              await CacheUtil.del(`chat:sessionId:${userId}`);
+              ChatWonderService.generateChatSessionId(userId, true).catch(() => {});
+              
+              if (!res.headersSent) {
+                  responseError(res, 409, "Session expired. Please resend your message.", { code: "session_expired" });
+              } else {
+                  writeSseEvent({ type: "error", code: "session_expired", message: "Session expired. Please resend your message." });
+                  res.end();
+              }
+              return;
+            }
+
+            if (!res.headersSent) {
+              responseError(res, 500, err.message);
+              return;
+            }
+
+            writeSseEvent({ type: "error", message: err.message });
+            res.end();
           },
         },
         userId,
@@ -523,130 +675,24 @@ export default class ChatWonderController {
         sitemapContext,
         history,
       });
-
-      if (streamError) {
-        throw streamError;
-      }
-
-      // 5. Clean + parse the buffered response.
-      const { cleaned } = stripSourcesPrefix(fullResponse);
-      const parsed = parseChatWonderResponse(cleaned);
-      if (parsed.events.length > 0) {
-        parsed.events = await resolveItineraryLocations(parsed.events);
-      }
-      // The structured payloads ChatWonder appends as [GARMENT_DATA] /
-      // [COSMETICS_DATA] blocks, parsed into JSON objects (null when absent).
-      const garment_data = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
-      const cosmetics_data = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
-      const maps_data = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
-      // Stylist payload for nav — prefers [STYLIST], falls back to [NAV_DATA] (ChatWonder's native block)
-      const stylist_data = extractChatWonderDataBlock(fullResponse, "STYLIST")
-        ?? extractChatWonderDataBlock(fullResponse, "NAV_DATA");
-      const gender_data = extractChatWonderDataBlock(fullResponse, "GENDER_UPDATE") as any;
-
-      if (gender_data && gender_data.gender) {
-        const newGender = String(gender_data.gender).toUpperCase();
-        if (["MALE", "FEMALE", "UNISEX"].includes(newGender)) {
-          await UserService.updateUser(userId, { gender: newGender as any });
-          logger.info(`[ChatWonderController] Caught GENDER_UPDATE: ${newGender}`);
-        }
-      }
-
-      // Plain display text, without the joined `[ garments ]/[ cosmetics ]/[ map ]`
-      // markers or any appended data blocks (`[MAPS_DATA]`, `[STYLIST]`,
-      // `[NAV_DATA]`, etc.) — the structured data lives in *_data above.
-      const message = parsed.message
-        .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
-        .split(
-          /\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE)\]/,
-        )[0]
-        .trim();
-
-      // 6. Finalization keywords save/finalize the plan draft.
-      const isFinalization =
-        /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
-          input
-        );
-
-      if (isFinalization) {
-        await ChatWonderService.finalizeOutlineByConversationId(conversationId);
-        logger.info(
-          `[ChatWonderController.chat] Finalized UserOutline status for conversation: ${conversationId}`
-        );
-
-        if (kioskId) {
-          emitToKiosk(kioskId, "itinerary_locked", { conversationId });
-          logger.info(`[ChatWonderController.chat] Emitted itinerary_locked to kiosk: ${kioskId}`);
-        }
-      }
-
-      // 7. Save AI response to history (the joined display string, so the chat
-      // bubble still renders the suggestions inline).
-      const aiMessage = await ChatWonderService.saveAIMessage(
-        userId,
-        conversationId,
-        parsed.message
-      );
-
-      // 8. Optional TTS: speak the clean display text when the client opts in
-      // with `voice: true`. Non-fatal — a synthesis failure still returns the
-      // text reply, just with `audioBase64: null`.
-      let audioBase64: string | null = null;
-      if (wantsVoice && message) {
-        try {
-          const audio = await voiceService.tts(message, ttsLang);
-          audioBase64 = audio.toString("base64");
-        } catch (ttsErr) {
-          logger.warn(`[ChatWonderController.chat] TTS failed: ${(ttsErr as Error).message}`);
-        }
-      }
-
-      return res.json({
-        status: "success",
-        data: {
-          message,
-          // Base64 MP3 of the spoken reply (null when not requested or on failure).
-          audioBase64,
-          intent: parsed.intent,
-          // Structured, fully-parsed payloads (null when not present).
-          garment_data,
-          cosmetics_data,
-          maps_data,
-          // Navigation decision (target_url, confidence, …) for [stylist] requests.
-          stylist_data,
-          gender_update: gender_data,
-          events: parsed.events,
-          sets: parsed.sets,
-          metadata: {
-            conversationId,
-            userMessageId: userMessage.id,
-            aiMessageId: aiMessage.id,
-          },
-        },
-        message: "OK",
-      });
     } catch (err) {
       const message = (err as Error).message || "Internal server error";
       logger.error(`[ChatWonderController.chat] ${message}`);
 
-      // Session-expired recovery: clear the stale session, pre-warm a fresh one,
-      // and return a clean 409 so the client can resend.
       if (message.includes("Unknown session")) {
         await CacheUtil.del(`chat:sessionId:${userId}`);
-        logger.info(
-          `[ChatWonderController.chat] Stale session cleared for user ${userId}. Pre-warming fresh session...`
-        );
+        ChatWonderService.generateChatSessionId(userId, true).catch(() => {});
 
-        ChatWonderService.generateChatSessionId(userId, true)
-          .then((id) => logger.info(`[ChatWonderController.chat] Fresh session pre-warmed: ${id}`))
-          .catch((e) => logger.warn(`[ChatWonderController.chat] Pre-warm failed: ${e.message}`));
-
-        return responseError(res, 409, "Session expired. Please resend your message.", {
-          code: "session_expired",
-        });
+        if (!res.headersSent) {
+          return responseError(res, 409, "Session expired. Please resend your message.", {
+            code: "session_expired",
+          });
+        }
       }
 
-      return responseError(res, 500, message);
+      if (!res.headersSent) {
+        return responseError(res, 500, message);
+      }
     }
   }
 }
