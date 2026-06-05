@@ -82,16 +82,42 @@ export default class OutlineController {
   }
 
   /**
-   * RESET — clears the user's itinerary by soft-deleting all active outlines.
-   * Used on page refresh so the user starts with a clean itinerary.
+   * RESET — two modes (see ADR 0001):
+   *   - No `scope` → full wipe: soft-delete all active outlines. Used by Restart.
+   *   - `scope` = "fashion" | "cosmetic" | "itinerary" → scoped per-feature reset
+   *     on the active outline, used by the per-screen Reset command.
    */
   static async reset(req: Request, res: Response, next: NextFunction) {
     const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
+    const scope = req.body?.scope as string | undefined;
+
     try {
-      const result = await OutlineRepo.softDeleteAllByUserId(userId);
-      return responseSuccess(res, 200, { cleared: result.count }, "Itinerary reset");
+      if (!scope) {
+        const result = await OutlineRepo.softDeleteAllByUserId(userId);
+        return responseSuccess(res, 200, { cleared: result.count }, "Outline reset");
+      }
+
+      if (!["fashion", "cosmetic", "itinerary"].includes(scope)) {
+        return responseError(res, 400, "Invalid scope");
+      }
+
+      const outline = await OutlineRepo.findActiveWithEvents(userId);
+      if (!outline) {
+        return responseSuccess(res, 200, { cleared: 0, scope }, "No active outline");
+      }
+
+      let result: { count: number };
+      if (scope === "fashion") {
+        result = await OutlineRepo.clearFashionByOutlineId(outline.id);
+      } else if (scope === "cosmetic") {
+        result = await OutlineRepo.clearCosmeticsByOutlineId(outline.id);
+      } else {
+        result = await OutlineRepo.clearItineraryByOutlineId(outline.id);
+      }
+
+      return responseSuccess(res, 200, { cleared: result.count, scope }, `${scope} reset`);
     } catch (err) {
       next(err);
     }

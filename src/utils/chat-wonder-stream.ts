@@ -42,7 +42,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     weather = {},
     location,
     skinAnalysis,
-    gender = "MALE",
+    gender,
     sitemapContext,
     history,
   } = options;
@@ -90,7 +90,9 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
       const payload = {
         session_id: sessionId,
-        user_input: `${userInput} - i am ${gender}`,
+        // Only assert a gender when we actually know it. When it's unset we send
+        // the input as-is so the (external) persona can ask, rather than faking one.
+        user_input: gender ? `${userInput} - i am ${gender}` : userInput,
         ...(userId ? { user_id: userId } : {}),
         ...(outlineId ? { outline_id: outlineId } : {}),
         weather,

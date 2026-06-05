@@ -299,7 +299,8 @@ export default class ChatWonderController {
             const garment = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
             const cosmetics = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
             const maps = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
-            const stylist = extractChatWonderDataBlock(fullResponse, "STYLIST");
+            const stylist = extractChatWonderDataBlock(fullResponse, "STYLIST")
+              ?? extractChatWonderDataBlock(fullResponse, "NAV_DATA");
             const genderUpdate = extractChatWonderDataBlock(fullResponse, "GENDER_UPDATE") as any;
 
             if (genderUpdate && genderUpdate.gender) {
@@ -538,8 +539,9 @@ export default class ChatWonderController {
       const garment_data = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
       const cosmetics_data = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
       const maps_data = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
-      // Stylist payload for maps, fashion, cosmetics, and nav
-      const stylist_data = extractChatWonderDataBlock(fullResponse, "STYLIST");
+      // Stylist payload for nav — prefers [STYLIST], falls back to [NAV_DATA] (ChatWonder's native block)
+      const stylist_data = extractChatWonderDataBlock(fullResponse, "STYLIST")
+        ?? extractChatWonderDataBlock(fullResponse, "NAV_DATA");
       const gender_data = extractChatWonderDataBlock(fullResponse, "GENDER_UPDATE") as any;
 
       if (gender_data && gender_data.gender) {
@@ -551,12 +553,13 @@ export default class ChatWonderController {
       }
 
       // Plain display text, without the joined `[ garments ]/[ cosmetics ]/[ map ]`
-      // markers or the appended `[MAPS_DATA]` / `[NAV_DATA]` blocks — the structured
-      // data lives in *_data above.
+      // markers or any appended data blocks (`[MAPS_DATA]`, `[STYLIST]`,
+      // `[NAV_DATA]`, etc.) — the structured data lives in *_data above.
       const message = parsed.message
         .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
-        .split("[MAPS_DATA]")[0]
-        .split("[STYLIST]")[0]
+        .split(
+          /\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE)\]/,
+        )[0]
         .trim();
 
       // 6. Finalization keywords save/finalize the plan draft.

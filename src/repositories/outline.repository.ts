@@ -140,4 +140,43 @@ export default class OutlineRepo {
       data: { deletedAt: new Date() },
     });
   }
+
+  /**
+   * SCOPED RESET — deletes only one feature's contribution to an outline, used by
+   * the per-screen **Reset** command (see ADR 0001). Each clears the persisted
+   * rows linked either directly to the outline or via one of its events.
+   */
+  static async clearFashionByOutlineId(outlineId: string) {
+    return prisma.outfit.deleteMany({
+      where: {
+        OR: [
+          { userOutlineId: outlineId },
+          { itineraryEvent: { userOutlineId: outlineId } },
+        ],
+      },
+    });
+  }
+
+  static async clearCosmeticsByOutlineId(outlineId: string) {
+    const deleted = await prisma.cosmeticRecommendation.deleteMany({
+      where: {
+        OR: [
+          { userOutlineId: outlineId },
+          { itineraryEvent: { userOutlineId: outlineId } },
+        ],
+      },
+    });
+    // Unlink the skin analysis so the cosmetics tile reads empty.
+    await prisma.userOutline.update({
+      where: { id: outlineId },
+      data: { skinAnalysisId: null },
+    });
+    return deleted;
+  }
+
+  static async clearItineraryByOutlineId(outlineId: string) {
+    return prisma.itineraryEvent.deleteMany({
+      where: { userOutlineId: outlineId },
+    });
+  }
 }
