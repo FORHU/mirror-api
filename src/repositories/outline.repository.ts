@@ -22,6 +22,49 @@ export default class OutlineRepo {
     });
   }
 
+  static async findActiveWithOverview(userId: string) {
+    return prisma.userOutline.findFirst({
+      where: { userId, deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      include: {
+        events: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            outfits: {
+              include: {
+                file: true,
+                items: {
+                  include: {
+                    garment: {
+                      include: {
+                        file: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            cosmeticRecommendations: {
+              include: {
+                cosmeticProduct: {
+                  include: {
+                    fileUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        weather: true,
+        skinAnalysis: {
+          include: {
+            file: true,
+          },
+        },
+      },
+    });
+  }
+
   static async findByConversationId(conversationId: string) {
     return prisma.userOutline.findUnique({
       where: { conversationId },

@@ -33,9 +33,7 @@ export default class OutlineController {
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {
-      const outlines = await OutlineRepo.findByUserId(userId);
-      // Most recent non-deleted outline is "active"
-      const active = outlines.find((o) => !o.deletedAt) ?? null;
+      const active = await OutlineRepo.findActiveWithOverview(userId);
       return responseSuccess(res, 200, active);
     } catch (err) {
       next(err);
