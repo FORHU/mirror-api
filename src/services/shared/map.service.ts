@@ -131,22 +131,23 @@ export const mapService = {
 
   geocodeAddress: async (
     query: string,
-    proximityLng: number = 120.596,
-    proximityLat: number = 16.3971
+    proximityLng?: number,
+    proximityLat?: number
   ): Promise<GeocodeResult[]> => {
     try {
       const encoded = encodeURIComponent(query);
+      const params: Record<string, string | number> = {
+        access_token: MAPBOX_SECRET_TOKEN,
+        country: "PH",
+        limit: 5,
+        types: "address,place,poi",
+      };
+      if (proximityLng != null && proximityLat != null) {
+        params.proximity = `${proximityLng},${proximityLat}`;
+      }
       const response = await axios.get<GeocodingResponse>(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json`,
-        {
-          params: {
-            access_token: MAPBOX_SECRET_TOKEN,
-            proximity: `${proximityLng},${proximityLat}`,
-            country: "PH",
-            limit: 5,
-            types: "address,place,poi",
-          },
-        }
+        { params }
       );
       return response.data.features.map((f) => ({
         name: f.place_name.split(",")[0],

@@ -254,8 +254,8 @@ export default class MapController {
     try {
       const results = await mapService.geocodeAddress(
         value.query,
-        value.lng ?? 120.596,
-        value.lat ?? 16.3971
+        value.lng,
+        value.lat
       );
       res.status(200).json({ results });
     } catch (err) {
