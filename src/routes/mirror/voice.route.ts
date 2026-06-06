@@ -9,7 +9,7 @@ router.post(
   VoiceController.transcribe
 );
 
-router.post("/ask", express.json(), VoiceController.ask);
+
 
 router.post("/tts", express.json(), VoiceController.tts);
 

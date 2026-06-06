@@ -593,6 +593,9 @@ export default class ChatWonderController {
               // Wait for all queued TTS requests to finish
               await ttsPromise;
 
+              logger.info(`[ChatWonderController.chat] Stream completed. FullResponse length: ${fullResponse.length}`);
+              logger.info(`[ChatWonderController.chat] Raw FullResponse:\n------------------\n${fullResponse}\n------------------`);
+
               // Clean + parse the buffered response.
               const { cleaned } = stripSourcesPrefix(fullResponse);
               const parsed = parseChatWonderResponse(cleaned);
