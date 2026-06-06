@@ -159,22 +159,53 @@ export const mapService = {
         placeId: f.id,
         placeType: f.place_type?.[0] ?? "other",
       }));
+      // Venue-type descriptor words — excluded from context matching because they
+      // are part of a POI name, not an administrative area (e.g. "mall", "church").
+      // They are also used to detect POI queries so we can apply name-match guards.
+      const VENUE_TYPE_WORDS = new Set([
+        "mall", "center", "centre", "plaza", "complex", "building", "tower",
+        "restaurant", "cafe", "cafeteria", "eatery", "diner", "bistro", "bar",
+        "bakery", "grill", "kitchen", "buffet", "food", "court",
+        "church", "chapel", "cathedral", "basilica", "shrine", "parish",
+        "convent", "monastery", "grotto",
+        "school", "university", "college", "academy", "institute", "campus",
+        "hospital", "clinic",
+        "hotel", "resort", "inn", "lodge", "hostel",
+        "park", "garden", "farm", "market", "supermarket",
+        "museum", "library", "theater", "cinema", "gallery",
+        "station", "terminal", "gym", "spa",
+      ]);
       // Filter results by checking whether any key query word appears in the
       // administrative context (everything after the first comma in place_name).
       // This rejects road/street results whose name contains a region word but
       // whose location is outside that region — e.g. "Benguet Road, Antipolo,
       // Rizal" for "bugias benguet" (context "Antipolo, Rizal" has no query
       // word) while keeping "Buguias, Benguet" (context "Benguet, Cordillera"
-      // matches "benguet"). Generic place-type words are stripped first so
-      // "vigan city" doesn't penalise "Vigan, Ilocos Sur" for missing "city".
+      // matches "benguet"). Generic place-type words and venue descriptors are
+      // stripped first so "good taste center mall" doesn't try to match "mall"
+      // against the administrative context of Baguio City.
       const PLACE_TYPE_WORDS = new Set(["city", "municipality", "province", "barangay", "village", "near", "nearest", "closest", "in", "at", "along", "beside"]);
+      const ALL_SKIP_WORDS = new Set([...PLACE_TYPE_WORDS, ...VENUE_TYPE_WORDS]);
       const queryWords = query.toLowerCase().split(/\s+/)
-        .filter((w) => w.length > 1 && !PLACE_TYPE_WORDS.has(w));
+        .filter((w) => w.length > 1 && !ALL_SKIP_WORDS.has(w));
       const filtered = raw.filter((r) => {
         const contextLower = r.address.split(",").slice(1).join(",").toLowerCase();
         return queryWords.some((w) => contextLower.includes(w));
       });
-      return filtered.length > 0 ? filtered : raw;
+      // Secondary guard: reject place/region results (municipalities, cities) whose
+      // name shares no words with the query. This kills fuzzy mismatches like
+      // "Mallig, Isabela" for "good taste center mall" where the query words
+      // ("good", "taste") appear nowhere in "Mallig".
+      const nameWords = query.toLowerCase().split(/\s+/)
+        .filter((w) => w.length > 2 && !ALL_SKIP_WORDS.has(w));
+      const base = filtered.length > 0 ? filtered : raw;
+      const nameGuarded = base.filter((r) => {
+        if (r.placeType === "poi" || r.placeType === "address" || r.placeType === "neighborhood") return true;
+        if (nameWords.length === 0) return true;
+        const resultWords = r.name.toLowerCase().split(/[\s,\-]+/);
+        return nameWords.some((qw) => resultWords.some((rw) => rw.includes(qw) || qw.includes(rw)));
+      });
+      return nameGuarded.length > 0 ? nameGuarded : base;
     } catch (error) {
       logger.error(`Mapbox Geocode Error: ${(error as Error).message}`);
       throw new Error("Geocoding service unavailable");
