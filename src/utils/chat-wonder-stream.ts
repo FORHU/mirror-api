@@ -29,6 +29,7 @@ export interface StreamChatOptions {
   gender?: string;
   /** App routes ChatWonder may navigate to (for `[nav]` requests). */
   sitemapContext?: string[];
+  history?: { role: "user" | "assistant"; content: string }[];
 }
 
 export async function streamChat(options: StreamChatOptions): Promise<void> {
@@ -43,6 +44,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     skinAnalysis,
     gender,
     sitemapContext,
+    history,
   } = options;
 
   return new Promise((resolve, reject) => {
@@ -98,6 +100,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
         ...(gender ? { gender } : {}),
         ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
+        ...(history && history.length ? { history } : {}),
       };
       logger.info(
         `[CHAT-WONDER-STREAM] user payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "..." })}`

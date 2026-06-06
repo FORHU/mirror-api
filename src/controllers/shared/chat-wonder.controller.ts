@@ -151,8 +151,6 @@ export default class ChatWonderController {
       return responseError(res, 401, "Unauthorized");
     }
 
-    const gender = await ChatWonderService.getUserGender(userId);
-
     const schema = Joi.object({
       input: Joi.string().min(1).max(5000).optional(),
       user_input: Joi.string().min(1).max(5000).optional(),
@@ -422,6 +420,7 @@ export default class ChatWonderController {
         skinAnalysis,
         gender: gender || undefined,
         sitemapContext,
+        history,
       });
     } catch (err) {
       logger.error(`[ChatWonderController] Controller error: ${(err as Error).message}`);
@@ -732,6 +731,7 @@ export default class ChatWonderController {
         skinAnalysis,
         gender: gender || undefined,
         sitemapContext,
+        history,
       });
     } catch (err) {
       const message = (err as Error).message || "Internal server error";
