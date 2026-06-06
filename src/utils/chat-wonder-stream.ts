@@ -92,7 +92,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         session_id: sessionId,
         // Only assert a gender when we actually know it. When it's unset we send
         // the input as-is so the (external) persona can ask, rather than faking one.
-        user_input: gender ? `${userInput} - i am ${gender}` : userInput,
+        user_input:  userInput,
         ...(userId ? { user_id: userId } : {}),
         ...(outlineId ? { outline_id: outlineId } : {}),
         weather,
