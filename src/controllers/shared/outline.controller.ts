@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
-import OutlineRepo from "../../repositories/outline.repository";
+import OutlineRepo, { MapStop } from "../../repositories/outline.repository";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
 import { notifyCompanion } from "../../utils/socket.util";
 
@@ -87,6 +87,23 @@ export default class OutlineController {
    *   - `scope` = "fashion" | "cosmetic" | "itinerary" → scoped per-feature reset
    *     on the active outline, used by the per-screen Reset command.
    */
+  static async saveMapStops(req: Request, res: Response, next: NextFunction) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) return responseError(res, 401, "Unauthorized");
+
+    const stops: MapStop[] = req.body?.stops;
+    if (!Array.isArray(stops)) return responseError(res, 400, "stops must be an array");
+
+    try {
+      const outline = await OutlineRepo.findActiveWithEvents(userId);
+      if (!outline) return responseError(res, 404, "No active outline");
+      await OutlineRepo.saveMapStops(outline.id, stops);
+      return responseSuccess(res, 200, { saved: stops.length });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async reset(req: Request, res: Response, next: NextFunction) {
     const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");

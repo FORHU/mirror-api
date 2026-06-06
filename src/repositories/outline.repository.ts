@@ -1,6 +1,15 @@
 import { prisma } from "../utils/prisma";
 import { OUTLINE_STATUS } from "@prisma/client";
 
+export interface MapStop {
+  name: string;
+  lat: number;
+  lng: number;
+  address?: string;
+  eventType?: string;
+  timeBlock?: string;
+}
+
 export default class OutlineRepo {
   static async findById(id: string) {
     return prisma.userOutline.findUnique({
@@ -134,6 +143,21 @@ export default class OutlineRepo {
    * `deletedAt`. After this, `getActive` (which filters on `!deletedAt`) returns
    * null — i.e. the itinerary is reset. Returns the number of outlines cleared.
    */
+  static async saveMapStops(outlineId: string, stops: MapStop[]) {
+    // Wipe previous map-sourced events, then write fresh ones
+    await prisma.itineraryEvent.deleteMany({ where: { userOutlineId: outlineId } });
+    if (stops.length === 0) return;
+    await prisma.itineraryEvent.createMany({
+      data: stops.map((s) => ({
+        userOutlineId: outlineId,
+        type: s.eventType ?? "location",
+        timeBlock: s.timeBlock ?? "anytime",
+        routeDestination: s.name,
+        routeOrigin: null,
+      })),
+    });
+  }
+
   static async softDeleteAllByUserId(userId: string) {
     return prisma.userOutline.updateMany({
       where: { userId, deletedAt: null },
