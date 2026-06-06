@@ -14,7 +14,7 @@ export default class AuthRepo {
   static async createUser(data: {
     email: string;
     username: string;
-    gender?: "MALE" | "FEMALE" | null;
+    gender?: "MALE" | "FEMALE" | "UNISEX" | null;
   }) {
     return prisma.user.create({
       data: {
