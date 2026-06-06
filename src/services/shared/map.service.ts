@@ -162,7 +162,11 @@ export const mapService = {
       // Venue-type descriptor words — excluded from context matching because they
       // are part of a POI name, not an administrative area (e.g. "mall", "church").
       // They are also used to detect POI queries so we can apply name-match guards.
+      // Venue-type words across English, French, Spanish, German, Italian.
+      // Both accented and unaccented French forms are included because Whisper
+      // (speech-to-text) preserves diacritics but typed queries may not.
       const VENUE_TYPE_WORDS = new Set([
+        // English
         "mall",
         "center",
         "centre",
@@ -200,6 +204,7 @@ export const mapService = {
         "campus",
         "hospital",
         "clinic",
+        "pharmacy",
         "hotel",
         "resort",
         "inn",
@@ -213,12 +218,60 @@ export const mapService = {
         "museum",
         "library",
         "theater",
+        "theatre",
         "cinema",
         "gallery",
         "station",
         "terminal",
         "gym",
         "spa",
+        // French (accented + unaccented)
+        "musée",
+        "musee",
+        "école",
+        "ecole",
+        "lycée",
+        "lycee",
+        "gare",
+        "hôpital",
+        "hopital",
+        "église",
+        "eglise",
+        "cathédrale",
+        "cathedrale",
+        "université",
+        "universite",
+        "bibliothèque",
+        "bibliotheque",
+        "théâtre",
+        "cinéma",
+        "galerie",
+        "mairie",
+        "pharmacie",
+        "palais",
+        "stade",
+        "marché",
+        "marche",
+        "arrondissement",
+        "quartier",
+        // Spanish
+        "escuela",
+        "universidad",
+        "iglesia",
+        "mercado",
+        "parque",
+        "farmacia",
+        // German
+        "schule",
+        "kirche",
+        "krankenhaus",
+        "bahnhof",
+        "markt",
+        // Italian
+        "scuola",
+        "chiesa",
+        "ospedale",
+        "stazione",
       ]);
       // Filter results by checking whether any key query word appears in the
       // administrative context (everything after the first comma in place_name).
@@ -260,12 +313,23 @@ export const mapService = {
         .toLowerCase()
         .split(/\s+/)
         .filter((w) => w.length > 2 && !ALL_SKIP_WORDS.has(w));
-      const base = filtered.length > 0 ? filtered : raw;
+      // When context filter finds nothing, sort raw by distance to user's location
+      // so the nearest result wins (prevents popular far-away POIs like BGC from
+      // beating a correct nearby match when the query contains "here in [city]").
+      const proximityFallback =
+        filtered.length === 0 && proximityLng != null && proximityLat != null
+          ? [...raw].sort((a, b) => {
+              const dA = (a.lat - proximityLat!) ** 2 + (a.lng - proximityLng!) ** 2;
+              const dB = (b.lat - proximityLat!) ** 2 + (b.lng - proximityLng!) ** 2;
+              return dA - dB;
+            })
+          : null;
+      const base = filtered.length > 0 ? filtered : (proximityFallback ?? raw);
       const nameGuarded = base.filter((r) => {
         if (r.placeType === "poi" || r.placeType === "address" || r.placeType === "neighborhood")
           return true;
         if (nameWords.length === 0) return true;
-        const resultWords = r.name.toLowerCase().split(/[\s,\-]+/);
+        const resultWords = r.name.toLowerCase().split(/[\s,-]+/);
         return nameWords.some((qw) => resultWords.some((rw) => rw.includes(qw) || qw.includes(rw)));
       });
       const result = nameGuarded.length > 0 ? nameGuarded : base;
@@ -273,10 +337,13 @@ export const mapService = {
       // placeType preference can reliably pick the right destination over a
       // bare address with the same road name (e.g. "Saint Louis University"
       // poi over "Bonifacio Road, Banaba" address).
-      const isVenueQuery = query
-        .toLowerCase()
-        .split(/\s+/)
-        .some((w) => VENUE_TYPE_WORDS.has(w));
+      // Treat ALL-CAPS abbreviations (e.g. "SLU", "UB") as venue queries so POI
+      // results are surfaced first even when no full venue-type word is present.
+      const isVenueQuery =
+        query
+          .toLowerCase()
+          .split(/\s+/)
+          .some((w) => VENUE_TYPE_WORDS.has(w)) || /\b[A-Z]{2,6}\b/.test(query);
       if (isVenueQuery) {
         return [...result].sort((a, b) => {
           const rank = (r: typeof a) =>

@@ -1,14 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { voiceService, VoiceContext } from "../../services/shared/voice.service";
 
-import { CHAT_WONDER_API_URL } from "../../config";
-import { weatherService } from "../../services/shared/weather.service";
-import { mapService } from "../../services/shared/map.service";
-import { resolveItineraryEvents, ChatWonderEvent } from "../../utils/chat-wonder-events.util";
-import { Prisma } from "@prisma/client";
-import { prisma } from "../../utils/prisma";
-import logger from "../../utils/logger";
-
 export default class VoiceController {
   static async transcribe(req: Request, res: Response, next: NextFunction) {
     const pcmBuffer = req.body as Buffer;

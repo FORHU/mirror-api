@@ -1,3 +1,4 @@
+import os from "os";
 import axios from "axios";
 import {
   PollyClient,
@@ -194,7 +195,7 @@ function pcmToWav(pcmBuffer: Buffer, sampleRate = 16000, channels = 1, bitDepth 
 async function transcribeWithWhisper(pcmBuffer: Buffer, language: string): Promise<string> {
   const wavBuffer = pcmToWav(pcmBuffer);
   const langCode = language.split("-")[0];
-  const tmpPath = path.join(require("os").tmpdir(), `voice-${Date.now()}.wav`);
+  const tmpPath = path.join(os.tmpdir(), `voice-${Date.now()}.wav`);
   fs.writeFileSync(tmpPath, wavBuffer);
   try {
     const response = await openai.audio.transcriptions.create({
