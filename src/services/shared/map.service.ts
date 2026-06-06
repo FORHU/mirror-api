@@ -205,7 +205,19 @@ export const mapService = {
         const resultWords = r.name.toLowerCase().split(/[\s,\-]+/);
         return nameWords.some((qw) => resultWords.some((rw) => rw.includes(qw) || qw.includes(rw)));
       });
-      return nameGuarded.length > 0 ? nameGuarded : base;
+      const result = nameGuarded.length > 0 ? nameGuarded : base;
+      // For venue-type queries, surface POI results first so the client's
+      // placeType preference can reliably pick the right destination over a
+      // bare address with the same road name (e.g. "Saint Louis University"
+      // poi over "Bonifacio Road, Banaba" address).
+      const isVenueQuery = query.toLowerCase().split(/\s+/).some((w) => VENUE_TYPE_WORDS.has(w));
+      if (isVenueQuery) {
+        return [...result].sort((a, b) => {
+          const rank = (r: typeof a) => r.placeType === "poi" ? 0 : r.placeType === "address" ? 1 : 2;
+          return rank(a) - rank(b);
+        });
+      }
+      return result;
     } catch (error) {
       logger.error(`Mapbox Geocode Error: ${(error as Error).message}`);
       throw new Error("Geocoding service unavailable");
