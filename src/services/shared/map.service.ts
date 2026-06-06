@@ -156,14 +156,20 @@ export const mapService = {
         lng: f.center[0],
         placeId: f.id,
       }));
-      // Filter out results whose name doesn't contain the key query words.
-      // Prevents spurious disambiguation when Mapbox returns a far-away result
-      // that shares one word with the query (e.g. "Wines Road Baguio, Davao City"
-      // appearing in results for "sm baguio" just because it contains "baguio").
-      const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+      // Filter results by checking whether any key query word appears in the
+      // administrative context (everything after the first comma in place_name).
+      // This rejects road/street results whose name contains a region word but
+      // whose location is outside that region — e.g. "Benguet Road, Antipolo,
+      // Rizal" for "bugias benguet" (context "Antipolo, Rizal" has no query
+      // word) while keeping "Buguias, Benguet" (context "Benguet, Cordillera"
+      // matches "benguet"). Generic place-type words are stripped first so
+      // "vigan city" doesn't penalise "Vigan, Ilocos Sur" for missing "city".
+      const PLACE_TYPE_WORDS = new Set(["city", "municipality", "province", "barangay", "village", "near", "nearest", "closest", "in", "at", "along", "beside"]);
+      const queryWords = query.toLowerCase().split(/\s+/)
+        .filter((w) => w.length > 1 && !PLACE_TYPE_WORDS.has(w));
       const filtered = raw.filter((r) => {
-        const nameLower = r.name.toLowerCase();
-        return queryWords.every((w) => nameLower.includes(w));
+        const contextLower = r.address.split(",").slice(1).join(",").toLowerCase();
+        return queryWords.some((w) => contextLower.includes(w));
       });
       return filtered.length > 0 ? filtered : raw;
     } catch (error) {
