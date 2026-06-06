@@ -140,7 +140,7 @@ export const mapService = {
         access_token: MAPBOX_SECRET_TOKEN,
         country: "PH",
         limit: 5,
-        types: "address,place,poi",
+        types: "address,place,poi,region,district",
       };
       if (proximityLng != null && proximityLat != null) {
         params.proximity = `${proximityLng},${proximityLat}`;
@@ -149,13 +149,23 @@ export const mapService = {
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json`,
         { params }
       );
-      return response.data.features.map((f) => ({
+      const raw = response.data.features.map((f) => ({
         name: f.place_name.split(",")[0],
         address: f.place_name,
         lat: f.center[1],
         lng: f.center[0],
         placeId: f.id,
       }));
+      // Filter out results whose name doesn't contain the key query words.
+      // Prevents spurious disambiguation when Mapbox returns a far-away result
+      // that shares one word with the query (e.g. "Wines Road Baguio, Davao City"
+      // appearing in results for "sm baguio" just because it contains "baguio").
+      const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+      const filtered = raw.filter((r) => {
+        const nameLower = r.name.toLowerCase();
+        return queryWords.every((w) => nameLower.includes(w));
+      });
+      return filtered.length > 0 ? filtered : raw;
     } catch (error) {
       logger.error(`Mapbox Geocode Error: ${(error as Error).message}`);
       throw new Error("Geocoding service unavailable");
