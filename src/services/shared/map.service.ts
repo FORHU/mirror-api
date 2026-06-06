@@ -5,6 +5,7 @@ import logger from "../../utils/logger";
 export interface GeocodingFeature {
   id: string;
   place_name: string;
+  place_type: string[];
   center: [number, number];
   geometry: {
     type: "Point";
@@ -23,6 +24,7 @@ export interface GeocodeResult {
   lat: number;
   lng: number;
   placeId: string;
+  placeType: string;
 }
 
 export interface DirectionsStep {
@@ -155,6 +157,7 @@ export const mapService = {
         lat: f.center[1],
         lng: f.center[0],
         placeId: f.id,
+        placeType: f.place_type?.[0] ?? "other",
       }));
       // Filter results by checking whether any key query word appears in the
       // administrative context (everything after the first comma in place_name).
