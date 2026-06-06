@@ -23,7 +23,11 @@ export default class VoiceController {
     }
 
     try {
-      const transcript = await voiceService.transcribeAudio(pcmBuffer, lang, provider as "aws" | "openai");
+      const transcript = await voiceService.transcribeAudio(
+        pcmBuffer,
+        lang,
+        provider as "aws" | "openai"
+      );
       return res.json({ transcript });
     } catch (err) {
       if ((err as Error).message === "EMPTY_TRANSCRIPT") {
@@ -34,8 +38,6 @@ export default class VoiceController {
       next(err);
     }
   }
-
-
 
   static async tts(req: Request, res: Response, next: NextFunction) {
     const { text } = req.body as { text?: string };

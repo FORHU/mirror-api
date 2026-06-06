@@ -9,8 +9,6 @@ router.post(
   VoiceController.transcribe
 );
 
-
-
 router.post("/tts", express.json(), VoiceController.tts);
 
 router.post("/suggest", express.json(), VoiceController.suggest);

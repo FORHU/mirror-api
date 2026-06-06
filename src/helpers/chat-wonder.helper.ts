@@ -13,7 +13,9 @@ export const chatWonderBaseSchema = Joi.object({
   location: Joi.object({
     lat: Joi.number().min(-90).max(90).required(),
     lng: Joi.number().min(-180).max(180).required(),
-  }).allow(null).optional(),
+  })
+    .allow(null)
+    .optional(),
   skin_analysis: Joi.object().allow(null).optional(),
   kioskId: Joi.string().allow(null, "").optional(),
   sitemap_context: Joi.array().items(Joi.string()).optional(),

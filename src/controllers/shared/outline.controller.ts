@@ -139,5 +139,4 @@ export default class OutlineController {
       next(err);
     }
   }
-
 }

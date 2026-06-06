@@ -7,7 +7,6 @@ import OutlineRepo from "../../repositories/outline.repository";
 import UserRepository from "../../repositories/user.repository";
 
 export default class ChatWonderService {
-
   // NOTE: ChatWonder personas (Mirror Stylist, [STYLIST] nav rules, etc.) live
   // on the EXTERNAL ChatWonder service, not in this repo. There is no in-repo
   // system prompt; the former dead getPersonaPrompt() was removed.

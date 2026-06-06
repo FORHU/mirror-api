@@ -218,7 +218,9 @@ export function extractChatWonderDataBlock(
   // Take everything after the marker, but stop at the next data/terminator
   // marker so adjacent blocks don't bleed into this one.
   const after = rawResponse.slice(idx + marker.length);
-  const stop = after.search(/\[(?:GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|GENDER_UPDATE|STYLIST|DONE)\]/);
+  const stop = after.search(
+    /\[(?:GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|GENDER_UPDATE|STYLIST|DONE)\]/
+  );
   const segment = stop === -1 ? after : after.slice(0, stop);
 
   // MAPS_DATA arrives as a top-level JSON array (`[{…}]`); GARMENT/COSMETICS as

@@ -173,10 +173,7 @@ export default class OutlineRepo {
   static async clearFashionByOutlineId(outlineId: string) {
     return prisma.outfit.deleteMany({
       where: {
-        OR: [
-          { userOutlineId: outlineId },
-          { itineraryEvent: { userOutlineId: outlineId } },
-        ],
+        OR: [{ userOutlineId: outlineId }, { itineraryEvent: { userOutlineId: outlineId } }],
       },
     });
   }
@@ -184,10 +181,7 @@ export default class OutlineRepo {
   static async clearCosmeticsByOutlineId(outlineId: string) {
     const deleted = await prisma.cosmeticRecommendation.deleteMany({
       where: {
-        OR: [
-          { userOutlineId: outlineId },
-          { itineraryEvent: { userOutlineId: outlineId } },
-        ],
+        OR: [{ userOutlineId: outlineId }, { itineraryEvent: { userOutlineId: outlineId } }],
       },
     });
     // Unlink the skin analysis so the cosmetics tile reads empty.

@@ -350,7 +350,7 @@ export const voiceService = {
   transcribeAudio: async (
     pcmBuffer: Buffer,
     language: string = "en-US",
-    provider: "aws" | "openai" = "aws",
+    provider: "aws" | "openai" = "aws"
   ): Promise<string> => {
     const transcript =
       provider === "openai"

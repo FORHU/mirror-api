@@ -252,11 +252,7 @@ export default class MapController {
     if (error) return res.status(400).json({ error: error.message });
 
     try {
-      const results = await mapService.geocodeAddress(
-        value.query,
-        value.lng,
-        value.lat
-      );
+      const results = await mapService.geocodeAddress(value.query, value.lng, value.lat);
       res.status(200).json({ results });
     } catch (err) {
       if ((err as Error).message === "Geocoding service unavailable") {

@@ -163,7 +163,9 @@ export default class ChatWonderController {
       location: Joi.object({
         lat: Joi.number().min(-90).max(90).required(),
         lng: Joi.number().min(-180).max(180).required(),
-      }).allow(null).optional(),
+      })
+        .allow(null)
+        .optional(),
       skin_analysis: Joi.object().allow(null).optional(),
       kioskId: Joi.string().allow(null, "").optional(),
       sitemap_context: Joi.array().items(Joi.string()).optional(),
@@ -299,8 +301,9 @@ export default class ChatWonderController {
             let garment = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
             let cosmetics = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
             let maps = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
-            let stylist = extractChatWonderDataBlock(fullResponse, "STYLIST")
-              ?? extractChatWonderDataBlock(fullResponse, "NAV_DATA");
+            let stylist =
+              extractChatWonderDataBlock(fullResponse, "STYLIST") ??
+              extractChatWonderDataBlock(fullResponse, "NAV_DATA");
 
             // --- INTERCEPT: Force pure conversational greeting ---
             // If this was the hidden auto-greeting, absolutely forbid the AI from triggering
@@ -310,7 +313,9 @@ export default class ChatWonderController {
               cosmetics = null;
               maps = null;
               stylist = null;
-              logger.info("[ChatWonderController] Intercepted and stripped data blocks from greeting.");
+              logger.info(
+                "[ChatWonderController] Intercepted and stripped data blocks from greeting."
+              );
             }
             const genderUpdate = extractChatWonderDataBlock(fullResponse, "GENDER_UPDATE") as any;
 
@@ -399,8 +404,12 @@ export default class ChatWonderController {
       const gender = await ChatWonderService.getUserGender(userId);
 
       // Fetch outlineId if it exists
-      const outline = await ChatWonderService.ensureConversation(userId, input.substring(0, 50), inputConversationId).then(cid => OutlineRepo.findByConversationId(cid));
-      
+      const outline = await ChatWonderService.ensureConversation(
+        userId,
+        input.substring(0, 50),
+        inputConversationId
+      ).then((cid) => OutlineRepo.findByConversationId(cid));
+
       // 7. Stream from external ChatWonder API
       await streamChat({
         userInput: input,
@@ -413,7 +422,6 @@ export default class ChatWonderController {
         skinAnalysis,
         gender: gender || undefined,
         sitemapContext,
-        history,
       });
     } catch (err) {
       logger.error(`[ChatWonderController] Controller error: ${(err as Error).message}`);
@@ -550,7 +558,9 @@ export default class ChatWonderController {
               const audio = await voiceService.tts(text, ttsLang);
               audioBase64 = audio.toString("base64");
             } catch (ttsErr) {
-              logger.warn(`[ChatWonderController.chat] TTS failed for chunk: ${(ttsErr as Error).message}`);
+              logger.warn(
+                `[ChatWonderController.chat] TTS failed for chunk: ${(ttsErr as Error).message}`
+              );
             }
           }
           writeSseEvent({ type: "audio_chunk", text, audioBase64 });
@@ -568,7 +578,7 @@ export default class ChatWonderController {
             if (display.length > displayedLen) {
               const newText = display.slice(displayedLen);
               displayedLen = display.length;
-              
+
               // Emit chunk for the UI to stream text character-by-character
               writeSseEvent({ type: "chunk", content: newText });
 
@@ -593,8 +603,12 @@ export default class ChatWonderController {
               // Wait for all queued TTS requests to finish
               await ttsPromise;
 
-              logger.info(`[ChatWonderController.chat] Stream completed. FullResponse length: ${fullResponse.length}`);
-              logger.info(`[ChatWonderController.chat] Raw FullResponse:\n------------------\n${fullResponse}\n------------------`);
+              logger.info(
+                `[ChatWonderController.chat] Stream completed. FullResponse length: ${fullResponse.length}`
+              );
+              logger.info(
+                `[ChatWonderController.chat] Raw FullResponse:\n------------------\n${fullResponse}\n------------------`
+              );
 
               // Clean + parse the buffered response.
               const { cleaned } = stripSourcesPrefix(fullResponse);
@@ -607,8 +621,9 @@ export default class ChatWonderController {
               let garment_data = extractChatWonderDataBlock(fullResponse, "GARMENT_DATA");
               let cosmetics_data = extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA");
               let maps_data = extractChatWonderDataBlock(fullResponse, "MAPS_DATA");
-              let stylist_data = extractChatWonderDataBlock(fullResponse, "STYLIST")
-                ?? extractChatWonderDataBlock(fullResponse, "NAV_DATA");
+              let stylist_data =
+                extractChatWonderDataBlock(fullResponse, "STYLIST") ??
+                extractChatWonderDataBlock(fullResponse, "NAV_DATA");
 
               // --- INTERCEPT: Force pure conversational greeting ---
               if (input.includes("[SYSTEM] The user just walked up to the mirror.")) {
@@ -616,7 +631,9 @@ export default class ChatWonderController {
                 cosmetics_data = null;
                 maps_data = null;
                 stylist_data = null;
-                logger.info("[ChatWonderController] Intercepted and stripped data blocks from greeting (buffered).");
+                logger.info(
+                  "[ChatWonderController] Intercepted and stripped data blocks from greeting (buffered)."
+                );
               }
               const gender_data = extractChatWonderDataBlock(fullResponse, "GENDER_UPDATE") as any;
 
@@ -631,7 +648,7 @@ export default class ChatWonderController {
               const message = parsed.message
                 .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
                 .split(
-                  /\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE)\]/,
+                  /\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE)\]/
                 )[0]
                 .trim();
 
@@ -672,7 +689,9 @@ export default class ChatWonderController {
               });
               res.end();
             } catch (err) {
-              logger.error(`[ChatWonderController.chat] onComplete error: ${(err as Error).message}`);
+              logger.error(
+                `[ChatWonderController.chat] onComplete error: ${(err as Error).message}`
+              );
               writeSseEvent({ type: "error", message: "Failed to parse final response" });
               res.end();
             }
@@ -682,12 +701,18 @@ export default class ChatWonderController {
             if (err.message.includes("Unknown session")) {
               await CacheUtil.del(`chat:sessionId:${userId}`);
               ChatWonderService.generateChatSessionId(userId, true).catch(() => {});
-              
+
               if (!res.headersSent) {
-                  responseError(res, 409, "Session expired. Please resend your message.", { code: "session_expired" });
+                responseError(res, 409, "Session expired. Please resend your message.", {
+                  code: "session_expired",
+                });
               } else {
-                  writeSseEvent({ type: "error", code: "session_expired", message: "Session expired. Please resend your message." });
-                  res.end();
+                writeSseEvent({
+                  type: "error",
+                  code: "session_expired",
+                  message: "Session expired. Please resend your message.",
+                });
+                res.end();
               }
               return;
             }
@@ -707,7 +732,6 @@ export default class ChatWonderController {
         skinAnalysis,
         gender: gender || undefined,
         sitemapContext,
-        history,
       });
     } catch (err) {
       const message = (err as Error).message || "Internal server error";

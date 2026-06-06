@@ -307,9 +307,26 @@ async function askChatWonderForSkinProducts(
     try {
       const json = JSON.parse(fullResponse);
       const suggestion = json.cosmetics_suggestion || json.message || fullResponse;
+
+      if (userId) {
+        const conversationId = await ChatWonderService.ensureConversation(
+          userId,
+          "Skin Analysis Scan"
+        );
+        await ChatWonderService.saveAIMessage(userId, conversationId, String(suggestion));
+      }
+
       logger.info(`[SkinAnalysis] ChatWonder suggestion: ${String(suggestion).slice(0, 200)}…`);
       return String(suggestion);
     } catch {
+      if (userId) {
+        const conversationId = await ChatWonderService.ensureConversation(
+          userId,
+          "Skin Analysis Scan"
+        );
+        await ChatWonderService.saveAIMessage(userId, conversationId, fullResponse);
+      }
+
       logger.info(`[SkinAnalysis] ChatWonder suggestion (raw): ${fullResponse.slice(0, 200)}…`);
       return fullResponse;
     }
