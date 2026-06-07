@@ -8,14 +8,16 @@ import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
-  cutToMessage,
 } from "../../utils/parse-chatWonder-response.util";
-import { emitToKiosk } from "../../utils/socket.util";
 import { voiceService } from "../../services/shared/voice.service";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
-import CacheUtil from "../../utils/cache.util";
-import { chatWonderBaseSchema, checkAndFinalizeOutline } from "../../helpers/chat-wonder.helper";
+import {
+  chatWonderBaseSchema,
+  checkAndFinalizeOutline,
+  cleanDisplayPrefix,
+  clearStaleSession,
+} from "../../helpers/chat-wonder.helper";
 import OutlineRepo from "../../repositories/outline.repository";
 
 export default class ChatWonderController {
@@ -131,10 +133,8 @@ export default class ChatWonderController {
     } catch (err) {
       logger.error(`[ChatWonderController.streamRaw] ${(err as Error).message}`);
 
-      // Auto-clear the stale session from Redis so the next request gets a fresh one
       if ((err as Error).message.includes("Unknown session")) {
-        await CacheUtil.del(`chat:sessionId:${userId}`);
-        logger.info(`[ChatWonderController.streamRaw] Stale session cleared for user ${userId}.`);
+        await clearStaleSession(userId);
       }
 
       return responseError(res, 500, (err as Error).message || "Internal server error");
@@ -151,34 +151,7 @@ export default class ChatWonderController {
       return responseError(res, 401, "Unauthorized");
     }
 
-    const schema = Joi.object({
-      input: Joi.string().min(1).max(5000).optional(),
-      user_input: Joi.string().min(1).max(5000).optional(),
-      conversationId: Joi.string().allow(null, "").optional(),
-      session_id: Joi.string().allow(null, "").optional(),
-      type: Joi.string().allow(null, "").optional(),
-      weather: Joi.object().allow(null).optional(),
-      location: Joi.object({
-        lat: Joi.number().min(-90).max(90).required(),
-        lng: Joi.number().min(-180).max(180).required(),
-      })
-        .allow(null)
-        .optional(),
-      skin_analysis: Joi.object().allow(null).optional(),
-      kioskId: Joi.string().allow(null, "").optional(),
-      sitemap_context: Joi.array().items(Joi.string()).optional(),
-      history: Joi.array()
-        .items(
-          Joi.object({
-            role: Joi.string().valid("user", "assistant").required(),
-            content: Joi.string().required(),
-          })
-        )
-        .max(10)
-        .optional(),
-    }).or("input", "user_input"); // Require at least one of these
-
-    const { error, value } = schema.validate(req.body, { allowUnknown: true });
+    const { error, value } = chatWonderBaseSchema.validate(req.body, { allowUnknown: true });
     if (error) {
       return responseError(res, 400, error.message);
     }
@@ -193,23 +166,18 @@ export default class ChatWonderController {
     const skinAnalysis = value.skin_analysis;
 
     try {
-      // 1. Ensure conversation exists
-      const conversationId = await ChatWonderService.ensureConversation(
-        userId,
-        input.substring(0, 50),
-        inputConversationId
-      );
+      const [conversationId, sessionId, gender] = await Promise.all([
+        ChatWonderService.ensureConversation(userId, input.substring(0, 50), inputConversationId),
+        ChatWonderService.generateChatSessionId(userId),
+        ChatWonderService.getUserGender(userId),
+      ]);
 
-      // 2. Generate/Retrieve session ID
-      const sessionId = await ChatWonderService.generateChatSessionId(userId);
+      const [userMessage, outline] = await Promise.all([
+        ChatWonderService.saveUserMessage(userId, conversationId, input),
+        OutlineRepo.findByConversationId(conversationId),
+      ]);
 
-      // 3. Save user message
-      const userMessage = await ChatWonderService.saveUserMessage(userId, conversationId, input);
-
-      // 4. (Removed buildUserContext since AI has direct access)
-      // 5. Persona Prompt and Outfit Catalog Injection have been removed.
-
-      // 6. Set SSE headers
+      // Set SSE headers
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache, no-transform");
       res.setHeader("Connection", "keep-alive");
@@ -223,30 +191,7 @@ export default class ChatWonderController {
         responseWithFlush.flush?.();
       };
 
-      // Tracks how much clean prose we've already streamed to the display channel.
-      // ChatWonder appends `[GARMENT_DATA]{…}` / `[COSMETICS_DATA]{…}` / `[DONE]`
-      // blocks and a per-set `## Set …` breakdown AFTER the conversational intro,
-      // streamed token-by-token. `cutToMessage` removes both; we run it on the
-      // cumulative buffer and emit only the new portion, so the display matches
-      // the authoritative `parsed.message`.
       let displayedLen = 0;
-      const cleanDisplayPrefix = (full: string): string => {
-        let display = cutToMessage(full);
-        // Hold back a possibly-incomplete trailing data marker (unclosed `[…`)
-        // so a half-arrived `[GARMENT_DATA]` never flickers in.
-        const lastOpen = display.lastIndexOf("[");
-        if (lastOpen !== -1 && !display.slice(lastOpen).includes("]")) {
-          display = display.slice(0, lastOpen);
-        }
-        // Hold back an in-progress heading line: until its text is complete we
-        // can't tell a `## Set` (cut) from a kept heading like `### Outfit …`.
-        const lastNL = display.lastIndexOf("\n");
-        const lastLine = display.slice(lastNL + 1).trimStart();
-        if (/^#{1,6}(\s|$)/.test(lastLine)) {
-          display = lastNL === -1 ? "" : display.slice(0, lastNL);
-        }
-        return display;
-      };
 
       const callbacks: StreamCallbacks = {
         onChunk: (chunk: string) => {
@@ -278,23 +223,7 @@ export default class ChatWonderController {
               parsed.events = await resolveItineraryLocations(parsed.events);
             }
             logger.debug(`[ChatWonderController] Cleaned response: ${cleaned}`);
-            // Check if user input contains finalization keywords to save/finalize the plan draft
-            const isFinalization =
-              /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
-                input
-              );
-
-            if (isFinalization) {
-              await ChatWonderService.finalizeOutlineByConversationId(conversationId);
-              logger.info(
-                `[ChatWonderController] Finalized UserOutline status for conversation: ${conversationId}`
-              );
-
-              if (kioskId) {
-                emitToKiosk(kioskId, "itinerary_locked", { conversationId });
-                logger.info(`[ChatWonderController] Emitted itinerary_locked to kiosk: ${kioskId}`);
-              }
-            }
+            await checkAndFinalizeOutline(input, conversationId, kioskId);
 
             // Save AI response to history
             const aiMessage = await ChatWonderService.saveAIMessage(
@@ -380,15 +309,7 @@ export default class ChatWonderController {
         onError: async (err: Error) => {
           logger.error(`[ChatWonderController] Stream error: ${err.message}`);
           if (err.message.includes("Unknown session")) {
-            await CacheUtil.del(`chat:sessionId:${userId}`);
-            logger.info(
-              `[ChatWonderController] Stale session cleared for user ${userId}. Pre-warming fresh session...`
-            );
-
-            ChatWonderService.generateChatSessionId(userId, true)
-              .then((id) => logger.info(`[ChatWonderController] Fresh session pre-warmed: ${id}`))
-              .catch((e) => logger.warn(`[ChatWonderController] Pre-warm failed: ${e.message}`));
-
+            await clearStaleSession(userId);
             writeSseEvent({
               type: "error",
               code: "session_expired",
@@ -407,16 +328,7 @@ export default class ChatWonderController {
         },
       };
 
-      const gender = await ChatWonderService.getUserGender(userId);
-
-      // Fetch outlineId if it exists
-      const outline = await ChatWonderService.ensureConversation(
-        userId,
-        input.substring(0, 50),
-        inputConversationId
-      ).then((cid) => OutlineRepo.findByConversationId(cid));
-
-      // 7. Stream from external ChatWonder API
+      // Stream from external ChatWonder API
       await streamChat({
         userInput: input,
         sessionId: sessionId as string,
@@ -439,20 +351,14 @@ export default class ChatWonderController {
   }
 
   /**
-   * Buffered, non-streaming twin of `streamChat`. Behaves identically
-   * (conversation persistence, finalization keywords, kiosk emits,
-   * session-expired recovery, gender + weather context) but buffers the whole
-   * ChatWonder response and answers with a single `application/json` payload
-   * instead of SSE.
+   * Primary chat endpoint (`POST /message`). Streams SSE events identical to
+   * `streamChat` (`chunk`, `complete`, `error`) plus interleaved `audio_chunk`
+   * events carrying base64-encoded TTS audio when `voice: true` is sent in the
+   * body. Session-expired errors arrive as an in-band `error` SSE event (the
+   * client retries by calling `restart` then resending).
    *
-   * Because nothing is written until the response completes, every error path
-   * returns a real HTTP status (e.g. `session_expired` → 409) rather than an
-   * in-band SSE `error` event.
-   *
-   * The body is `{ message, intent, garment_data, cosmetics_data, metadata }`:
-   * `message` is the plain display text and `garment_data`/`cosmetics_data` are
-   * the parsed `[GARMENT_DATA]`/`[COSMETICS_DATA]` blocks (null when absent) — a
-   * deliberately richer contract than `/stream`'s `complete` event.
+   * Extra body fields vs `streamChat`: `voice` (boolean) and `lang` (BCP-47
+   * string, e.g. `"en-US"`) for TTS language selection.
    */
   static async chat(req: Request, res: Response) {
     const userId = (req as Request & { user?: { id: string } }).user?.id;
@@ -460,34 +366,11 @@ export default class ChatWonderController {
       return responseError(res, 401, "Unauthorized");
     }
 
-    const schema = Joi.object({
-      input: Joi.string().min(1).max(5000).optional(),
-      user_input: Joi.string().min(1).max(5000).optional(),
-      conversationId: Joi.string().optional(),
-      session_id: Joi.string().optional(),
-      type: Joi.string().optional(),
-      weather: Joi.object().optional(),
-      location: Joi.object({
-        lat: Joi.number().min(-90).max(90).required(),
-        lng: Joi.number().min(-180).max(180).required(),
-      }).optional(),
-      skin_analysis: Joi.object().optional(),
-      kioskId: Joi.string().optional(),
-      voice: Joi.boolean().optional(), // opt-in: synthesize TTS audio for the reply
-      lang: Joi.string().optional(), // TTS language (e.g. "en-US", "fr-FR", "ko-KR")
-      sitemap_context: Joi.array().items(Joi.string()).optional(),
-      history: Joi.array()
-        .items(
-          Joi.object({
-            role: Joi.string().valid("user", "assistant").required(),
-            content: Joi.string().required(),
-          })
-        )
-        .max(10)
-        .optional(),
-    }).or("input", "user_input"); // Require at least one of these
-
-    const { error, value } = schema.validate(req.body, { allowUnknown: true });
+    const chatSchema = chatWonderBaseSchema.keys({
+      voice: Joi.boolean().optional(),
+      lang: Joi.string().optional(),
+    });
+    const { error, value } = chatSchema.validate(req.body, { allowUnknown: true });
     if (error) {
       return responseError(res, 400, error.message);
     }
@@ -504,19 +387,11 @@ export default class ChatWonderController {
     const history = (value.history ?? []).slice(-10);
 
     try {
-      const gender = await ChatWonderService.getUserGender(userId);
-
-      // 1. Ensure conversation exists
-      const conversationId = await ChatWonderService.ensureConversation(
-        userId,
-        input.substring(0, 50),
-        inputConversationId
-      );
-
-      // 2. Generate/Retrieve session ID
-      const sessionId = await ChatWonderService.generateChatSessionId(userId);
-
-      // 3. Save user message
+      const [conversationId, sessionId, gender] = await Promise.all([
+        ChatWonderService.ensureConversation(userId, input.substring(0, 50), inputConversationId),
+        ChatWonderService.generateChatSessionId(userId),
+        ChatWonderService.getUserGender(userId),
+      ]);
       const userMessage = await ChatWonderService.saveUserMessage(userId, conversationId, input);
 
       res.setHeader("Content-Type", "text/event-stream");
@@ -534,20 +409,6 @@ export default class ChatWonderController {
       const writeSseEvent = (payload: Record<string, unknown>) => {
         res.write(`data: ${JSON.stringify(payload)}\n\n`);
         responseWithFlush.flush?.();
-      };
-
-      const cleanDisplayPrefix = (full: string): string => {
-        let display = cutToMessage(full);
-        const lastOpen = display.lastIndexOf("[");
-        if (lastOpen !== -1 && !display.slice(lastOpen).includes("]")) {
-          display = display.slice(0, lastOpen);
-        }
-        const lastNL = display.lastIndexOf("\n");
-        const lastLine = display.slice(lastNL + 1).trimStart();
-        if (/^#{1,6}(\s|$)/.test(lastLine)) {
-          display = lastNL === -1 ? "" : display.slice(0, lastNL);
-        }
-        return display;
       };
 
       const processSentence = (text: string) => {
@@ -667,17 +528,7 @@ export default class ChatWonderController {
                 )[0]
                 .trim();
 
-              const isFinalization =
-                /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
-                  input
-                );
-
-              if (isFinalization) {
-                await ChatWonderService.finalizeOutlineByConversationId(conversationId);
-                if (kioskId) {
-                  emitToKiosk(kioskId, "itinerary_locked", { conversationId });
-                }
-              }
+              await checkAndFinalizeOutline(input, conversationId, kioskId);
 
               const aiMessage = await ChatWonderService.saveAIMessage(
                 userId,
@@ -714,21 +565,13 @@ export default class ChatWonderController {
           onError: async (err: Error) => {
             logger.error(`[ChatWonderController.chat] Stream error: ${err.message}`);
             if (err.message.includes("Unknown session")) {
-              await CacheUtil.del(`chat:sessionId:${userId}`);
-              ChatWonderService.generateChatSessionId(userId, true).catch(() => {});
-
-              if (!res.headersSent) {
-                responseError(res, 409, "Session expired. Please resend your message.", {
-                  code: "session_expired",
-                });
-              } else {
-                writeSseEvent({
-                  type: "error",
-                  code: "session_expired",
-                  message: "Session expired. Please resend your message.",
-                });
-                res.end();
-              }
+              await clearStaleSession(userId);
+              writeSseEvent({
+                type: "error",
+                code: "session_expired",
+                message: "Session expired. Please resend your message.",
+              });
+              res.end();
               return;
             }
 
@@ -754,9 +597,7 @@ export default class ChatWonderController {
       logger.error(`[ChatWonderController.chat] ${message}`);
 
       if (message.includes("Unknown session")) {
-        await CacheUtil.del(`chat:sessionId:${userId}`);
-        ChatWonderService.generateChatSessionId(userId, true).catch(() => {});
-
+        await clearStaleSession(userId);
         if (!res.headersSent) {
           return responseError(res, 409, "Session expired. Please resend your message.", {
             code: "session_expired",

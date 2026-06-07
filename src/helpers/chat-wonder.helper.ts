@@ -2,6 +2,8 @@ import Joi from "joi";
 import ChatWonderService from "../services/shared/chat-wonder.service";
 import { emitToKiosk } from "../utils/socket.util";
 import logger from "../utils/logger";
+import CacheUtil from "../utils/cache.util";
+import { cutToMessage } from "../utils/parse-chatWonder-response.util";
 
 export const chatWonderBaseSchema = Joi.object({
   input: Joi.string().min(1).max(5000).optional(),
@@ -51,4 +53,31 @@ export async function checkAndFinalizeOutline(
       logger.info(`[ChatWonderHelper] Emitted itinerary_locked to kiosk: ${kioskId}`);
     }
   }
+}
+
+/**
+ * Strips trailing data markers and holds back a partially-arrived marker so
+ * it never flickers in the display stream. Suppresses an in-progress heading
+ * line until it is complete (can't distinguish `## Set` from `### Outfit` mid-line).
+ */
+export function cleanDisplayPrefix(full: string): string {
+  let display = cutToMessage(full);
+  const lastOpen = display.lastIndexOf("[");
+  if (lastOpen !== -1 && !display.slice(lastOpen).includes("]")) {
+    display = display.slice(0, lastOpen);
+  }
+  const lastNL = display.lastIndexOf("\n");
+  const lastLine = display.slice(lastNL + 1).trimStart();
+  if (/^#{1,6}(\s|$)/.test(lastLine)) {
+    display = lastNL === -1 ? "" : display.slice(0, lastNL);
+  }
+  return display;
+}
+
+/** Clears a stale chat session from Redis and pre-warms a fresh one. */
+export async function clearStaleSession(userId: string): Promise<void> {
+  await CacheUtil.del(`chat:sessionId:${userId}`);
+  ChatWonderService.generateChatSessionId(userId, true)
+    .then((id) => logger.info(`[ChatWonderHelper] Fresh session pre-warmed: ${id}`))
+    .catch((e) => logger.warn(`[ChatWonderHelper] Pre-warm failed for user ${userId}: ${e.message}`));
 }
