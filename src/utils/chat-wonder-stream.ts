@@ -190,7 +190,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
       }
     });
 
-    ws.on("error", (error) => {
+    ws.on("error", (error: Error) => {
       logger.error(`[CHAT-WONDER-STREAM] WebSocket error: ${error.message}`);
       Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
         logger.warn(
