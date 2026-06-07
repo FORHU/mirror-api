@@ -190,6 +190,34 @@ export function cutToMessage(text: string): string {
 }
 
 /**
+ * Strips raw markdown (like images, links, headers, bold) from text
+ * so it is safe and clean for Text-to-Speech and the simple Voice UI overlay.
+ */
+export function stripMarkdownFormatting(text: string): string {
+  if (!text) return text;
+  return (
+    text
+      // Remove markdown images entirely: `![Alt Text](url)`
+      .replace(/!\[.*?\]\(.*?\)/g, "")
+      // Convert markdown links to just their text: `[Link Text](url)` -> `Link Text`
+      .replace(/\[(.*?)\]\(.*?\)/g, "$1")
+      // Remove headers (#, ##, ###) and bold (**) markers
+      .replace(/[#*]+/g, "")
+      // Collapse multiple spaces/newlines caused by removals
+      .replace(/ {2,}/g, " ")
+      .trim()
+  );
+}
+
+/**
+ * Clean up the response for display in the UI.
+ * Strips out specific blocks so they don't flicker.
+ */
+export function cleanDisplayPrefix(text: string): string {
+  return stripDataBlocks(text).replace(DATA_BLOCK_TAIL, "").replace(SET_BREAKDOWN_TAIL, "");
+}
+
+/**
  * Build the structured response from a successfully-parsed object.
  */
 function buildFromParsed(
@@ -298,20 +326,23 @@ export function extractChatWonderDataBlock(
     return { gender: trimmedSegment };
   }
 
-  const jsonMatch = trimmedSegment.startsWith("[")
-    ? trimmedSegment.match(/\[[\s\S]*\]/)
-    : trimmedSegment.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
+  let unescaped = "";
+  if (trimmedSegment.startsWith("{") || trimmedSegment.startsWith("[")) {
+    const endIdx = matchBracket(trimmedSegment, 0);
+    if (endIdx !== -1) {
+      unescaped = trimmedSegment.slice(0, endIdx + 1);
+    }
+  }
+
+  if (!unescaped) return null;
 
   try {
-    let unescaped = jsonMatch[0];
     if (unescaped.includes('\\"')) {
       unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
     }
     return JSON.parse(unescaped);
   } catch {
     try {
-      let unescaped = jsonMatch[0];
       if (unescaped.includes('\\"')) {
         unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
       }

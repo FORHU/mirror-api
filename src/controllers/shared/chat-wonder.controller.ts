@@ -9,6 +9,7 @@ import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
+  stripMarkdownFormatting,
 } from "../../utils/parse-chatWonder-response.util";
 import { voiceService } from "../../services/shared/voice.service";
 import logger from "../../utils/logger";
@@ -269,11 +270,13 @@ export default class ChatWonderController {
             }
 
             // Strip out the inline UI markers that buildFromParsed appends
-            const finalDisplayMessage = parsed.message
-              .split(/\n\n\[\s*(?:garments|cosmetics|map)\s*\]/)[0]
-              .split("[MAPS_DATA]")[0]
-              .split("[NAV_DATA]")[0]
-              .trim();
+            const finalDisplayMessage = stripMarkdownFormatting(
+              parsed.message
+                .split(/\n\n\[\s*(?:garments|cosmetics|map)\s*\]/)[0]
+                .split("[MAPS_DATA]")[0]
+                .split("[NAV_DATA]")[0]
+                .trim()
+            );
 
             writeSseEvent({
               type: "complete",
@@ -527,12 +530,14 @@ export default class ChatWonderController {
                 }
               }
 
-              const message = parsed.message
-                .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
-                .split(
-                  /\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE)\]/
-                )[0]
-                .trim();
+              const message = stripMarkdownFormatting(
+                parsed.message
+                  .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
+                  .split(
+                    /\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE)\]/
+                  )[0]
+                  .trim()
+              );
 
               await checkAndFinalizeOutline(input, conversationId, kioskId);
 

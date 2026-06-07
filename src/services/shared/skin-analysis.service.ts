@@ -251,91 +251,6 @@ export async function buildSkinCatalogContext(): Promise<string> {
   }
 }
 
-async function askChatWonderForSkinProducts(
-  vision: ReturnType<typeof parsePerfectCorpEntry>,
-  userId?: string
-): Promise<string | null> {
-  if (!CHAT_WONDER_API_URL) {
-    logger.warn("[SkinAnalysis] CHAT_WONDER_API_URL not set — skipping ChatWonder call");
-    return null;
-  }
-
-  try {
-    const [sessionId, documentContext] = await Promise.all([
-      userId
-        ? ChatWonderService.generateChatSessionId(userId).then(String)
-        : Promise.resolve(`skin-scan-${Date.now()}`),
-      buildSkinCatalogContext(),
-    ]);
-
-    if (!sessionId) {
-      logger.warn("[SkinAnalysis] Could not get ChatWonder session ID — skipping");
-      return null;
-    }
-
-    const prompt = buildSkinPrompt(vision);
-    logger.info(
-      `[SkinAnalysis] Sending skin profile to ChatWonder | session: ${sessionId} | catalog injected: ${documentContext ? "yes" : "no"}`
-    );
-
-    let fullResponse = "";
-
-    await streamChat({
-      userInput: prompt,
-      sessionId,
-      callbacks: {
-        onChunk: (chunk) => {
-          fullResponse += chunk;
-        },
-        onComplete: () => {
-          /* resolved by Promise */
-        },
-        onError: (err) => {
-          logger.warn(`[SkinAnalysis] ChatWonder stream error: ${err.message}`);
-        },
-      },
-    });
-
-    if (!fullResponse) {
-      logger.warn("[SkinAnalysis] ChatWonder returned empty response");
-      return null;
-    }
-
-    logger.info(`[SkinAnalysis] ChatWonder raw response length: ${fullResponse.length} chars`);
-
-    // Try to extract cosmetics_suggestion from JSON response; fall back to raw text
-    try {
-      const json = JSON.parse(fullResponse);
-      const suggestion = json.cosmetics_suggestion || json.message || fullResponse;
-
-      if (userId) {
-        const conversationId = await ChatWonderService.ensureConversation(
-          userId,
-          "Skin Analysis Scan"
-        );
-        await ChatWonderService.saveAIMessage(userId, conversationId, String(suggestion));
-      }
-
-      logger.info(`[SkinAnalysis] ChatWonder suggestion: ${String(suggestion).slice(0, 200)}…`);
-      return String(suggestion);
-    } catch {
-      if (userId) {
-        const conversationId = await ChatWonderService.ensureConversation(
-          userId,
-          "Skin Analysis Scan"
-        );
-        await ChatWonderService.saveAIMessage(userId, conversationId, fullResponse);
-      }
-
-      logger.info(`[SkinAnalysis] ChatWonder suggestion (raw): ${fullResponse.slice(0, 200)}…`);
-      return fullResponse;
-    }
-  } catch (err) {
-    logger.warn(`[SkinAnalysis] ChatWonder call failed: ${(err as Error).message}`);
-    return null;
-  }
-}
-
 // ─── Destination weather resolver ────────────────────────────────────────────
 // Extracts location names from a user input string, geocodes each one,
 // fetches live weather, and merges into a single worst-case WeatherContext.
@@ -599,11 +514,7 @@ export default class SkinAnalysisService {
         `hydration=${vision.hydrationPct} concerns=[${vision.concerns.join(", ")}]`
     );
 
-    // 4. Ask ChatWonder to suggest products based on the skin profile,
-    //    then fall back to the local rule engine if ChatWonder is unavailable.
-    const chatWonderSuggestion = await askChatWonderForSkinProducts(vision, userId);
-
-    // 5. Load catalog and run rule engine (always runs — ChatWonder enriches on top)
+    // 5. Load catalog and run rule engine
     const catalog = await prisma.cosmeticProduct.findMany({
       where: { fileUrl: { is: { fileUrl: { not: "" } } } },
       select: {
@@ -674,7 +585,6 @@ export default class SkinAnalysisService {
           weather: weather ?? null,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           perfectCorp: (vision as any).rawScores ?? null,
-          chatWonderSuggestion: chatWonderSuggestion ?? null,
         },
       },
       ranked.map((r) => ({

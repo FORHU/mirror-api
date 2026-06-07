@@ -89,10 +89,6 @@ export default class ChatWonderService {
     return user?.gender ?? null;
   }
 
-  static async updateUserGender(userId: string, gender: "MALE" | "FEMALE") {
-    return UserRepository.update(userId, { gender });
-  }
-
   /**
    * Clears the user's stored gender (sets it to null). Used on "restart" so the
    * app re-asks gender for the next person at the mirror.
