@@ -68,6 +68,15 @@ export default class OutlineRepo {
         skinAnalysis: {
           include: {
             file: true,
+            recommendations: {
+              include: {
+                cosmeticProduct: {
+                  include: {
+                    fileUrl: true,
+                  },
+                },
+              },
+            },
           },
         },
       },

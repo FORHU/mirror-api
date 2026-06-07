@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 import ChatWonderService from "../../services/shared/chat-wonder.service";
+import OutlineRepo from "../../repositories/outline.repository";
 import UserService from "../../services/shared/user.service";
 import { streamChat, type StreamCallbacks } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
@@ -18,7 +19,6 @@ import {
   cleanDisplayPrefix,
   clearStaleSession,
 } from "../../helpers/chat-wonder.helper";
-import OutlineRepo from "../../repositories/outline.repository";
 
 export default class ChatWonderController {
   /**
@@ -41,10 +41,16 @@ export default class ChatWonderController {
   }
 
   /**
-   * RESTART — full reset for the next person at the mirror:
+   * RESTART — gender + ChatWonder session only:
    *   1. Null the user's stored gender (app will re-ask).
    *   2. Force a brand-new ChatWonder session (clears conversation history).
-   * Does NOT touch the itinerary — that's the refresh/reset-outline flow.
+   *
+   * Does NOT wipe the Outline. The Outline wipe lives in `/outlines/reset`
+   * (no-scope = `softDeleteAllByUserId`), which the client fires alongside this
+   * on a true "next person" Restart (see ADR 0001). Keeping the wipe out of here
+   * is deliberate: `restart` is also the 409 stale-session recovery path
+   * (useChatWonderStream / overview retry), and that must NOT delete the
+   * in-progress Outline.
    */
   static async restart(req: Request, res: Response) {
     const userId = (req as Request & { user?: { id: string } }).user?.id;

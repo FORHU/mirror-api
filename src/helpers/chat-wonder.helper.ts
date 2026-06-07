@@ -79,5 +79,7 @@ export async function clearStaleSession(userId: string): Promise<void> {
   await CacheUtil.del(`chat:sessionId:${userId}`);
   ChatWonderService.generateChatSessionId(userId, true)
     .then((id) => logger.info(`[ChatWonderHelper] Fresh session pre-warmed: ${id}`))
-    .catch((e) => logger.warn(`[ChatWonderHelper] Pre-warm failed for user ${userId}: ${e.message}`));
+    .catch((e) =>
+      logger.warn(`[ChatWonderHelper] Pre-warm failed for user ${userId}: ${e.message}`)
+    );
 }

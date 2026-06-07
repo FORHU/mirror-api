@@ -115,12 +115,78 @@ const DATA_BLOCK_TAIL =
 const SET_BREAKDOWN_TAIL = /\n*#{1,6}\s*Set\b[\s\S]*$/i;
 
 /**
- * Reduce a raw response to the user-facing message: drop the trailing data
- * blocks and the redundant per-set breakdown. Does NOT trim, so callers that
- * stream incrementally can track emitted length; trim at the final use site.
+ * The JSON-bearing markers ChatWonder emits. Each is `[MARKER]` followed by a
+ * JSON object (`{…}`) or array (`[…]`). Unlike `[Sources]`/`[DONE]`, these can
+ * appear ANYWHERE in the response — nav replies lead with `[NAV_DATA]{…}` before
+ * the prose — so they must be removed by position, not just stripped as a tail.
+ */
+const JSON_BLOCK_MARKER = /\[(?:GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|STYLIST)\]/;
+
+/**
+ * Given the index of an opening `{` or `[`, return the index of its matching
+ * close, accounting for nesting and quoted strings. Returns -1 if unbalanced.
+ */
+function matchBracket(text: string, start: number): number {
+  const open = text[start];
+  const close = open === "{" ? "}" : "]";
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+    } else if (c === '"') {
+      inStr = true;
+    } else if (c === open) {
+      depth++;
+    } else if (c === close) {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Remove every `[MARKER]{…}` / `[MARKER][…]` span wherever it occurs, keeping
+ * the prose around it. Robust to blocks that lead, trail, or interleave.
+ */
+function stripDataBlocks(text: string): string {
+  let out = "";
+  let rest = text;
+  for (;;) {
+    const m = rest.match(JSON_BLOCK_MARKER);
+    if (!m || m.index === undefined) {
+      out += rest;
+      break;
+    }
+    out += rest.slice(0, m.index);
+    let j = m.index + m[0].length;
+    while (j < rest.length && /\s/.test(rest[j])) j++;
+    if (rest[j] === "{" || rest[j] === "[") {
+      const close = matchBracket(rest, j);
+      if (close !== -1) {
+        rest = rest.slice(close + 1);
+        continue;
+      }
+    }
+    // Marker without a parseable JSON payload — drop just the marker token.
+    rest = rest.slice(j);
+  }
+  return out;
+}
+
+/**
+ * Reduce a raw response to the user-facing message: strip the structured data
+ * blocks (anywhere they appear) and the redundant per-set breakdown. Does NOT
+ * trim, so callers that stream incrementally can track emitted length; trim at
+ * the final use site.
  */
 export function cutToMessage(text: string): string {
-  return text.replace(DATA_BLOCK_TAIL, "").replace(SET_BREAKDOWN_TAIL, "");
+  return stripDataBlocks(text).replace(DATA_BLOCK_TAIL, "").replace(SET_BREAKDOWN_TAIL, "");
 }
 
 /**
