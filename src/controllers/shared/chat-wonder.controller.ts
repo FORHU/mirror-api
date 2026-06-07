@@ -216,6 +216,7 @@ export default class ChatWonderController {
       res.setHeader("X-Accel-Buffering", "no");
 
       let fullResponse = "";
+      let navEarlyEmitted = false;
       const responseWithFlush = res as Response & { flush?: () => void };
       const writeSseEvent = (payload: Record<string, unknown>) => {
         res.write(`data: ${JSON.stringify(payload)}\n\n`);
@@ -250,6 +251,13 @@ export default class ChatWonderController {
       const callbacks: StreamCallbacks = {
         onChunk: (chunk: string) => {
           fullResponse += chunk;
+          if (!navEarlyEmitted && fullResponse.includes("[NAV_DATA]")) {
+            const navData = extractChatWonderDataBlock(fullResponse, "NAV_DATA");
+            if (navData) {
+              writeSseEvent({ type: "nav_early", stylist_data: navData });
+              navEarlyEmitted = true;
+            }
+          }
           // Mirror EVERY chunk verbatim on a separate event so a raw consumer can
           // concatenate all `raw_chunk` events to reconstruct the exact byte stream.
           writeSseEvent({ type: "raw_chunk", content: chunk });
@@ -517,6 +525,7 @@ export default class ChatWonderController {
       res.setHeader("X-Accel-Buffering", "no");
 
       let fullResponse = "";
+      let navEarlyEmitted = false;
       let sentenceBuffer = "";
       let displayedLen = 0;
       let ttsPromise = Promise.resolve();
@@ -573,6 +582,13 @@ export default class ChatWonderController {
         callbacks: {
           onChunk: (chunk: string) => {
             fullResponse += chunk;
+            if (!navEarlyEmitted && fullResponse.includes("[NAV_DATA]")) {
+              const navData = extractChatWonderDataBlock(fullResponse, "NAV_DATA");
+              if (navData) {
+                writeSseEvent({ type: "nav_early", stylist_data: navData });
+                navEarlyEmitted = true;
+              }
+            }
             const display = cleanDisplayPrefix(fullResponse);
             if (display.length > displayedLen) {
               const newText = display.slice(displayedLen);
