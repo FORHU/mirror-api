@@ -21,6 +21,7 @@ env:
   AWS_REGION: ap-southeast-1
   NODE_ENV: staging
   IMAGE_TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+  EC2_IAM_ROLE_NAME: forhu-staging-style-os-mirror-role
 
 jobs:
   deploy:
@@ -44,6 +45,13 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Grant EC2 role CloudWatch Logs access
+        run: |
+          aws iam put-role-policy \
+            --role-name "${{ env.EC2_IAM_ROLE_NAME }}" \
+            --policy-name mirror-api-cloudwatch-logs \
+            --policy-document file://infra/ec2-cloudwatch-logs-policy.json
 
       - name: Login to Amazon ECR
         id: login-ecr
