@@ -21,6 +21,7 @@ env:
   AWS_REGION: ap-southeast-1
   NODE_ENV: staging
   IMAGE_TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+  EC2_IAM_ROLE_NAME: forhu-staging-style-os-mirror-role
 
 jobs:
   deploy:
@@ -44,6 +45,13 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Grant EC2 role CloudWatch Logs access
+        run: |
+          aws iam put-role-policy \
+            --role-name "${{ env.EC2_IAM_ROLE_NAME }}" \
+            --policy-name mirror-api-cloudwatch-logs \
+            --policy-document file://infra/ec2-cloudwatch-logs-policy.json
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -165,5 +173,10 @@ jobs:
             docker run -d --name mirror-api --restart unless-stopped \
               --env-file /home/ec2-user/mirror-api.env \
               -p 3007:3007 \
+              --log-driver awslogs \
+              --log-opt awslogs-region=${{ env.AWS_REGION }} \
+              --log-opt awslogs-group=/mirror-api/staging \
+              --log-opt awslogs-stream=mirror-api \
+              --log-opt awslogs-create-group=true \
               ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
             docker image prune -f
