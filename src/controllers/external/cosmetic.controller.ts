@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
+import crypto from "crypto";
 import CosmeticProductService from "../../services/shared/cosmetic-product.service";
+import CacheUtil from "../../utils/cache.util";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
 import { pageFromRepo } from "../../helpers/pagination.helper";
 
@@ -35,13 +37,19 @@ export const mapCosmeticForAI = (cosmetic: any) => ({
 export default class ExternalCosmeticController {
   static async index(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await CosmeticProductService.getProducts(
-        req.query as unknown as Record<string, string | undefined | string[]>
-      );
-      const responseData = {
-        ...result,
-        data: result.data.map(mapCosmeticForAI),
-      };
+      const queryStr = JSON.stringify(req.query, Object.keys(req.query).sort());
+      const cacheKey = `external:cosmetics:index:${crypto.createHash("md5").update(queryStr).digest("hex")}`;
+
+      const responseData = await CacheUtil.remember(cacheKey, 3600, async () => {
+        const result = await CosmeticProductService.getProducts(
+          req.query as unknown as Record<string, string | undefined | string[]>
+        );
+        return {
+          ...result,
+          data: result.data.map(mapCosmeticForAI),
+        };
+      });
+
       return responseSuccess(res, 200, pageFromRepo(responseData));
     } catch (err) {
       next(err);

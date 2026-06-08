@@ -61,7 +61,6 @@ router.use("/mirror/generation", mirrorGenerationRoute);
 router.use("/external/garments", authenticateApiKey, externalGarmentRoute);
 router.use("/external/outfits", authenticateApiKey, externalOutfitRoute);
 router.use("/external/cosmetics", authenticateApiKey, externalCosmeticRoute);
-router.use("/external/cosmetic-products", authenticateApiKey, externalCosmeticRoute);
 router.use("/external/user", authenticateApiKey, externalUserRoute);
 router.use("/external/outlines", authenticateApiKey, externalOutlineRoute);
 

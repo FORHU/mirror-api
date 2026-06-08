@@ -20,6 +20,7 @@ import {
   cleanDisplayPrefix,
   clearStaleSession,
 } from "../../helpers/chat-wonder.helper";
+import { weatherService } from "../../services/shared/weather.service";
 
 export default class ChatWonderController {
   /**
@@ -163,7 +164,7 @@ export default class ChatWonderController {
       return responseError(res, 400, error.message);
     }
 
-    const input = value.input || value.user_input;
+    let input = value.input || value.user_input;
     const inputConversationId = value.conversationId; // Note: session_id is a different Forhu AI concept, we keep conversationId logic
     const kioskId = value.kioskId;
     const frontendWeather = value.weather;
@@ -171,6 +172,16 @@ export default class ChatWonderController {
     const sitemapContext = value.sitemap_context;
     const history = (value.history ?? []).slice(-10);
     const skinAnalysis = value.skin_analysis;
+
+    if (input.startsWith("[stylist]")) {
+      if (skinAnalysis) {
+        input = input.replace("[stylist]", "[cosmetics]");
+      } else if (frontendWeather || frontendLocation) {
+        input = input.replace("[stylist]", "[garment]");
+      } else {
+        input = input.replace("[stylist]", "[maps]");
+      }
+    }
 
     try {
       const [conversationId, sessionId, gender] = await Promise.all([
@@ -384,16 +395,49 @@ export default class ChatWonderController {
       return responseError(res, 400, error.message);
     }
 
-    const input = value.input || value.user_input;
+    let input = value.input || value.user_input || "";
+    if (!input.startsWith("[")) {
+      input = `[stylist] ${input}`;
+    }
+
     const inputConversationId = value.conversationId;
     const kioskId = value.kioskId;
-    const frontendWeather = value.weather;
-    const frontendLocation = value.location;
-    const skinAnalysis = value.skin_analysis;
+    const pageMode: string | null = value.page_mode ?? null;
     const wantsVoice = value.voice === true;
     const ttsLang = value.lang || "en-US";
     const sitemapContext = value.sitemap_context;
     const history = (value.history ?? []).slice(-10);
+
+    const isGarment  = pageMode === "garment";
+    const isCosmetics = pageMode === "cosmetics";
+    const isOverview = pageMode === "overview";
+
+    const frontendLocation = value.location;
+    const skinAnalysis = value.skin_analysis;
+
+    let frontendWeather: Record<string, unknown> | undefined = undefined;
+    if (frontendLocation && (isGarment || isOverview || !pageMode)) {
+      try {
+        const d = await weatherService.getWeather(frontendLocation.lat, frontendLocation.lng);
+        frontendWeather = {
+          date: new Date().toISOString().split("T")[0],
+          description: String(d.condition ?? "").toLowerCase(),
+          estimated: false,
+          is_cold: Number(d.temperature) < 20,
+          is_hot: Number(d.temperature) >= 30,
+          is_rainy: Number(d.precipitationProb) >= 50 || String(d.condition ?? "").toLowerCase().includes("rain"),
+          lat: frontendLocation.lat,
+          lon: frontendLocation.lng,
+          temperature_c: Number(d.temperature),
+        };
+      } catch {
+        /* best effort */
+      }
+    }
+
+    logger.info(
+      `[ChatWonderController.chat] page_mode=${pageMode ?? "none"} | input=${input.slice(0, 80)}...`
+    );
 
     try {
       const [conversationId, sessionId, gender] = await Promise.all([

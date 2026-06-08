@@ -4,6 +4,5 @@ import ExternalCosmeticController from "../../controllers/external/cosmetic.cont
 const router = express.Router();
 
 router.get("/", ExternalCosmeticController.index);
-router.get("/:id", ExternalCosmeticController.show);
 
 export default router;
