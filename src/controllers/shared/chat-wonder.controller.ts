@@ -188,16 +188,6 @@ export default class ChatWonderController {
     const history = (value.history ?? []).slice(-10);
     const skinAnalysis = value.skin_analysis;
 
-    if (input.startsWith("[stylist]")) {
-      if (skinAnalysis) {
-        input = input.replace("[stylist]", "[cosmetics]");
-      } else if (frontendWeather || frontendLocation) {
-        input = input.replace("[stylist]", "[garment]");
-      } else {
-        input = input.replace("[stylist]", "[maps]");
-      }
-    }
-
     try {
       const [conversationId, sessionId, gender] = await Promise.all([
         ChatWonderService.ensureConversation(userId, input.substring(0, 50), inputConversationId),
