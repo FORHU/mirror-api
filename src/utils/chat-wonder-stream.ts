@@ -73,6 +73,23 @@ function buildGenderScopedInput(input: string, gender?: string): string {
   ].join("\n");
 }
 
+const wsPool = new Map<string, WebSocket>();
+
+function acquireWS(sessionId: string, wsEndpoint: string): WebSocket {
+  const existing = wsPool.get(sessionId);
+  if (
+    existing &&
+    (existing.readyState === WebSocket.OPEN ||
+      existing.readyState === WebSocket.CONNECTING)
+  ) {
+    return existing;
+  }
+
+  const ws = new WebSocket(wsEndpoint);
+  wsPool.set(sessionId, ws);
+  return ws;
+}
+
 export async function streamChat(options: StreamChatOptions): Promise<void> {
   const {
     userInput,
@@ -116,40 +133,55 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
     logger.info(`[CHAT-WONDER-STREAM] Connecting to ${wsEndpoint}`);
 
-    const ws = new WebSocket(wsEndpoint);
+    const ws = acquireWS(sessionId, wsEndpoint);
 
-    ws.on("open", () => {
+    // Clear stale per-request listeners from a previous use of this connection.
+    ws.removeAllListeners("message");
+    ws.removeAllListeners("error");
+    ws.removeAllListeners("close");
+    ws.removeAllListeners("open");
+
+    //   const builtPrompt = PromptBuilder.build({
+    //     input: userInput,
+    //     context: {
+    //       weather,
+    //       document_context: documentContext,
+    //     },
+    //     history: userHistorySelect,
+    //   });
+
+    const payload = {
+      session_id: sessionId,
+      // Only assert a gender when we actually know it. When it's unset we send
+      // the input as-is so the (external) persona can ask, rather than faking one.
+      user_input: buildGenderScopedInput(userInput, gender),
+      ...(userId ? { user_id: userId } : {}),
+      ...(outlineId ? { outline_id: outlineId } : {}),
+      weather,
+      ...(location ? { location } : {}),
+      ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
+      ...(gender ? { gender } : {}),
+      ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
+      ...(documentContext ? { document_context: documentContext } : {}),
+      ...(history && history.length ? { history } : {}),
+    };
+
+    const sendPayload = () => {
       logger.info("[CHAT-WONDER-STREAM] WebSocket connected");
-
-      //   const builtPrompt = PromptBuilder.build({
-      //     input: userInput,
-      //     context: {
-      //       weather,
-      //       document_context: documentContext,
-      //     },
-      //     history: userHistorySelect,
-      //   });
-
-      const payload = {
-        session_id: sessionId,
-        // Only assert a gender when we actually know it. When it's unset we send
-        // the input as-is so the (external) persona can ask, rather than faking one.
-        user_input: buildGenderScopedInput(userInput, gender),
-        ...(userId ? { user_id: userId } : {}),
-        ...(outlineId ? { outline_id: outlineId } : {}),
-        weather,
-        ...(location ? { location } : {}),
-        ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
-        ...(gender ? { gender } : {}),
-        ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
-        ...(documentContext ? { document_context: documentContext } : {}),
-        ...(history && history.length ? { history } : {}),
-      };
       logger.info(
         `[CHAT-WONDER-STREAM] user payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "..." })}`
       );
       ws.send(JSON.stringify(payload));
-    });
+    };
+
+    if (ws.readyState === WebSocket.OPEN) {
+      sendPayload();
+    } else if (ws.readyState === WebSocket.CONNECTING) {
+      ws.once("open", sendPayload);
+    } else {
+      wsPool.delete(sessionId);
+      return reject(new Error("ChatWonder WebSocket is not open"));
+    }
 
     ws.on("message", (data: WebSocket.Data) => {
       const raw = data.toString();
@@ -162,7 +194,6 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         if (raw === "__END__") {
           logger.info("[CHAT-WONDER-STREAM] Stream complete (legacy)");
           safeComplete();
-          ws.close();
           resolve();
           return;
         }
@@ -175,6 +206,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
               `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
             );
           });
+          wsPool.delete(sessionId);
           ws.close();
           reject(error);
           return;
@@ -208,7 +240,6 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         case "end":
           logger.info("[CHAT-WONDER-STREAM] Stream complete");
           safeComplete();
-          ws.close();
           resolve();
           break;
 
@@ -219,6 +250,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
               `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
             );
           });
+          wsPool.delete(sessionId);
           ws.close();
           reject(new Error(msg.message));
           break;
@@ -235,6 +267,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
     ws.on("error", (error) => {
       logger.error(`[CHAT-WONDER-STREAM] WebSocket error: ${error.message}`);
+      wsPool.delete(sessionId);
       Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
         logger.warn(
           `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
@@ -245,6 +278,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
     ws.on("close", () => {
       logger.info("[CHAT-WONDER-STREAM] WebSocket closed");
+      wsPool.delete(sessionId);
       // Fallback: If the server closes the connection abruptly without sending __END__
       safeComplete();
       resolve();
