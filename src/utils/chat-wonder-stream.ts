@@ -31,7 +31,9 @@ function acquireWS(sessionId: string, wsEndpoint: string): WebSocket {
     }
     try {
       entry.ws.terminate();
-    } catch (_) {}
+    } catch {
+      // Ignore termination errors on stale sockets.
+    }
     wsPool.delete(sessionId);
   }
   const ws = new WebSocket(wsEndpoint);
@@ -50,7 +52,9 @@ function evictWS(sessionId: string) {
     if (entry.pingTimer) clearInterval(entry.pingTimer);
     try {
       entry.ws.terminate();
-    } catch (_) {}
+    } catch {
+      // Ignore termination errors while evicting sockets.
+    }
   }
   wsPool.delete(sessionId);
 }
@@ -123,7 +127,11 @@ export interface StreamChatOptions {
 
 const DEFAULT_WS_CONNECT_TIMEOUT_MS = 10000;
 
-function waitForWebSocketOpen(ws: WebSocket, sessionId: string, timeoutMs = DEFAULT_WS_CONNECT_TIMEOUT_MS): Promise<void> {
+function waitForWebSocketOpen(
+  ws: WebSocket,
+  sessionId: string,
+  timeoutMs = DEFAULT_WS_CONNECT_TIMEOUT_MS
+): Promise<void> {
   if (ws.readyState === WebSocket.OPEN) return Promise.resolve();
   if (ws.readyState === WebSocket.CLOSING || ws.readyState === WebSocket.CLOSED) {
     return Promise.reject(new Error("ChatWonder WebSocket is not open"));
@@ -186,7 +194,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
   } = options;
 
   return new Promise((resolve, reject) => {
-    ;(async () => {
+    (async () => {
       if (!CHAT_WONDER_API_URL) {
         const error = new Error("CHAT_WONDER_API_URL is not defined in config");
         Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
@@ -197,183 +205,182 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         return reject(error);
       }
 
-    let completed = false;
-    const safeComplete = () => {
-      if (completed) return;
-      completed = true;
-      releaseWS(sessionId);
-      Promise.resolve(callbacks.onComplete()).catch((callbackError) => {
-        logger.warn(
-          `[CHAT-WONDER-STREAM] onComplete callback failed: ${(callbackError as Error).message}`
-        );
-      });
-    };
-
-    const wsUrl = CHAT_WONDER_API_URL.replace("http://", "ws://").replace("https://", "wss://");
-    const wsEndpoint = `${wsUrl}/chat-stream`;
-
-    logger.info(`[CHAT-WONDER-STREAM] Connecting to ${wsEndpoint}`);
-
-    let ws = acquireWS(sessionId, wsEndpoint);
-
-    // Clear stale per-request listeners from a previous use of this connection.
-    ws.removeAllListeners("message");
-    ws.removeAllListeners("error");
-    ws.removeAllListeners("close");
-
-
-    let hasConnected = false;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        await waitForWebSocketOpen(ws, sessionId);
-        hasConnected = true;
-        break;
-      } catch (connectError) {
-        logger.warn(
-          `[CHAT-WONDER-STREAM] WebSocket connect attempt ${attempt + 1} failed for session ${sessionId}: ${(connectError as Error).message}`
-        );
-        if (attempt === 0) {
-          ws = acquireWS(sessionId, wsEndpoint);
-          ws.removeAllListeners("message");
-          ws.removeAllListeners("error");
-          ws.removeAllListeners("close");
-          continue;
-        }
-        return reject(connectError);
-      }
-    }
-
-    if (!hasConnected) {
-      return reject(new Error("ChatWonder WebSocket failed to connect"));
-    }
-
-    const payload = {
-      session_id: sessionId,
-      // Only assert a gender when we actually know it. When it's unset we send
-      // the input as-is so the (external) persona can ask, rather than faking one.
-      user_input: userInput,
-      ...(userId ? { user_id: userId } : {}),
-      ...(outlineId ? { outline_id: outlineId } : {}),
-      weather,
-      ...(location ? { location } : {}),
-      ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
-      ...(gender ? { gender } : {}),
-      ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
-      ...(documentContext ? { document_context: documentContext } : {}),
-      ...(history && history.length ? { history } : {}),
-    };
-
-    const sendPayload = () => {
-      logger.info("[CHAT-WONDER-STREAM] WebSocket connected");
-      logger.info(
-        `[CHAT-WONDER-STREAM] Sending payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "..." })}`
-      );
-      ws.send(JSON.stringify(payload));
-    };
-
-    sendPayload();
-
-    ws.on("message", (data: WebSocket.Data) => {
-      const raw = data.toString();
-
-      let msg: StreamMessage | null = null;
-      try {
-        msg = JSON.parse(raw);
-      } catch {
-        // Fallback for backward compatibility with old backend formats
-        if (raw === "__END__") {
-          logger.info("[CHAT-WONDER-STREAM] Stream complete (legacy)");
-          safeComplete();
-          resolve();
-          return;
-        }
-
-        if (raw.startsWith("[Error]")) {
-          logger.error(`[CHAT-WONDER-STREAM] Error: ${raw}`);
-          const error = new Error(raw);
-          evictWS(sessionId);
-          Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
-            logger.warn(
-              `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
-            );
-          });
-          ws.close();
-          reject(error);
-          return;
-        }
-
-        if (raw.startsWith("[Tool]")) {
-          logger.info(`[CHAT-WONDER-STREAM] Tool execution: ${raw}`);
-          return;
-        }
-
-        logger.info(`[CHAT-WONDER-STREAM] Received chunk (${raw.length} chars) (legacy)`);
-        callbacks.onChunk(raw);
-        return;
-      }
-
-      if (!msg || typeof msg !== "object") {
-        logger.warn(`[CHAT-WONDER-STREAM] Received non-object JSON message: ${raw}`);
-        return;
-      }
-
-      // JSON Protocol Parsing
-      switch (msg.type) {
-        case "chunk":
-          callbacks.onChunk(msg.data ?? raw);
-          break;
-
-        case "tool":
-          logger.info(`[CHAT-WONDER-STREAM] Tool: ${msg.name}`);
-          break;
-
-        case "end":
-          logger.info("[CHAT-WONDER-STREAM] Stream complete");
-          safeComplete();
-          resolve();
-          break;
-
-        case "error":
-          logger.error(`[CHAT-WONDER-STREAM] Error: ${msg.message}`);
-          evictWS(sessionId);
-          Promise.resolve(callbacks.onError(new Error(msg.message))).catch((callbackError) => {
-            logger.warn(
-              `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
-            );
-          });
-          ws.close();
-          reject(new Error(msg.message));
-          break;
-
-        default:
-          // External API sends JSON in an unrecognized format — treat the raw message as a chunk
-          logger.info(
-            `[CHAT-WONDER-STREAM] Unrecognized JSON type "${msg.type ?? "none"}", treating as raw chunk`
+      let completed = false;
+      const safeComplete = () => {
+        if (completed) return;
+        completed = true;
+        releaseWS(sessionId);
+        Promise.resolve(callbacks.onComplete()).catch((callbackError) => {
+          logger.warn(
+            `[CHAT-WONDER-STREAM] onComplete callback failed: ${(callbackError as Error).message}`
           );
-          callbacks.onChunk(raw);
+        });
+      };
+
+      const wsUrl = CHAT_WONDER_API_URL.replace("http://", "ws://").replace("https://", "wss://");
+      const wsEndpoint = `${wsUrl}/chat-stream`;
+
+      logger.info(`[CHAT-WONDER-STREAM] Connecting to ${wsEndpoint}`);
+
+      let ws = acquireWS(sessionId, wsEndpoint);
+
+      // Clear stale per-request listeners from a previous use of this connection.
+      ws.removeAllListeners("message");
+      ws.removeAllListeners("error");
+      ws.removeAllListeners("close");
+
+      let hasConnected = false;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          await waitForWebSocketOpen(ws, sessionId);
+          hasConnected = true;
           break;
+        } catch (connectError) {
+          logger.warn(
+            `[CHAT-WONDER-STREAM] WebSocket connect attempt ${attempt + 1} failed for session ${sessionId}: ${(connectError as Error).message}`
+          );
+          if (attempt === 0) {
+            ws = acquireWS(sessionId, wsEndpoint);
+            ws.removeAllListeners("message");
+            ws.removeAllListeners("error");
+            ws.removeAllListeners("close");
+            continue;
+          }
+          return reject(connectError);
+        }
       }
-    });
 
-    ws.on("error", (error: Error) => {
-      logger.error(`[CHAT-WONDER-STREAM] WebSocket error: ${error.message}`);
-      evictWS(sessionId);
-      completed = true;
-      Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
-        logger.warn(
-          `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
+      if (!hasConnected) {
+        return reject(new Error("ChatWonder WebSocket failed to connect"));
+      }
+
+      const payload = {
+        session_id: sessionId,
+        // Only assert a gender when we actually know it. When it's unset we send
+        // the input as-is so the (external) persona can ask, rather than faking one.
+        user_input: userInput,
+        ...(userId ? { user_id: userId } : {}),
+        ...(outlineId ? { outline_id: outlineId } : {}),
+        weather,
+        ...(location ? { location } : {}),
+        ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
+        ...(gender ? { gender } : {}),
+        ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
+        ...(documentContext ? { document_context: documentContext } : {}),
+        ...(history && history.length ? { history } : {}),
+      };
+
+      const sendPayload = () => {
+        logger.info("[CHAT-WONDER-STREAM] WebSocket connected");
+        logger.info(
+          `[CHAT-WONDER-STREAM] Sending payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "..." })}`
         );
-      });
-      reject(error);
-    });
+        ws.send(JSON.stringify(payload));
+      };
 
-    ws.on("close", () => {
-      logger.info("[CHAT-WONDER-STREAM] WebSocket closed");
-      evictWS(sessionId);
-      // Fallback: If the server closes the connection abruptly without sending __END__
-      safeComplete();
-      resolve();
-    });
-  })().catch(reject);
+      sendPayload();
+
+      ws.on("message", (data: WebSocket.Data) => {
+        const raw = data.toString();
+
+        let msg: StreamMessage | null = null;
+        try {
+          msg = JSON.parse(raw);
+        } catch {
+          // Fallback for backward compatibility with old backend formats
+          if (raw === "__END__") {
+            logger.info("[CHAT-WONDER-STREAM] Stream complete (legacy)");
+            safeComplete();
+            resolve();
+            return;
+          }
+
+          if (raw.startsWith("[Error]")) {
+            logger.error(`[CHAT-WONDER-STREAM] Error: ${raw}`);
+            const error = new Error(raw);
+            evictWS(sessionId);
+            Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
+              logger.warn(
+                `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
+              );
+            });
+            ws.close();
+            reject(error);
+            return;
+          }
+
+          if (raw.startsWith("[Tool]")) {
+            logger.info(`[CHAT-WONDER-STREAM] Tool execution: ${raw}`);
+            return;
+          }
+
+          logger.info(`[CHAT-WONDER-STREAM] Received chunk (${raw.length} chars) (legacy)`);
+          callbacks.onChunk(raw);
+          return;
+        }
+
+        if (!msg || typeof msg !== "object") {
+          logger.warn(`[CHAT-WONDER-STREAM] Received non-object JSON message: ${raw}`);
+          return;
+        }
+
+        // JSON Protocol Parsing
+        switch (msg.type) {
+          case "chunk":
+            callbacks.onChunk(msg.data ?? raw);
+            break;
+
+          case "tool":
+            logger.info(`[CHAT-WONDER-STREAM] Tool: ${msg.name}`);
+            break;
+
+          case "end":
+            logger.info("[CHAT-WONDER-STREAM] Stream complete");
+            safeComplete();
+            resolve();
+            break;
+
+          case "error":
+            logger.error(`[CHAT-WONDER-STREAM] Error: ${msg.message}`);
+            evictWS(sessionId);
+            Promise.resolve(callbacks.onError(new Error(msg.message))).catch((callbackError) => {
+              logger.warn(
+                `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
+              );
+            });
+            ws.close();
+            reject(new Error(msg.message));
+            break;
+
+          default:
+            // External API sends JSON in an unrecognized format — treat the raw message as a chunk
+            logger.info(
+              `[CHAT-WONDER-STREAM] Unrecognized JSON type "${msg.type ?? "none"}", treating as raw chunk`
+            );
+            callbacks.onChunk(raw);
+            break;
+        }
+      });
+
+      ws.on("error", (error: Error) => {
+        logger.error(`[CHAT-WONDER-STREAM] WebSocket error: ${error.message}`);
+        evictWS(sessionId);
+        completed = true;
+        Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
+          logger.warn(
+            `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
+          );
+        });
+        reject(error);
+      });
+
+      ws.on("close", () => {
+        logger.info("[CHAT-WONDER-STREAM] WebSocket closed");
+        evictWS(sessionId);
+        // Fallback: If the server closes the connection abruptly without sending __END__
+        safeComplete();
+        resolve();
+      });
+    })().catch(reject);
   });
 }

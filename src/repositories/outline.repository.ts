@@ -20,7 +20,7 @@ export default class OutlineRepo {
   static async findByIdWithEvents(id: string) {
     return prisma.userOutline.findUnique({
       where: { id },
-      include: { 
+      include: {
         events: true,
         outfits: {
           include: {
@@ -124,7 +124,7 @@ export default class OutlineRepo {
     return prisma.userOutline.findFirst({
       where: { userId, deletedAt: null },
       orderBy: { createdAt: "desc" },
-      include: { 
+      include: {
         events: true,
         outfits: {
           include: {

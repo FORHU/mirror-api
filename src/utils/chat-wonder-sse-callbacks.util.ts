@@ -94,11 +94,11 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
 
       sentenceBuffer += newText;
 
-      let match;
-      while (true) {
+      let match: RegExpMatchArray | null = null;
+      while (sentenceBuffer.length > 0) {
         match = sentenceBuffer.match(/^([\s\S]*?[.!?]+(?:\s+|$))([\s\S]*)$/);
         if (!match) {
-          const softMatch = sentenceBuffer.match(/^([\s\S]*?:)(\s+)([A-Z#\-\*][\s\S]*)$/);
+          const softMatch = sentenceBuffer.match(/^([\s\S]*?:)(\s+)([A-Z#*-][\s\S]*)$/);
           if (!softMatch) break;
           processSentence(`${softMatch[1]}${softMatch[2]}`);
           sentenceBuffer = softMatch[3];
@@ -158,7 +158,9 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       if (gender_data?.gender) {
         const newGender = String(gender_data.gender).toUpperCase();
         if (VALID_GENDERS.includes(newGender as (typeof VALID_GENDERS)[number])) {
-          await UserService.updateUser(userId, { gender: newGender as "MALE" | "FEMALE" | "UNISEX" });
+          await UserService.updateUser(userId, {
+            gender: newGender as "MALE" | "FEMALE" | "UNISEX",
+          });
           logger.info(`[ChatWonderController] Caught GENDER_UPDATE: ${newGender}`);
         }
       }

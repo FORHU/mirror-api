@@ -80,7 +80,10 @@ function buildProfile(
     };
   }
 
-  const req = requestSkin && typeof requestSkin === "object" ? (requestSkin as Record<string, unknown>) : null;
+  const req =
+    requestSkin && typeof requestSkin === "object"
+      ? (requestSkin as Record<string, unknown>)
+      : null;
   return {
     skinType: toSkinType(req?.skinType),
     hydrationPct: num(req?.hydrationPct, 50),
@@ -295,7 +298,7 @@ export async function buildCatalogContext(
       "Keep the visible assistant reply concise and organized: one short intro, then at most 3 bullet points with product names and brief reasons.",
       "Do not include long ingredient essays, full product dumps, or repeated details in the visible reply. Put exact product IDs in COSMETICS_DATA instead.",
       "Return a [COSMETICS_DATA] JSON block with this shape:",
-      "{\"recommendations\":[{\"id\":\"exact catalog id\",\"rank\":1,\"score\":95,\"reason\":\"short user-facing reason\"}]}",
+      '{"recommendations":[{"id":"exact catalog id","rank":1,"score":95,"reason":"short user-facing reason"}]}',
       "Every recommendation.id must exactly match one id below.",
       `User skin profile: type=${profile.skinType}; hydration=${profile.hydrationPct}; oiliness=${profile.oilinessPct}; concerns=${concerns}.`,
       "Candidate products, one JSON object per line:",
@@ -381,9 +384,13 @@ export async function resolveOutlineCosmeticsByIds(
 
     if (outline) {
       await persistOutlineCosmetics(outline.id, resolved);
-      logger.info(`[resolveCosmeticsByIds] Persisted ${resolved.length} ChatWonder cosmetics to outline ${outline.id}`);
+      logger.info(
+        `[resolveCosmeticsByIds] Persisted ${resolved.length} ChatWonder cosmetics to outline ${outline.id}`
+      );
     } else {
-      logger.warn(`[resolveCosmeticsByIds] No outline for conversation ${conversationId}; returning live-only`);
+      logger.warn(
+        `[resolveCosmeticsByIds] No outline for conversation ${conversationId}; returning live-only`
+      );
     }
 
     return resolved;
@@ -436,7 +443,9 @@ export async function resolveAndPersistOutlineCosmetics(
     });
 
     if (!catalog.length) {
-      logger.warn(`[resolveCosmetics] Catalog empty (no products with images) for conversation ${conversationId}`);
+      logger.warn(
+        `[resolveCosmetics] Catalog empty (no products with images) for conversation ${conversationId}`
+      );
       return [];
     }
 
@@ -498,9 +507,13 @@ export async function resolveAndPersistOutlineCosmetics(
           })),
         }),
       ]);
-      logger.info(`[resolveCosmetics] Persisted ${ranked.length} cosmetics to outline ${outline.id}`);
+      logger.info(
+        `[resolveCosmetics] Persisted ${ranked.length} cosmetics to outline ${outline.id}`
+      );
     } else {
-      logger.warn(`[resolveCosmetics] No outline for conversation ${conversationId}; returning live-only`);
+      logger.warn(
+        `[resolveCosmetics] No outline for conversation ${conversationId}; returning live-only`
+      );
     }
 
     return resolved;

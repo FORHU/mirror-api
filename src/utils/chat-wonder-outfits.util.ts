@@ -56,13 +56,13 @@ export async function buildOutfitCatalog(userId?: string | null, limit = 60): Pr
         slot: i.slot,
         garment: i.garment
           ? {
-            id: i.garment.id,
-            name: i.garment.name,
-            imageUrl: i.garment.imageUrl,
-            garmentType: i.garment.garmentType,
-            fittingSlot: i.garment.fittingSlot,
-            category: i.garment.category,
-          }
+              id: i.garment.id,
+              name: i.garment.name,
+              imageUrl: i.garment.imageUrl,
+              garmentType: i.garment.garmentType,
+              fittingSlot: i.garment.fittingSlot,
+              category: i.garment.category,
+            }
           : null,
       })),
     }));
@@ -269,7 +269,9 @@ export async function persistOutlineOutfits(
     });
 
     if (outfitsToCopy.length === 0) {
-      logger.warn(`[persistOutlineOutfits] None of the recommended outfits exist in catalog (outline ${outline.id})`);
+      logger.warn(
+        `[persistOutlineOutfits] None of the recommended outfits exist in catalog (outline ${outline.id})`
+      );
       return;
     }
 
@@ -313,7 +315,9 @@ export async function persistOutlineOutfits(
       });
     }
 
-    logger.info(`[persistOutlineOutfits] Persisted ${outfitsToCopy.length} duplicated outfits to outline ${outline.id}`);
+    logger.info(
+      `[persistOutlineOutfits] Persisted ${outfitsToCopy.length} duplicated outfits to outline ${outline.id}`
+    );
   } catch (error) {
     logger.error(`[persistOutlineOutfits] ${(error as Error).message}`);
   }
