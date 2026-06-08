@@ -5,12 +5,13 @@ import OutlineRepo from "../../repositories/outline.repository";
 import UserService from "../../services/shared/user.service";
 import { streamChat, type StreamCallbacks } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
-import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
+import { resolveItineraryLocations, persistOutlineMaps } from "../../utils/chat-wonder-maps.util";
 import {
   buildCatalogContext,
   resolveAndPersistOutlineCosmetics,
   resolveOutlineCosmeticsByIds,
 } from "../../utils/chat-wonder-cosmetics.util";
+import { persistOutlineOutfits } from "../../utils/chat-wonder-outfits.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
@@ -313,6 +314,12 @@ export default class ChatWonderController {
               if (resolved.length) cosmetics = { recommendations: resolved };
             }
 
+            // Persist the recommended outfits to the outline by duplicating them.
+            await persistOutlineOutfits(conversationId, garment);
+
+            // Persist map stops as ItineraryEvent rows on the outline.
+            await persistOutlineMaps(conversationId, maps);
+
             // Strip out the inline UI markers that buildFromParsed appends
             const finalDisplayMessage = stripMarkdownFormatting(
               parsed.message
@@ -453,37 +460,41 @@ export default class ChatWonderController {
     const frontendLocation = value.location;
     const skinAnalysis = value.skin_analysis;
 
-    let frontendWeather: Record<string, unknown> | undefined = undefined;
-    if (frontendLocation && (isGarment || isOverview || !pageMode)) {
-      try {
-        const d = await weatherService.getWeather(frontendLocation.lat, frontendLocation.lng);
-        frontendWeather = {
-          date: new Date().toISOString().split("T")[0],
-          description: String(d.condition ?? "").toLowerCase(),
-          estimated: false,
-          is_cold: Number(d.temperature) < 20,
-          is_hot: Number(d.temperature) >= 30,
-          is_rainy: Number(d.precipitationProb) >= 50 || String(d.condition ?? "").toLowerCase().includes("rain"),
-          lat: frontendLocation.lat,
-          lon: frontendLocation.lng,
-          temperature_c: Number(d.temperature),
-        };
-      } catch {
-        /* best effort */
-      }
-    }
 
     logger.info(
       `[ChatWonderController.chat] page_mode=${pageMode ?? "none"} | input=${input.slice(0, 80)}...`
     );
 
+    // Helper to build a weather object from the weatherService response
+    const buildWeatherObj = (d: import("../../services/shared/weather.service").WeatherData) => ({
+      date: new Date().toISOString().split("T")[0],
+      description: String(d.condition ?? "").toLowerCase(),
+      estimated: false,
+      is_cold: Number(d.temperature) < 20,
+      is_hot: Number(d.temperature) >= 30,
+      is_rainy: Number(d.precipitationProb) >= 50 || String(d.condition ?? "").toLowerCase().includes("rain"),
+      lat: frontendLocation!.lat,
+      lon: frontendLocation!.lng,
+      temperature_c: Number(d.temperature),
+    });
+
+    const needsWeather = !!(frontendLocation && (isGarment || isOverview || !pageMode));
+
     try {
-      const [conversationId, sessionId, gender] = await Promise.all([
+      // Fix 2: Run weather fetch IN PARALLEL with DB setup instead of sequentially before it
+      const [conversationId, sessionId, gender, frontendWeather] = await Promise.all([
         ChatWonderService.ensureConversation(userId, input.substring(0, 50), inputConversationId),
         ChatWonderService.generateChatSessionId(userId),
         ChatWonderService.getUserGender(userId),
+        needsWeather
+          ? weatherService.getWeather(frontendLocation!.lat, frontendLocation!.lng)
+              .then(buildWeatherObj)
+              .catch(() => undefined as Record<string, unknown> | undefined)
+          : Promise.resolve(undefined as Record<string, unknown> | undefined),
       ]);
-      const userMessage = await ChatWonderService.saveUserMessage(userId, conversationId, input);
+
+      // Fix 3: Fire saveUserMessage without blocking SSE headers — await it only in onComplete
+      const userMessagePromise = ChatWonderService.saveUserMessage(userId, conversationId, input);
 
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -505,24 +516,25 @@ export default class ChatWonderController {
       const processSentence = (text: string) => {
         if (!text.trim()) return;
 
-        // Chain the TTS generation and SSE emission in order
+        // Fix 5: Start TTS fetch immediately in parallel
+        const ttsFetchPromise = wantsVoice 
+          ? voiceService.tts(text, ttsLang).catch((ttsErr) => {
+              logger.warn(
+                `[ChatWonderController.chat] TTS failed for chunk: ${(ttsErr as Error).message}`
+              );
+              return null;
+            })
+          : Promise.resolve(null);
+
+        // Chain the SSE emission sequentially so they stay in order
         ttsPromise = ttsPromise.then(async () => {
           // If the connection was closed by the client, stop generating audio to save quota
           if (res.writableEnded || res.destroyed) {
             return;
           }
 
-          let audioBase64: string | null = null;
-          if (wantsVoice) {
-            try {
-              const audio = await voiceService.tts(text, ttsLang);
-              audioBase64 = audio.toString("base64");
-            } catch (ttsErr) {
-              logger.warn(
-                `[ChatWonderController.chat] TTS failed for chunk: ${(ttsErr as Error).message}`
-              );
-            }
-          }
+          const audio = await ttsFetchPromise;
+          const audioBase64 = audio ? audio.toString("base64") : null;
           writeSseEvent({ type: "audio_chunk", text, audioBase64 });
         });
       };
@@ -647,14 +659,7 @@ export default class ChatWonderController {
                   .trim()
               );
 
-              await checkAndFinalizeOutline(input, conversationId, kioskId);
-
-              const aiMessage = await ChatWonderService.saveAIMessage(
-                userId,
-                conversationId,
-                parsed.message
-              );
-
+              // Fix 4: Emit complete event immediately, persist AI message + outline in background
               writeSseEvent({
                 type: "complete",
                 message,
@@ -668,11 +673,21 @@ export default class ChatWonderController {
                 sets: parsed.sets,
                 metadata: {
                   conversationId,
-                  userMessageId: userMessage.id,
-                  aiMessageId: aiMessage.id,
+                  userMessageId: "pending", // resolved async below
                 },
               });
               res.end();
+
+              // Background persistence — does not block the client response
+              Promise.all([
+                userMessagePromise,
+                ChatWonderService.saveAIMessage(userId, conversationId, parsed.message),
+                checkAndFinalizeOutline(input, conversationId, kioskId),
+                persistOutlineOutfits(conversationId, garment_data),
+                persistOutlineMaps(conversationId, maps_data),
+              ]).catch(err =>
+                logger.error(`[ChatWonderController.chat] background persist failed: ${(err as Error).message}`)
+              );
             } catch (err) {
               logger.error(
                 `[ChatWonderController.chat] onComplete error: ${(err as Error).message}`

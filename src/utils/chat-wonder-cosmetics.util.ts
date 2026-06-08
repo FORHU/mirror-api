@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import logger from "./logger";
+import CacheUtil from "./cache.util";
 import { SKIN_TYPE } from "@prisma/client";
 import {
   rankProducts,
@@ -7,6 +8,9 @@ import {
   type AnalysisInput,
   type ProductForScoring,
 } from "./cosmetics.util";
+
+const CATALOG_CACHE_KEY = "cosmetics:catalog_context";
+const CATALOG_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 
 /**
  * Server-side cosmetics grounding.
@@ -239,6 +243,13 @@ export async function buildCatalogContext(
   limit = DEFAULT_CONTEXT_LIMIT
 ): Promise<string> {
   try {
+    // Serve from Redis cache when available (skin-agnostic: catalog rarely changes)
+    const cached = await CacheUtil.get(CATALOG_CACHE_KEY);
+    if (cached) {
+      logger.info("[buildCatalogContext] Serving catalog from Redis cache");
+      return cached as string;
+    }
+
     const catalog = await loadCatalogForCosmetics();
     if (!catalog.length) {
       logger.warn("[buildCatalogContext] Cosmetic catalog is empty");
@@ -278,9 +289,11 @@ export async function buildCatalogContext(
     );
 
     const concerns = profile.concerns.length ? profile.concerns.join(", ") : "general maintenance";
-    return [
+    const result = [
       "COSMETIC PRODUCT CATALOG",
       "Recommend ONLY products from this catalog. Do not invent product names, brands, images, or IDs.",
+      "Keep the visible assistant reply concise and organized: one short intro, then at most 3 bullet points with product names and brief reasons.",
+      "Do not include long ingredient essays, full product dumps, or repeated details in the visible reply. Put exact product IDs in COSMETICS_DATA instead.",
       "Return a [COSMETICS_DATA] JSON block with this shape:",
       "{\"recommendations\":[{\"id\":\"exact catalog id\",\"rank\":1,\"score\":95,\"reason\":\"short user-facing reason\"}]}",
       "Every recommendation.id must exactly match one id below.",
@@ -288,6 +301,12 @@ export async function buildCatalogContext(
       "Candidate products, one JSON object per line:",
       ...lines,
     ].join("\n");
+
+    // Cache for 5 minutes — catalog changes are infrequent
+    await CacheUtil.set(CATALOG_CACHE_KEY, result, CATALOG_CACHE_TTL_SECONDS);
+    logger.info(`[buildCatalogContext] Built and cached catalog (${lines.length} products)`);
+
+    return result;
   } catch (error) {
     logger.error(`[buildCatalogContext] ${(error as Error).message}`);
     return "";

@@ -35,6 +35,7 @@ import {
   type ChatWonderParsedResponse,
 } from "../../utils/parse-chatWonder-response.util";
 import logger from "../../utils/logger";
+import * as crypto from "crypto";
 import ChatRepository from "../../repositories/chat.repository";
 import fs from "fs";
 import path from "path";
@@ -193,6 +194,7 @@ function pcmToWav(pcmBuffer: Buffer, sampleRate = 16000, channels = 1, bitDepth 
 }
 
 async function transcribeWithWhisper(pcmBuffer: Buffer, language: string): Promise<string> {
+  const t0 = Date.now();
   const wavBuffer = pcmToWav(pcmBuffer);
   const langCode = language.split("-")[0];
   const tmpPath = path.join(os.tmpdir(), `voice-${Date.now()}.wav`);
@@ -204,6 +206,7 @@ async function transcribeWithWhisper(pcmBuffer: Buffer, language: string): Promi
       language: langCode,
     });
     const text = response.text?.trim();
+    logger.info(`[VoiceService] Whisper transcription time: ${Date.now() - t0}ms`);
     if (!text) throw new Error("EMPTY_TRANSCRIPT");
     return text;
   } finally {
@@ -240,6 +243,7 @@ async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> 
   };
 
   try {
+    const t0 = Date.now();
     const cmd = new StartStreamTranscriptionCommand({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       LanguageCode: language as any,
@@ -247,8 +251,8 @@ async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> 
       MediaSampleRateHertz: 16000,
       AudioStream: audioStream(),
     });
-
     const result = await doTranscribe(cmd);
+    logger.info(`[VoiceService] AWS Transcribe streaming time: ${Date.now() - t0}ms`);
     if (!result) throw new Error("EMPTY_TRANSCRIPT");
     return result;
   } catch (err: unknown) {
@@ -259,6 +263,28 @@ async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> 
     }
     throw err;
   }
+}
+
+/**
+ * Strips URLs and markdown links from text before TTS so the voice never reads
+ * out links. The link *label* is kept (e.g. "[Round Rattan Bag](http://...)"
+ * becomes "Round Rattan Bag") so sentences still read naturally. This only
+ * affects the spoken copy — the original message returned to the UI is untouched,
+ * so on-screen links stay visible/clickable.
+ */
+function stripLinksForSpeech(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // ![alt](url) markdown image -> remove
+    .replace(/\[([^\]]+)\]\(\s*(?:https?:\/\/|www\.|\/)[^)]*\)/g, "$1") // [label](url) -> label
+    .replace(/\b(?:https?:\/\/|www\.)\S+/gi, "") // bare URLs -> remove
+    .replace(/\(\s*[.-]\s*\)/g, "") // "(.)" / "(-)" artifacts should not be spoken
+    .replace(/^\s*[.-]\s+/gm, "") // markdown-ish bullet markers -> spoken sentence
+    .replace(/\s+[–—-]\s+/g, ", ") // separator dashes -> natural pause, not "dash"
+    .replace(/(?:^|\n)\s*\.\s+/g, "\n") // stray leading dots from model lists
+    .replace(/\s+([.,!?;:])/g, "$1") // drop space left before punctuation
+    .replace(/\s{2,}/g, " ") // collapse leftover whitespace
+    .trim();
 }
 
 function applyEmotionSSML(text: string, emotion?: string): string {
@@ -281,8 +307,9 @@ function applyEmotionSSML(text: string, emotion?: string): string {
 }
 
 async function synthesize(text: string, language: string, emotion?: string): Promise<Buffer> {
+  const synthStart = Date.now();
   logger.info(`[VoiceService] Synthesizing speech of length: ${text.length}`);
-  logger.info(`[VoiceService] Speech text: ${text.substring(0, 100)}...`);
+  logger.debug(`[VoiceService] Speech text: ${text.substring(0, 100)}...`);
 
   const isFallbackText = text.includes("having trouble connecting");
   if (isFallbackText) {
@@ -293,16 +320,62 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
     }
   }
 
+  // Remove links so the voice doesn't read URLs aloud. If a chunk was nothing
+  // but a link, there is nothing left to speak — return empty audio.
+  const cleanText = stripLinksForSpeech(text);
+  if (!cleanText) {
+    logger.info("[VoiceService] Text was empty after stripping links — skipping synthesis");
+    return Buffer.alloc(0);
+  }
+
   // Voice config per language — default to Ruth (generative) for en-US
   const langMap: Record<string, { voiceId: VoiceId; langCode: string }> = {
-    "fr-FR": { voiceId: VoiceId.Lea, langCode: "fr-FR" },
-    "ko-KR": { voiceId: VoiceId.Seoyeon, langCode: "ko-KR" },
+    "en-GB":  { voiceId: VoiceId.Amy,       langCode: "en-GB"  },
+    "en-AU":  { voiceId: VoiceId.Olivia,    langCode: "en-AU"  },
+    "en-IN":  { voiceId: VoiceId.Kajal,     langCode: "en-IN"  },
+    "en-SG":  { voiceId: VoiceId.Jasmine,   langCode: "en-SG"  },
+    "en-NZ":  { voiceId: VoiceId.Aria,      langCode: "en-NZ"  },
+    "en-ZA":  { voiceId: VoiceId.Ayanda,    langCode: "en-ZA"  },
+    "en-IE":  { voiceId: VoiceId.Niamh,     langCode: "en-IE"  },
+    "fr-FR":  { voiceId: VoiceId.Lea,       langCode: "fr-FR"  },
+    "fr-CA":  { voiceId: VoiceId.Gabrielle, langCode: "fr-CA"  },
+    "fr-BE":  { voiceId: VoiceId.Isabelle,  langCode: "fr-BE"  },
+    "de-DE":  { voiceId: VoiceId.Daniel,    langCode: "de-DE"  },
+    "de-AT":  { voiceId: VoiceId.Hannah,    langCode: "de-AT"  },
+    "de-CH":  { voiceId: VoiceId.Sabrina,   langCode: "de-CH"  },
+    "es-ES":  { voiceId: VoiceId.Lucia,     langCode: "es-ES"  },
+    "es-MX":  { voiceId: VoiceId.Mia,       langCode: "es-MX"  },
+    "es-US":  { voiceId: VoiceId.Lupe,      langCode: "es-US"  },
+    "it-IT":  { voiceId: VoiceId.Bianca,    langCode: "it-IT"  },
+    "pt-BR":  { voiceId: VoiceId.Camila,    langCode: "pt-BR"  },
+    "pt-PT":  { voiceId: VoiceId.Ines,      langCode: "pt-PT"  },
+    "nl-NL":  { voiceId: VoiceId.Laura,     langCode: "nl-NL"  },
+    "nl-BE":  { voiceId: VoiceId.Lisa,      langCode: "nl-BE"  },
+    "pl-PL":  { voiceId: VoiceId.Ola,       langCode: "pl-PL"  },
+    "ru-RU":  { voiceId: VoiceId.Tatyana,   langCode: "ru-RU"  },
+    "sv-SE":  { voiceId: VoiceId.Elin,      langCode: "sv-SE"  },
+    "da-DK":  { voiceId: VoiceId.Sofie,     langCode: "da-DK"  },
+    "nb-NO":  { voiceId: VoiceId.Ida,       langCode: "nb-NO"  },
+    "fi-FI":  { voiceId: VoiceId.Suvi,      langCode: "fi-FI"  },
+    "cs-CZ":  { voiceId: VoiceId.Jitka,     langCode: "cs-CZ"  },
+    "ro-RO":  { voiceId: VoiceId.Carmen,    langCode: "ro-RO"  },
+    "tr-TR":  { voiceId: VoiceId.Burcu,     langCode: "tr-TR"  },
+    "ca-ES":  { voiceId: VoiceId.Arlet,     langCode: "ca-ES"  },
+    "cy-GB":  { voiceId: VoiceId.Gwyneth,   langCode: "cy-GB"  },
+    "is-IS":  { voiceId: VoiceId.Dora,      langCode: "is-IS"  },
+    "ja-JP":  { voiceId: VoiceId.Kazuha,    langCode: "ja-JP"  },
+    "ko-KR":  { voiceId: VoiceId.Seoyeon,   langCode: "ko-KR"  },
+    "cmn-CN": { voiceId: VoiceId.Zhiyu,     langCode: "cmn-CN" },
+    "yue-CN": { voiceId: VoiceId.Hiujin,    langCode: "yue-CN" },
+    "hi-IN":  { voiceId: VoiceId.Kajal,     langCode: "hi-IN"  },
+    "arb":    { voiceId: VoiceId.Zeina,     langCode: "arb"    },
+    "ar-AE":  { voiceId: VoiceId.Hala,      langCode: "ar-AE"  },
   };
   const { voiceId, langCode } = langMap[language] ?? { voiceId: VoiceId.Ruth, langCode: "en-US" };
   const engine = GENERATIVE_VOICES.has(voiceId) ? Engine.GENERATIVE : Engine.NEURAL;
 
   const maxChunkLength = 2000;
-  const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
+  const sentences = cleanText.match(/[^.!?]+[.!?]*/g) || [cleanText];
   const textChunks: string[] = [];
   let currentChunk = "";
   for (const sentence of sentences) {
@@ -317,25 +390,71 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
 
   const audioBuffers: Buffer[] = [];
 
+  // Simple in-memory LRU cache for TTS chunks (small, per-process)
+  const TTS_CACHE_SIZE = 200;
+  // store on module-level to persist across calls
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore: we attach cache to function to avoid top-level mutable export
+  if (!(synthesize as any)._cache) (synthesize as any)._cache = new Map<string, Buffer>();
+  const ttsCache: Map<string, Buffer> = (synthesize as any)._cache;
+
+  // Polly concurrency control (bounded parallelism)
+  const POLLY_CONCURRENCY = 3;
+
   try {
-    for (const chunkText of textChunks) {
-      // Generative engine does not support SSML — use plain text
-      const useSSML = engine === Engine.NEURAL;
-      const cmd = new SynthesizeSpeechCommand({
-        Engine: engine,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        LanguageCode: langCode as any,
-        VoiceId: voiceId,
-        OutputFormat: OutputFormat.MP3,
-        Text: useSSML ? applyEmotionSSML(chunkText, emotion) : chunkText,
-        TextType: useSSML ? "ssml" : "text",
+    for (let i = 0; i < textChunks.length; i += POLLY_CONCURRENCY) {
+      const batch = textChunks.slice(i, i + POLLY_CONCURRENCY);
+      const promises = batch.map(async (chunkText) => {
+        const useSSML = engine === Engine.NEURAL;
+        const effectiveText = useSSML ? applyEmotionSSML(chunkText, emotion) : chunkText;
+        const cacheKey = crypto
+          .createHash("sha256")
+          .update(effectiveText + "|" + voiceId + "|" + langCode + "|" + (emotion || ""))
+          .digest("hex");
+
+        if (ttsCache.has(cacheKey)) {
+          const cached = ttsCache.get(cacheKey)!;
+          // refresh LRU
+          ttsCache.delete(cacheKey);
+          ttsCache.set(cacheKey, cached);
+          logger.debug(`[VoiceService] TTS cache hit for chunk (len=${chunkText.length})`);
+          return cached;
+        }
+
+        const cmd = new SynthesizeSpeechCommand({
+          Engine: engine,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          LanguageCode: langCode as any,
+          VoiceId: voiceId,
+          OutputFormat: OutputFormat.MP3,
+          Text: effectiveText,
+          TextType: useSSML ? "ssml" : "text",
+        });
+
+        const chunkStart = Date.now();
+        const res = await pollyClient.send(cmd);
+        const dur = Date.now() - chunkStart;
+        logger.info(`[VoiceService] Polly chunk synthesized in ${dur}ms (chars=${chunkText.length})`);
+        if (!res.AudioStream) throw new Error("No audio stream returned");
+        const audioArray = await res.AudioStream.transformToByteArray();
+        const buff = Buffer.from(audioArray);
+        // cache result
+        ttsCache.set(cacheKey, buff);
+        if (ttsCache.size > TTS_CACHE_SIZE) {
+          const firstKey = ttsCache.keys().next().value;
+          if (firstKey) {
+            ttsCache.delete(firstKey);
+          }
+        }
+        return buff;
       });
 
-      const res = await pollyClient.send(cmd);
-      if (!res.AudioStream) throw new Error("No audio stream returned");
-      const audioArray = await res.AudioStream.transformToByteArray();
-      audioBuffers.push(Buffer.from(audioArray));
+      const results = await Promise.all(promises);
+      audioBuffers.push(...results);
     }
+
+    const total = Date.now() - synthStart;
+    logger.info(`[VoiceService] TTS synthesis total time: ${total}ms, chunks=${textChunks.length}`);
     return Buffer.concat(audioBuffers);
   } catch (err) {
     logger.error(`[VoiceService] AWS Polly failed: ${(err as Error).message}`);
