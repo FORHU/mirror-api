@@ -261,6 +261,24 @@ async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> 
   }
 }
 
+/**
+ * Strips URLs and markdown links from text before TTS so the voice never reads
+ * out links. The link *label* is kept (e.g. "[Round Rattan Bag](http://...)"
+ * becomes "Round Rattan Bag") so sentences still read naturally. This only
+ * affects the spoken copy — the original message returned to the UI is untouched,
+ * so on-screen links stay visible/clickable.
+ */
+function stripLinksForSpeech(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // ![alt](url) markdown image -> remove
+    .replace(/\[([^\]]+)\]\(\s*(?:https?:\/\/|www\.|\/)[^)]*\)/g, "$1") // [label](url) -> label
+    .replace(/\b(?:https?:\/\/|www\.)\S+/gi, "") // bare URLs -> remove
+    .replace(/\s+([.,!?;:])/g, "$1") // drop space left before punctuation
+    .replace(/\s{2,}/g, " ") // collapse leftover whitespace
+    .trim();
+}
+
 function applyEmotionSSML(text: string, emotion?: string): string {
   const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   switch (emotion) {
@@ -293,6 +311,14 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
     }
   }
 
+  // Remove links so the voice doesn't read URLs aloud. If a chunk was nothing
+  // but a link, there is nothing left to speak — return empty audio.
+  const cleanText = stripLinksForSpeech(text);
+  if (!cleanText) {
+    logger.info("[VoiceService] Text was empty after stripping links — skipping synthesis");
+    return Buffer.alloc(0);
+  }
+
   // Voice config per language — default to Ruth (generative) for en-US
   const langMap: Record<string, { voiceId: VoiceId; langCode: string }> = {
     "fr-FR": { voiceId: VoiceId.Lea, langCode: "fr-FR" },
@@ -302,7 +328,7 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
   const engine = GENERATIVE_VOICES.has(voiceId) ? Engine.GENERATIVE : Engine.NEURAL;
 
   const maxChunkLength = 2000;
-  const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
+  const sentences = cleanText.match(/[^.!?]+[.!?]*/g) || [cleanText];
   const textChunks: string[] = [];
   let currentChunk = "";
   for (const sentence of sentences) {
