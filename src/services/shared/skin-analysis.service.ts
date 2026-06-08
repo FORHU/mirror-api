@@ -1,5 +1,3 @@
-import * as fs from "fs";
-import * as path from "path";
 import { prisma } from "../../utils/prisma";
 import SkinAnalysisRepo from "../../repositories/skin-analysis.repository";
 import FileRepo from "../../repositories/file.repository";
@@ -17,6 +15,8 @@ import {
   CHAT_WONDER_API_URL,
   YOUCAM_API_KEY,
   YOUCAM_API_URL,
+  SKIN_ANALYSIS_MOCK_DATA,
+  type SkinVision,
 } from "../../config";
 import logger from "../../utils/logger";
 import { parsePagination } from "../../helpers/pagination.helper";
@@ -27,8 +27,6 @@ import { computeRisks, buildTags } from "../../utils/weather.util";
 
 // ─── Mock skin-analysis loader (dev) ────────────────────────────────────────
 
-const MOCK_HISTORY_PATH = path.resolve(process.cwd(), "src/mocks/skin-analysis.history.json");
-
 type PerfectCorpEntry = {
   success: boolean;
   overallScore?: number;
@@ -36,22 +34,13 @@ type PerfectCorpEntry = {
   output: Array<{ type: string; ui_score?: number; score?: number }>;
 };
 
-function loadMockVision() {
-  try {
-    const raw = fs.readFileSync(MOCK_HISTORY_PATH, "utf-8");
-    const entries: PerfectCorpEntry[] = JSON.parse(raw);
-    const successful = entries.filter((e) => e.success);
-    if (!successful.length) return null;
-    // Pick a random entry so each scan feels different
-    const entry = successful[Math.floor(Math.random() * successful.length)];
-    return parsePerfectCorpEntry(entry);
-  } catch (err) {
-    logger.warn(`[SkinAnalysis] Could not load mock history: ${err}`);
-    return null;
-  }
+// Pick a random pre-built mock vision (from config) so each scan feels different.
+// No file I/O or parsing — the data is an in-memory constant.
+function pickMockVision(): SkinVision {
+  return SKIN_ANALYSIS_MOCK_DATA[Math.floor(Math.random() * SKIN_ANALYSIS_MOCK_DATA.length)];
 }
 
-function parsePerfectCorpEntry(entry: PerfectCorpEntry) {
+function parsePerfectCorpEntry(entry: PerfectCorpEntry): SkinVision {
   // Build score map from output array
   const s: Record<string, number> = {};
   for (const item of entry.output ?? []) {
@@ -108,22 +97,6 @@ function parsePerfectCorpEntry(entry: PerfectCorpEntry) {
     overallScore: entry.overallScore ?? 75,
     skinAge: entry.skinAge ?? null,
     rawScores: s,
-  };
-}
-
-// ─── Fallback vision when JSON file is missing ──────────────────────────────
-
-function getFallbackVision() {
-  return {
-    skinType: "COMBINATION" as const,
-    skinTone: "Natural",
-    hydrationPct: 50,
-    oilinessPct: 50,
-    concerns: ["General maintenance"],
-    routineTip: "Maintain your routine with a gentle cleanser, SPF, and a hydrating serum.",
-    overallScore: 75,
-    skinAge: null as number | null,
-    rawScores: {} as Record<string, number>,
   };
 }
 
@@ -492,9 +465,9 @@ export default class SkinAnalysisService {
     }
 
     // 3. Vision analysis — toggle via SKIN_ANALYSIS_ENABLED env var
-    //    false (default) → mock data from skin-analysis.history.json
+    //    false (default) → random mock data from SKIN_ANALYSIS_MOCK_DATA (config)
     //    true            → real PerfectCorp/YouCam API call
-    let vision: ReturnType<typeof parsePerfectCorpEntry>;
+    let vision: SkinVision;
 
     if (SKIN_ANALYSIS_ENABLED) {
       const youCamResult = await callYouCamApi(file.fileUrl);
@@ -502,10 +475,10 @@ export default class SkinAnalysisService {
         vision = youCamResult;
       } else {
         logger.warn("[SkinAnalysis] YouCam call failed — falling back to mock");
-        vision = loadMockVision() ?? getFallbackVision();
+        vision = pickMockVision();
       }
     } else {
-      vision = loadMockVision() ?? getFallbackVision();
+      vision = pickMockVision();
     }
 
     logger.info(
