@@ -36,6 +36,18 @@ export default class OutlineRepo {
       where: { userId, deletedAt: null },
       orderBy: { createdAt: "desc" },
       include: {
+        // The outline's own cosmetics master list (refreshed each cosmetics
+        // turn by resolveAndPersistOutlineCosmetics). /overview hydrates from this.
+        cosmeticRecommendations: {
+          orderBy: { rank: "asc" },
+          include: {
+            cosmeticProduct: {
+              include: {
+                fileUrl: true,
+              },
+            },
+          },
+        },
         events: {
           orderBy: { createdAt: "asc" },
           include: {
