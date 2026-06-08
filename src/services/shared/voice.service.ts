@@ -35,6 +35,7 @@ import {
   type ChatWonderParsedResponse,
 } from "../../utils/parse-chatWonder-response.util";
 import logger from "../../utils/logger";
+import * as crypto from "crypto";
 import ChatRepository from "../../repositories/chat.repository";
 import fs from "fs";
 import path from "path";
@@ -193,6 +194,7 @@ function pcmToWav(pcmBuffer: Buffer, sampleRate = 16000, channels = 1, bitDepth 
 }
 
 async function transcribeWithWhisper(pcmBuffer: Buffer, language: string): Promise<string> {
+  const t0 = Date.now();
   const wavBuffer = pcmToWav(pcmBuffer);
   const langCode = language.split("-")[0];
   const tmpPath = path.join(os.tmpdir(), `voice-${Date.now()}.wav`);
@@ -204,6 +206,7 @@ async function transcribeWithWhisper(pcmBuffer: Buffer, language: string): Promi
       language: langCode,
     });
     const text = response.text?.trim();
+    logger.info(`[VoiceService] Whisper transcription time: ${Date.now() - t0}ms`);
     if (!text) throw new Error("EMPTY_TRANSCRIPT");
     return text;
   } finally {
@@ -240,6 +243,7 @@ async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> 
   };
 
   try {
+    const t0 = Date.now();
     const cmd = new StartStreamTranscriptionCommand({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       LanguageCode: language as any,
@@ -247,8 +251,8 @@ async function transcribe(pcmBuffer: Buffer, language: string): Promise<string> 
       MediaSampleRateHertz: 16000,
       AudioStream: audioStream(),
     });
-
     const result = await doTranscribe(cmd);
+    logger.info(`[VoiceService] AWS Transcribe streaming time: ${Date.now() - t0}ms`);
     if (!result) throw new Error("EMPTY_TRANSCRIPT");
     return result;
   } catch (err: unknown) {
@@ -303,8 +307,9 @@ function applyEmotionSSML(text: string, emotion?: string): string {
 }
 
 async function synthesize(text: string, language: string, emotion?: string): Promise<Buffer> {
+  const synthStart = Date.now();
   logger.info(`[VoiceService] Synthesizing speech of length: ${text.length}`);
-  logger.info(`[VoiceService] Speech text: ${text.substring(0, 100)}...`);
+  logger.debug(`[VoiceService] Speech text: ${text.substring(0, 100)}...`);
 
   const isFallbackText = text.includes("having trouble connecting");
   if (isFallbackText) {
@@ -385,25 +390,71 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
 
   const audioBuffers: Buffer[] = [];
 
+  // Simple in-memory LRU cache for TTS chunks (small, per-process)
+  const TTS_CACHE_SIZE = 200;
+  // store on module-level to persist across calls
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore: we attach cache to function to avoid top-level mutable export
+  if (!(synthesize as any)._cache) (synthesize as any)._cache = new Map<string, Buffer>();
+  const ttsCache: Map<string, Buffer> = (synthesize as any)._cache;
+
+  // Polly concurrency control (bounded parallelism)
+  const POLLY_CONCURRENCY = 3;
+
   try {
-    for (const chunkText of textChunks) {
-      // Generative engine does not support SSML — use plain text
-      const useSSML = engine === Engine.NEURAL;
-      const cmd = new SynthesizeSpeechCommand({
-        Engine: engine,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        LanguageCode: langCode as any,
-        VoiceId: voiceId,
-        OutputFormat: OutputFormat.MP3,
-        Text: useSSML ? applyEmotionSSML(chunkText, emotion) : chunkText,
-        TextType: useSSML ? "ssml" : "text",
+    for (let i = 0; i < textChunks.length; i += POLLY_CONCURRENCY) {
+      const batch = textChunks.slice(i, i + POLLY_CONCURRENCY);
+      const promises = batch.map(async (chunkText) => {
+        const useSSML = engine === Engine.NEURAL;
+        const effectiveText = useSSML ? applyEmotionSSML(chunkText, emotion) : chunkText;
+        const cacheKey = crypto
+          .createHash("sha256")
+          .update(effectiveText + "|" + voiceId + "|" + langCode + "|" + (emotion || ""))
+          .digest("hex");
+
+        if (ttsCache.has(cacheKey)) {
+          const cached = ttsCache.get(cacheKey)!;
+          // refresh LRU
+          ttsCache.delete(cacheKey);
+          ttsCache.set(cacheKey, cached);
+          logger.debug(`[VoiceService] TTS cache hit for chunk (len=${chunkText.length})`);
+          return cached;
+        }
+
+        const cmd = new SynthesizeSpeechCommand({
+          Engine: engine,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          LanguageCode: langCode as any,
+          VoiceId: voiceId,
+          OutputFormat: OutputFormat.MP3,
+          Text: effectiveText,
+          TextType: useSSML ? "ssml" : "text",
+        });
+
+        const chunkStart = Date.now();
+        const res = await pollyClient.send(cmd);
+        const dur = Date.now() - chunkStart;
+        logger.info(`[VoiceService] Polly chunk synthesized in ${dur}ms (chars=${chunkText.length})`);
+        if (!res.AudioStream) throw new Error("No audio stream returned");
+        const audioArray = await res.AudioStream.transformToByteArray();
+        const buff = Buffer.from(audioArray);
+        // cache result
+        ttsCache.set(cacheKey, buff);
+        if (ttsCache.size > TTS_CACHE_SIZE) {
+          const firstKey = ttsCache.keys().next().value;
+          if (firstKey) {
+            ttsCache.delete(firstKey);
+          }
+        }
+        return buff;
       });
 
-      const res = await pollyClient.send(cmd);
-      if (!res.AudioStream) throw new Error("No audio stream returned");
-      const audioArray = await res.AudioStream.transformToByteArray();
-      audioBuffers.push(Buffer.from(audioArray));
+      const results = await Promise.all(promises);
+      audioBuffers.push(...results);
     }
+
+    const total = Date.now() - synthStart;
+    logger.info(`[VoiceService] TTS synthesis total time: ${total}ms, chunks=${textChunks.length}`);
     return Buffer.concat(audioBuffers);
   } catch (err) {
     logger.error(`[VoiceService] AWS Polly failed: ${(err as Error).message}`);
