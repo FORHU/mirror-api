@@ -88,7 +88,7 @@ function buildProfile(
     skinType: toSkinType(req?.skinType),
     hydrationPct: num(req?.hydrationPct, 50),
     oilinessPct: num(req?.oilinessPct, 50),
-    concerns: Array.isArray(req?.concerns) ? (req!.concerns as unknown[]).map(String) : [],
+    concerns: Array.isArray(req?.concerns) ? (req?.concerns as unknown[]).map(String) : [],
   };
 }
 

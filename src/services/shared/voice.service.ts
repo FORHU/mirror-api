@@ -6,6 +6,7 @@ import {
   Engine,
   VoiceId,
   OutputFormat,
+  type LanguageCode,
 } from "@aws-sdk/client-polly";
 
 const GENERATIVE_VOICES = new Set<string>([
@@ -393,10 +394,9 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
   // Simple in-memory LRU cache for TTS chunks (small, per-process)
   const TTS_CACHE_SIZE = 200;
   // store on module-level to persist across calls
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore: we attach cache to function to avoid top-level mutable export
-  if (!(synthesize as any)._cache) (synthesize as any)._cache = new Map<string, Buffer>();
-  const ttsCache: Map<string, Buffer> = (synthesize as any)._cache;
+  const synthesizeFn = synthesize as { _cache?: Map<string, Buffer> };
+  if (!synthesizeFn._cache) synthesizeFn._cache = new Map<string, Buffer>();
+  const ttsCache: Map<string, Buffer> = synthesizeFn._cache;
 
   // Polly concurrency control (bounded parallelism)
   const POLLY_CONCURRENCY = 3;
@@ -412,8 +412,8 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
           .update(effectiveText + "|" + voiceId + "|" + langCode + "|" + (emotion || ""))
           .digest("hex");
 
-        if (ttsCache.has(cacheKey)) {
-          const cached = ttsCache.get(cacheKey)!;
+        const cached = ttsCache.get(cacheKey);
+        if (cached) {
           // refresh LRU
           ttsCache.delete(cacheKey);
           ttsCache.set(cacheKey, cached);
@@ -423,8 +423,7 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
 
         const cmd = new SynthesizeSpeechCommand({
           Engine: engine,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          LanguageCode: langCode as any,
+          LanguageCode: langCode as LanguageCode,
           VoiceId: voiceId,
           OutputFormat: OutputFormat.MP3,
           Text: effectiveText,

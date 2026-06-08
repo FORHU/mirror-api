@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import OutlineRepo, { MapStop } from "../../repositories/outline.repository";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
-import { notifyCompanion } from "../../utils/socket.util";
 
 const createSchema = Joi.object({
   userPrompt: Joi.array().items(Joi.string()).default([]),

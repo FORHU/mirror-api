@@ -118,6 +118,13 @@ export default class ChatWonderController {
       `[ChatWonderController.chat] page_mode=${pageMode ?? "none"} | input=${input.slice(0, 80)}...`
     );
 
+    const location =
+      frontendLocation &&
+      typeof frontendLocation.lat === "number" &&
+      typeof frontendLocation.lng === "number"
+        ? { lat: frontendLocation.lat, lng: frontendLocation.lng }
+        : null;
+
     // Helper to build a weather object from the weatherService response
     const buildWeatherObj = (d: WeatherData) => ({
       date: new Date().toISOString().split("T")[0],
@@ -130,12 +137,12 @@ export default class ChatWonderController {
         String(d.condition ?? "")
           .toLowerCase()
           .includes("rain"),
-      lat: frontendLocation!.lat,
-      lon: frontendLocation!.lng,
+      lat: location.lat,
+      lon: location.lng,
       temperature_c: Number(d.temperature),
     });
 
-    const needsWeather = !!(frontendLocation && (isGarment || isOverview || !pageMode));
+    const needsWeather = !!(location && (isGarment || isOverview || !pageMode));
 
     try {
       // Fix 2: Run weather fetch IN PARALLEL with DB setup instead of sequentially before it
@@ -145,7 +152,7 @@ export default class ChatWonderController {
         ChatWonderService.getUserGender(userId),
         needsWeather
           ? weatherService
-              .getWeather(frontendLocation!.lat, frontendLocation!.lng)
+              .getWeather(location.lat, location.lng)
               .then(buildWeatherObj)
               .catch(() => undefined as Record<string, unknown> | undefined)
           : Promise.resolve(undefined as Record<string, unknown> | undefined),

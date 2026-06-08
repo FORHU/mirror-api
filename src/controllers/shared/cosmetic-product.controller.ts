@@ -123,8 +123,8 @@ export default class CosmeticProductController {
   }
 
   static async update(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as Request & { user?: { id: string } }).user?.id;
-    // if (!userId) return responseError(res, 401, "Unauthorized");
+    const _userId = (req as Request & { user?: { id: string } }).user?.id;
+    // if (!_userId) return responseError(res, 401, "Unauthorized");
 
     const { error, value } = updateSchema.validate(req.body, { abortEarly: false });
     if (error) return responseError(res, 400, error.message);
