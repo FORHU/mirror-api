@@ -66,6 +66,9 @@ jobs:
           CHAT_WONDER_API_URL:    ${{ secrets.CHAT_WONDER_API_URL }}
           BASE_URL:               ${{ secrets.BASE_URL }}
           THIRD_PARTY_API_KEY:    ${{ secrets.THIRD_PARTY_API_KEY }}
+          YOUCAM_API_KEY:         ${{ secrets.YOUCAM_API_KEY }}
+          YOUCAM_API_URL:         ${{ secrets.YOUCAM_API_URL }}
+          SKIN_ANALYSIS_ENABLED:  ${{ secrets.SKIN_ANALYSIS_ENABLED }}
           NODE_ENV:               production
           PORT:                   3007
         run: |
@@ -93,6 +96,9 @@ jobs:
           CHAT_WONDER_API_URL=${CHAT_WONDER_API_URL}
           BASE_URL=${BASE_URL}
           THIRD_PARTY_API_KEY=${THIRD_PARTY_API_KEY}
+          YOUCAM_API_KEY=${YOUCAM_API_KEY}
+          YOUCAM_API_URL=${YOUCAM_API_URL}
+          SKIN_ANALYSIS_ENABLED=${SKIN_ANALYSIS_ENABLED}
           NODE_ENV=${NODE_ENV}
           PORT=${PORT}
           EOF
