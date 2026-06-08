@@ -34,6 +34,45 @@ export interface StreamChatOptions {
   history?: { role: "user" | "assistant"; content: string }[];
 }
 
+function normalizeGender(value?: string): "MALE" | "FEMALE" | "UNISEX" | null {
+  const normalized = value?.trim().toUpperCase();
+  if (normalized === "MALE" || normalized === "FEMALE" || normalized === "UNISEX") {
+    return normalized;
+  }
+  return null;
+}
+
+function isGarmentRequest(input: string): boolean {
+  return /\[(?:garment|stylist)\]|\b(?:fashion|outfit|outfits|garment|garments|clothes|clothing|wear|dress me|style me)\b/i.test(
+    input
+  );
+}
+
+function buildGenderScopedInput(input: string, gender?: string): string {
+  const normalizedGender = normalizeGender(gender);
+  if (!normalizedGender || !isGarmentRequest(input)) return input;
+
+  const allowed =
+    normalizedGender === "UNISEX"
+      ? "UNISEX garments and clearly gender-neutral styling"
+      : `${normalizedGender} or UNISEX garments`;
+  const avoid =
+    normalizedGender === "MALE"
+      ? "Avoid feminine-coded garments such as dresses, skirts, heels, and women's silhouettes unless the user explicitly asks for them."
+      : normalizedGender === "FEMALE"
+        ? "Avoid masculine-coded garments such as men's suits, men's dress shirts, and men's silhouettes unless the user explicitly asks for them."
+        : "Avoid strongly gendered styling unless the user explicitly asks for it.";
+
+  return [
+    `[SYSTEM] Fashion gender guard: the current user's stored gender is ${normalizedGender}.`,
+    `For garment and outfit recommendations, only choose ${allowed}.`,
+    avoid,
+    "If catalog items include a gender field, treat that field as a hard filter before building outfits.",
+    "[END SYSTEM]",
+    input,
+  ].join("\n");
+}
+
 export async function streamChat(options: StreamChatOptions): Promise<void> {
   const {
     userInput,
@@ -95,7 +134,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         session_id: sessionId,
         // Only assert a gender when we actually know it. When it's unset we send
         // the input as-is so the (external) persona can ask, rather than faking one.
-        user_input: userInput,
+        user_input: buildGenderScopedInput(userInput, gender),
         ...(userId ? { user_id: userId } : {}),
         ...(outlineId ? { outline_id: outlineId } : {}),
         weather,
