@@ -165,5 +165,10 @@ jobs:
             docker run -d --name mirror-api --restart unless-stopped \
               --env-file /home/ec2-user/mirror-api.env \
               -p 3007:3007 \
+              --log-driver awslogs \
+              --log-opt awslogs-region=${{ env.AWS_REGION }} \
+              --log-opt awslogs-group=/mirror-api/staging \
+              --log-opt awslogs-stream=mirror-api \
+              --log-opt awslogs-create-group=true \
               ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
             docker image prune -f
