@@ -11,6 +11,42 @@ interface StreamMessage {
   [key: string]: unknown;
 }
 
+// ── Persistent WebSocket pool ────────────────────────────────────────────────
+// Keeps one open connection per ChatWonder session so subsequent voice
+// commands skip the TCP + WS handshake (~100–400 ms saved per request).
+interface PoolEntry {
+  ws: WebSocket;
+  busy: boolean;
+}
+const wsPool = new Map<string, PoolEntry>();
+
+function acquireWS(sessionId: string, wsEndpoint: string): WebSocket {
+  const entry = wsPool.get(sessionId);
+  if (entry && entry.ws.readyState === WebSocket.OPEN && !entry.busy) {
+    entry.busy = true;
+    logger.info(`[CHAT-WONDER-STREAM] Reusing connection for session ${sessionId}`);
+    return entry.ws;
+  }
+  // Close stale connection if it exists
+  if (entry) {
+    entry.ws.terminate();
+    wsPool.delete(sessionId);
+  }
+  const ws = new WebSocket(wsEndpoint);
+  wsPool.set(sessionId, { ws, busy: true });
+  return ws;
+}
+
+function releaseWS(sessionId: string) {
+  const entry = wsPool.get(sessionId);
+  if (entry) entry.busy = false;
+}
+
+function evictWS(sessionId: string) {
+  wsPool.delete(sessionId);
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 export interface StreamCallbacks {
   onChunk: (chunk: string) => void;
   onComplete: () => void | Promise<void>;
@@ -29,6 +65,8 @@ export interface StreamChatOptions {
   gender?: string;
   /** App routes ChatWonder may navigate to (for `[nav]` requests). */
   sitemapContext?: string[];
+  /** Compact product/document context injected into ChatWonder for grounded recommendations. */
+  documentContext?: string;
   history?: { role: "user" | "assistant"; content: string }[];
 }
 
@@ -44,6 +82,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     skinAnalysis,
     gender,
     sitemapContext,
+    documentContext,
     history,
   } = options;
 
@@ -62,6 +101,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     const safeComplete = () => {
       if (completed) return;
       completed = true;
+      releaseWS(sessionId);
       Promise.resolve(callbacks.onComplete()).catch((callbackError) => {
         logger.warn(
           `[CHAT-WONDER-STREAM] onComplete callback failed: ${(callbackError as Error).message}`
@@ -72,41 +112,33 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     const wsUrl = CHAT_WONDER_API_URL.replace("http://", "ws://").replace("https://", "wss://");
     const wsEndpoint = `${wsUrl}/chat-stream`;
 
-    logger.info(`[CHAT-WONDER-STREAM] Connecting to ${wsEndpoint}`);
+    const ws = acquireWS(sessionId, wsEndpoint);
 
-    const ws = new WebSocket(wsEndpoint);
+    // Clear stale per-request listeners from a previous use of this connection
+    ws.removeAllListeners("message");
+    ws.removeAllListeners("error");
+    ws.removeAllListeners("close");
 
-    ws.on("open", () => {
-      logger.info("[CHAT-WONDER-STREAM] WebSocket connected");
+    const payload = {
+      session_id: sessionId,
+      user_input: userInput,
+      ...(userId ? { user_id: userId } : {}),
+      ...(outlineId ? { outline_id: outlineId } : {}),
+      weather,
+      ...(location ? { location } : {}),
+      ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
+      ...(gender ? { gender } : {}),
+      ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
+      ...(documentContext ? { document_context: documentContext } : {}),
+      ...(history && history.length ? { history } : {}),
+    };
 
-      //   const builtPrompt = PromptBuilder.build({
-      //     input: userInput,
-      //     context: {
-      //       weather,
-      //       document_context: documentContext,
-      //     },
-      //     history: userHistorySelect,
-      //   });
-
-      const payload = {
-        session_id: sessionId,
-        // Only assert a gender when we actually know it. When it's unset we send
-        // the input as-is so the (external) persona can ask, rather than faking one.
-        user_input: userInput,
-        ...(userId ? { user_id: userId } : {}),
-        ...(outlineId ? { outline_id: outlineId } : {}),
-        weather,
-        ...(location ? { location } : {}),
-        ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
-        ...(gender ? { gender } : {}),
-        ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
-        ...(history && history.length ? { history } : {}),
-      };
+    const sendPayload = () => {
       logger.info(
-        `[CHAT-WONDER-STREAM] user payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "..." })}`
+        `[CHAT-WONDER-STREAM] Sending payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "..." })}`
       );
       ws.send(JSON.stringify(payload));
-    });
+    };
 
     ws.on("message", (data: WebSocket.Data) => {
       const raw = data.toString();
@@ -119,7 +151,6 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         if (raw === "__END__") {
           logger.info("[CHAT-WONDER-STREAM] Stream complete (legacy)");
           safeComplete();
-          ws.close();
           resolve();
           return;
         }
@@ -127,12 +158,12 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         if (raw.startsWith("[Error]")) {
           logger.error(`[CHAT-WONDER-STREAM] Error: ${raw}`);
           const error = new Error(raw);
+          evictWS(sessionId);
           Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
             logger.warn(
               `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
             );
           });
-          ws.close();
           reject(error);
           return;
         }
@@ -164,19 +195,18 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
         case "end":
           logger.info("[CHAT-WONDER-STREAM] Stream complete");
-          safeComplete();
-          ws.close();
+          safeComplete(); // releases busy flag — keeps WS alive for next request
           resolve();
           break;
 
         case "error":
           logger.error(`[CHAT-WONDER-STREAM] Error: ${msg.message}`);
+          evictWS(sessionId);
           Promise.resolve(callbacks.onError(new Error(msg.message))).catch((callbackError) => {
             logger.warn(
               `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
             );
           });
-          ws.close();
           reject(new Error(msg.message));
           break;
 
@@ -192,6 +222,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
     ws.on("error", (error) => {
       logger.error(`[CHAT-WONDER-STREAM] WebSocket error: ${error.message}`);
+      evictWS(sessionId);
       Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
         logger.warn(
           `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
@@ -202,9 +233,20 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
     ws.on("close", () => {
       logger.info("[CHAT-WONDER-STREAM] WebSocket closed");
-      // Fallback: If the server closes the connection abruptly without sending __END__
+      evictWS(sessionId);
+      // Fallback: server closed without sending end — complete and resolve
       safeComplete();
       resolve();
     });
+
+    // Send immediately if reusing an open connection, otherwise wait for handshake
+    if (ws.readyState === WebSocket.OPEN) {
+      sendPayload();
+    } else {
+      ws.on("open", () => {
+        logger.info(`[CHAT-WONDER-STREAM] WebSocket connected for session ${sessionId}`);
+        sendPayload();
+      });
+    }
   });
 }

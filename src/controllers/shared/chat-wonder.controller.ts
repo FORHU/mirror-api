@@ -6,7 +6,11 @@ import UserService from "../../services/shared/user.service";
 import { streamChat, type StreamCallbacks } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
 import { resolveItineraryLocations, persistOutlineMaps } from "../../utils/chat-wonder-maps.util";
-import { persistOutlineCosmetics } from "../../utils/chat-wonder-cosmetics.util";
+import {
+  buildCatalogContext,
+  resolveAndPersistOutlineCosmetics,
+  resolveOutlineCosmeticsByIds,
+} from "../../utils/chat-wonder-cosmetics.util";
 import { persistOutlineOutfits } from "../../utils/chat-wonder-outfits.util";
 import {
   parseChatWonderResponse,
@@ -22,6 +26,16 @@ import {
   cleanDisplayPrefix,
   clearStaleSession,
 } from "../../helpers/chat-wonder.helper";
+import { weatherService } from "../../services/shared/weather.service";
+
+function isCosmeticsLikely(input: string): boolean {
+  return (
+    input.includes("[cosmetics]") ||
+    /\b(cosmetic|makeup|make-up|skincare|skin care|foundation|moisturi|lipstick|sunscreen|serum|cleanser|toner|blush|concealer|spf|skin)\b/i.test(
+      input
+    )
+  );
+}
 
 export default class ChatWonderController {
   /**
@@ -165,7 +179,7 @@ export default class ChatWonderController {
       return responseError(res, 400, error.message);
     }
 
-    const input = value.input || value.user_input;
+    let input = value.input || value.user_input;
     const inputConversationId = value.conversationId; // Note: session_id is a different Forhu AI concept, we keep conversationId logic
     const kioskId = value.kioskId;
     const frontendWeather = value.weather;
@@ -173,6 +187,16 @@ export default class ChatWonderController {
     const sitemapContext = value.sitemap_context;
     const history = (value.history ?? []).slice(-10);
     const skinAnalysis = value.skin_analysis;
+
+    if (input.startsWith("[stylist]")) {
+      if (skinAnalysis) {
+        input = input.replace("[stylist]", "[cosmetics]");
+      } else if (frontendWeather || frontendLocation) {
+        input = input.replace("[stylist]", "[garment]");
+      } else {
+        input = input.replace("[stylist]", "[maps]");
+      }
+    }
 
     try {
       const [conversationId, sessionId, gender] = await Promise.all([
@@ -271,11 +295,25 @@ export default class ChatWonderController {
               }
             }
 
-            // Persist ChatWonder's cosmetics to the outline so /overview can
-            // hydrate them later (refreshed each turn). No-op when `cosmetics`
-            // is null (e.g. the intercepted greeting).
-            await persistOutlineCosmetics(conversationId, cosmetics);
-            
+            // Prefer ChatWonder's choices from the injected real catalog, then
+            // fall back to the local rule engine if it returns no usable IDs.
+            const isGreeting = input.includes(
+              "[SYSTEM] The user just walked up to the mirror."
+            );
+            const wantsCosmetics =
+              !isGreeting &&
+              (cosmetics != null ||
+                parsed.intent === "COSMETIC" ||
+                !!parsed.cosmetics_suggestion ||
+                input.includes("[cosmetics]"));
+            if (wantsCosmetics) {
+              let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics);
+              if (!resolved.length) {
+                resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
+              }
+              if (resolved.length) cosmetics = { recommendations: resolved };
+            }
+
             // Persist the recommended outfits to the outline by duplicating them.
             await persistOutlineOutfits(conversationId, garment);
 
@@ -350,6 +388,10 @@ export default class ChatWonderController {
         },
       };
 
+      const documentContext = isCosmeticsLikely(input)
+        ? await buildCatalogContext(skinAnalysis)
+        : undefined;
+
       // Stream from external ChatWonder API
       await streamChat({
         userInput: input,
@@ -362,6 +404,7 @@ export default class ChatWonderController {
         skinAnalysis,
         gender: gender || undefined,
         sitemapContext,
+        documentContext,
         history,
       });
     } catch (err) {
@@ -397,16 +440,49 @@ export default class ChatWonderController {
       return responseError(res, 400, error.message);
     }
 
-    const input = value.input || value.user_input;
+    let input = value.input || value.user_input || "";
+    if (!input.startsWith("[")) {
+      input = `[stylist] ${input}`;
+    }
+
     const inputConversationId = value.conversationId;
     const kioskId = value.kioskId;
-    const frontendWeather = value.weather;
-    const frontendLocation = value.location;
-    const skinAnalysis = value.skin_analysis;
+    const pageMode: string | null = value.page_mode ?? null;
     const wantsVoice = value.voice === true;
     const ttsLang = value.lang || "en-US";
     const sitemapContext = value.sitemap_context;
     const history = (value.history ?? []).slice(-10);
+
+    const isGarment  = pageMode === "garment";
+    const isCosmetics = pageMode === "cosmetics";
+    const isOverview = pageMode === "overview";
+
+    const frontendLocation = value.location;
+    const skinAnalysis = value.skin_analysis;
+
+    let frontendWeather: Record<string, unknown> | undefined = undefined;
+    if (frontendLocation && (isGarment || isOverview || !pageMode)) {
+      try {
+        const d = await weatherService.getWeather(frontendLocation.lat, frontendLocation.lng);
+        frontendWeather = {
+          date: new Date().toISOString().split("T")[0],
+          description: String(d.condition ?? "").toLowerCase(),
+          estimated: false,
+          is_cold: Number(d.temperature) < 20,
+          is_hot: Number(d.temperature) >= 30,
+          is_rainy: Number(d.precipitationProb) >= 50 || String(d.condition ?? "").toLowerCase().includes("rain"),
+          lat: frontendLocation.lat,
+          lon: frontendLocation.lng,
+          temperature_c: Number(d.temperature),
+        };
+      } catch {
+        /* best effort */
+      }
+    }
+
+    logger.info(
+      `[ChatWonderController.chat] page_mode=${pageMode ?? "none"} | input=${input.slice(0, 80)}...`
+    );
 
     try {
       const [conversationId, sessionId, gender] = await Promise.all([
@@ -457,6 +533,10 @@ export default class ChatWonderController {
           writeSseEvent({ type: "audio_chunk", text, audioBase64 });
         });
       };
+
+      const documentContext = isCosmeticsLikely(input)
+        ? await buildCatalogContext(skinAnalysis)
+        : undefined;
 
       // 4. Stream from external ChatWonder API
       await streamChat({
@@ -543,10 +623,27 @@ export default class ChatWonderController {
                 }
               }
 
-              // Persist ChatWonder's cosmetics to the outline so /overview can
-              // hydrate them later (refreshed each turn). No-op when
-              // `cosmetics_data` is null (e.g. the intercepted greeting).
-              await persistOutlineCosmetics(conversationId, cosmetics_data);
+              // Prefer ChatWonder's choices from the injected real catalog, then
+              // fall back to the local rule engine if it returns no usable IDs.
+              const isGreeting = input.includes(
+                "[SYSTEM] The user just walked up to the mirror."
+              );
+              const wantsCosmetics =
+                !isGreeting &&
+                (cosmetics_data != null ||
+                  parsed.intent === "COSMETIC" ||
+                  !!parsed.cosmetics_suggestion ||
+                  input.includes("[cosmetics]"));
+              if (wantsCosmetics) {
+                let resolved = await resolveOutlineCosmeticsByIds(
+                  conversationId,
+                  cosmetics_data
+                );
+                if (!resolved.length) {
+                  resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
+                }
+                if (resolved.length) cosmetics_data = { recommendations: resolved };
+              }
 
               // Persist the recommended outfits to the outline by duplicating them.
               await persistOutlineOutfits(conversationId, garment_data);
@@ -625,6 +722,7 @@ export default class ChatWonderController {
         skinAnalysis,
         gender: gender || undefined,
         sitemapContext,
+        documentContext,
         history,
       });
     } catch (err) {

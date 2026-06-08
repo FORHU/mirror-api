@@ -61,8 +61,8 @@ export default class OutlineRepo {
             },
           },
         },
-        // The outline's own cosmetics master list (refreshed each ChatWonder
-        // turn by persistOutlineCosmetics). This is what /overview hydrates from.
+        // The outline's own cosmetics master list (refreshed each cosmetics
+        // turn by resolveAndPersistOutlineCosmetics). /overview hydrates from this.
         cosmeticRecommendations: {
           orderBy: { rank: "asc" },
           include: {
