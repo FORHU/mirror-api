@@ -5,8 +5,9 @@ import OutlineRepo from "../../repositories/outline.repository";
 import UserService from "../../services/shared/user.service";
 import { streamChat, type StreamCallbacks } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
-import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
+import { resolveItineraryLocations, persistOutlineMaps } from "../../utils/chat-wonder-maps.util";
 import { persistOutlineCosmetics } from "../../utils/chat-wonder-cosmetics.util";
+import { persistOutlineOutfits } from "../../utils/chat-wonder-outfits.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
@@ -274,6 +275,12 @@ export default class ChatWonderController {
             // hydrate them later (refreshed each turn). No-op when `cosmetics`
             // is null (e.g. the intercepted greeting).
             await persistOutlineCosmetics(conversationId, cosmetics);
+            
+            // Persist the recommended outfits to the outline by duplicating them.
+            await persistOutlineOutfits(conversationId, garment);
+
+            // Persist map stops as ItineraryEvent rows on the outline.
+            await persistOutlineMaps(conversationId, maps);
 
             // Strip out the inline UI markers that buildFromParsed appends
             const finalDisplayMessage = stripMarkdownFormatting(
@@ -540,6 +547,12 @@ export default class ChatWonderController {
               // hydrate them later (refreshed each turn). No-op when
               // `cosmetics_data` is null (e.g. the intercepted greeting).
               await persistOutlineCosmetics(conversationId, cosmetics_data);
+
+              // Persist the recommended outfits to the outline by duplicating them.
+              await persistOutlineOutfits(conversationId, garment_data);
+
+              // Persist map stops as ItineraryEvent rows on the outline.
+              await persistOutlineMaps(conversationId, maps_data);
 
               const message = stripMarkdownFormatting(
                 parsed.message

@@ -20,7 +20,17 @@ export default class OutlineRepo {
   static async findByIdWithEvents(id: string) {
     return prisma.userOutline.findUnique({
       where: { id },
-      include: { events: true },
+      include: { 
+        events: true,
+        outfits: {
+          include: {
+            file: true,
+            items: {
+              include: { garment: { include: { file: true } } },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -36,6 +46,21 @@ export default class OutlineRepo {
       where: { userId, deletedAt: null },
       orderBy: { createdAt: "desc" },
       include: {
+        // The outline's own outfits master list (refreshed by persistOutlineOutfits)
+        outfits: {
+          include: {
+            file: true,
+            items: {
+              include: {
+                garment: {
+                  include: {
+                    file: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         // The outline's own cosmetics master list (refreshed each ChatWonder
         // turn by persistOutlineCosmetics). This is what /overview hydrates from.
         cosmeticRecommendations: {
@@ -99,7 +124,17 @@ export default class OutlineRepo {
     return prisma.userOutline.findFirst({
       where: { userId, deletedAt: null },
       orderBy: { createdAt: "desc" },
-      include: { events: true },
+      include: { 
+        events: true,
+        outfits: {
+          include: {
+            file: true,
+            items: {
+              include: { garment: { include: { file: true } } },
+            },
+          },
+        },
+      },
     });
   }
 
