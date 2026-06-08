@@ -281,6 +281,8 @@ export async function buildCatalogContext(
     return [
       "COSMETIC PRODUCT CATALOG",
       "Recommend ONLY products from this catalog. Do not invent product names, brands, images, or IDs.",
+      "Keep the visible assistant reply concise and organized: one short intro, then at most 3 bullet points with product names and brief reasons.",
+      "Do not include long ingredient essays, full product dumps, or repeated details in the visible reply. Put exact product IDs in COSMETICS_DATA instead.",
       "Return a [COSMETICS_DATA] JSON block with this shape:",
       "{\"recommendations\":[{\"id\":\"exact catalog id\",\"rank\":1,\"score\":95,\"reason\":\"short user-facing reason\"}]}",
       "Every recommendation.id must exactly match one id below.",
