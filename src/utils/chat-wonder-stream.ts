@@ -65,6 +65,8 @@ export interface StreamChatOptions {
   gender?: string;
   /** App routes ChatWonder may navigate to (for `[nav]` requests). */
   sitemapContext?: string[];
+  /** Compact product/document context injected into ChatWonder for grounded recommendations. */
+  documentContext?: string;
   history?: { role: "user" | "assistant"; content: string }[];
 }
 
@@ -80,6 +82,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     skinAnalysis,
     gender,
     sitemapContext,
+    documentContext,
     history,
   } = options;
 
@@ -126,6 +129,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
       ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
       ...(gender ? { gender } : {}),
       ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
+      ...(documentContext ? { document_context: documentContext } : {}),
       ...(history && history.length ? { history } : {}),
     };
 

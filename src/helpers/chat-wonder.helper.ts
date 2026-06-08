@@ -11,7 +11,6 @@ export const chatWonderBaseSchema = Joi.object({
   conversationId: Joi.string().allow(null, "").optional(),
   session_id: Joi.string().allow(null, "").optional(),
   type: Joi.string().allow(null, "").optional(),
-  weather: Joi.object().allow(null).optional(),
   location: Joi.object({
     lat: Joi.number().min(-90).max(90).required(),
     lng: Joi.number().min(-180).max(180).required(),
@@ -21,6 +20,11 @@ export const chatWonderBaseSchema = Joi.object({
   skin_analysis: Joi.object().allow(null).optional(),
   kioskId: Joi.string().allow(null, "").optional(),
   sitemap_context: Joi.array().items(Joi.string()).optional(),
+  /** Current app page mode — used by the backend to filter/route the payload correctly. */
+  page_mode: Joi.string()
+    .valid("garment", "cosmetics", "map", "overview")
+    .allow(null, "")
+    .optional(),
   history: Joi.array()
     .items(
       Joi.object({

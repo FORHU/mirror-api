@@ -21,6 +21,7 @@ env:
   AWS_REGION: ap-southeast-1
   NODE_ENV: staging
   IMAGE_TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+  EC2_IAM_ROLE_NAME: forhu-staging-style-os-mirror-role
 
 jobs:
   deploy:
@@ -44,6 +45,13 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Grant EC2 role CloudWatch Logs access
+        run: |
+          aws iam put-role-policy \
+            --role-name "${{ env.EC2_IAM_ROLE_NAME }}" \
+            --policy-name mirror-api-cloudwatch-logs \
+            --policy-document file://infra/ec2-cloudwatch-logs-policy.json
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -87,6 +95,10 @@ jobs:
           REFRESH_TOKEN_EXPIRY: ${{ secrets.REFRESH_TOKEN_EXPIRY }}
           KIOSK_DEVICE_SECRET: ${{ secrets.KIOSK_DEVICE_SECRET }}
           GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+          YOUCAM_API_KEY: ${{ secrets.YOUCAM_API_KEY }}
+          YOUCAM_API_URL: ${{ secrets.YOUCAM_API_URL }}
+          SKIN_ANALYSIS_ENABLED: ${{ secrets.SKIN_ANALYSIS_ENABLED }}
+
           NODE_ENV: ${{ env.NODE_ENV }}
         run: |
           cat > ${{ github.workspace }}/mirror-api.env << EOF
@@ -120,6 +132,9 @@ jobs:
           REFRESH_TOKEN_EXPIRY=${REFRESH_TOKEN_EXPIRY}
           KIOSK_DEVICE_SECRET=${KIOSK_DEVICE_SECRET}
           GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY}
+          YOUCAM_API_KEY=${YOUCAM_API_KEY}
+          YOUCAM_API_URL=${YOUCAM_API_URL}
+          SKIN_ANALYSIS_ENABLED=${SKIN_ANALYSIS_ENABLED}
           EOF
 
       - name: Copy env file to EC2
@@ -158,5 +173,10 @@ jobs:
             docker run -d --name mirror-api --restart unless-stopped \
               --env-file /home/ec2-user/mirror-api.env \
               -p 3007:3007 \
+              --log-driver awslogs \
+              --log-opt awslogs-region=${{ env.AWS_REGION }} \
+              --log-opt awslogs-group=/mirror-api/staging \
+              --log-opt awslogs-stream=mirror-api \
+              --log-opt awslogs-create-group=true \
               ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
             docker image prune -f
