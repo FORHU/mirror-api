@@ -109,23 +109,6 @@ function buildGenderScopedInput(input: string, gender?: string): string {
   ].join("\n");
 }
 
-const wsPool = new Map<string, WebSocket>();
-
-function acquireWS(sessionId: string, wsEndpoint: string): WebSocket {
-  const existing = wsPool.get(sessionId);
-  if (
-    existing &&
-    (existing.readyState === WebSocket.OPEN ||
-      existing.readyState === WebSocket.CONNECTING)
-  ) {
-    return existing;
-  }
-
-  const ws = new WebSocket(wsEndpoint);
-  wsPool.set(sessionId, ws);
-  return ws;
-}
-
 export async function streamChat(options: StreamChatOptions): Promise<void> {
   const {
     userInput,
@@ -244,7 +227,6 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
               `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
             );
           });
-          wsPool.delete(sessionId);
           ws.close();
           reject(error);
           return;
@@ -289,7 +271,6 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
               `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
             );
           });
-          wsPool.delete(sessionId);
           ws.close();
           reject(new Error(msg.message));
           break;
@@ -306,7 +287,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
     ws.on("error", (error) => {
       logger.error(`[CHAT-WONDER-STREAM] WebSocket error: ${error.message}`);
-      wsPool.delete(sessionId);
+      evictWS(sessionId);
       Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
         logger.warn(
           `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
@@ -317,20 +298,10 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
     ws.on("close", () => {
       logger.info("[CHAT-WONDER-STREAM] WebSocket closed");
-      wsPool.delete(sessionId);
+      evictWS(sessionId);
       // Fallback: If the server closes the connection abruptly without sending __END__
       safeComplete();
       resolve();
     });
-
-    // Send immediately if reusing an open connection, otherwise wait for handshake
-    if (ws.readyState === WebSocket.OPEN) {
-      sendPayload();
-    } else {
-      ws.on("open", () => {
-        logger.info(`[CHAT-WONDER-STREAM] WebSocket connected for session ${sessionId}`);
-        sendPayload();
-      });
-    }
   });
 }
