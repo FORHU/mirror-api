@@ -24,15 +24,6 @@ router.post("/restart", authenticate, ChatWonderController.restart);
  * @desc Stream chat responses using SSE
  * @access Private
  */
-router.post("/stream", authenticate, ChatWonderController.streamChat);
-
-/**
- * @route POST /api/mirror/chat-wonder/raw
- * @desc Raw passthrough — returns ChatWonder's response exactly as received,
- *       with no persona prompt, parsing, resolver, events, or persistence.
- * @access Private
- */
-router.post("/raw", authenticate, ChatWonderController.streamRaw);
 
 /**
  * @route POST /api/mirror/chat-wonder/message
