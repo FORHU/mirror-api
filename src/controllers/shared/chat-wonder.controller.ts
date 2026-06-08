@@ -466,7 +466,7 @@ export default class ChatWonderController {
     );
 
     // Helper to build a weather object from the weatherService response
-    const buildWeatherObj = (d: Record<string, unknown>) => ({
+    const buildWeatherObj = (d: import("../../services/shared/weather.service").WeatherData) => ({
       date: new Date().toISOString().split("T")[0],
       description: String(d.condition ?? "").toLowerCase(),
       estimated: false,
