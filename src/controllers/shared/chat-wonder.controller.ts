@@ -6,7 +6,11 @@ import UserService from "../../services/shared/user.service";
 import { streamChat, type StreamCallbacks } from "../../utils/chat-wonder-stream";
 import { stripSourcesPrefix } from "../../utils/source-metadata.util";
 import { resolveItineraryLocations } from "../../utils/chat-wonder-maps.util";
-import { persistOutlineCosmetics } from "../../utils/chat-wonder-cosmetics.util";
+import {
+  buildCatalogContext,
+  resolveAndPersistOutlineCosmetics,
+  resolveOutlineCosmeticsByIds,
+} from "../../utils/chat-wonder-cosmetics.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
@@ -21,6 +25,15 @@ import {
   cleanDisplayPrefix,
   clearStaleSession,
 } from "../../helpers/chat-wonder.helper";
+
+function isCosmeticsLikely(input: string): boolean {
+  return (
+    input.includes("[cosmetics]") ||
+    /\b(cosmetic|makeup|make-up|skincare|skin care|foundation|moisturi|lipstick|sunscreen|serum|cleanser|toner|blush|concealer|spf|skin)\b/i.test(
+      input
+    )
+  );
+}
 
 export default class ChatWonderController {
   /**
@@ -270,10 +283,24 @@ export default class ChatWonderController {
               }
             }
 
-            // Persist ChatWonder's cosmetics to the outline so /overview can
-            // hydrate them later (refreshed each turn). No-op when `cosmetics`
-            // is null (e.g. the intercepted greeting).
-            await persistOutlineCosmetics(conversationId, cosmetics);
+            // Prefer ChatWonder's choices from the injected real catalog, then
+            // fall back to the local rule engine if it returns no usable IDs.
+            const isGreeting = input.includes(
+              "[SYSTEM] The user just walked up to the mirror."
+            );
+            const wantsCosmetics =
+              !isGreeting &&
+              (cosmetics != null ||
+                parsed.intent === "COSMETIC" ||
+                !!parsed.cosmetics_suggestion ||
+                input.includes("[cosmetics]"));
+            if (wantsCosmetics) {
+              let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics);
+              if (!resolved.length) {
+                resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
+              }
+              if (resolved.length) cosmetics = { recommendations: resolved };
+            }
 
             // Strip out the inline UI markers that buildFromParsed appends
             const finalDisplayMessage = stripMarkdownFormatting(
@@ -343,6 +370,10 @@ export default class ChatWonderController {
         },
       };
 
+      const documentContext = isCosmeticsLikely(input)
+        ? await buildCatalogContext(skinAnalysis)
+        : undefined;
+
       // Stream from external ChatWonder API
       await streamChat({
         userInput: input,
@@ -355,6 +386,7 @@ export default class ChatWonderController {
         skinAnalysis,
         gender: gender || undefined,
         sitemapContext,
+        documentContext,
         history,
       });
     } catch (err) {
@@ -451,6 +483,10 @@ export default class ChatWonderController {
         });
       };
 
+      const documentContext = isCosmeticsLikely(input)
+        ? await buildCatalogContext(skinAnalysis)
+        : undefined;
+
       // 4. Stream from external ChatWonder API
       await streamChat({
         userInput: input,
@@ -536,10 +572,27 @@ export default class ChatWonderController {
                 }
               }
 
-              // Persist ChatWonder's cosmetics to the outline so /overview can
-              // hydrate them later (refreshed each turn). No-op when
-              // `cosmetics_data` is null (e.g. the intercepted greeting).
-              await persistOutlineCosmetics(conversationId, cosmetics_data);
+              // Prefer ChatWonder's choices from the injected real catalog, then
+              // fall back to the local rule engine if it returns no usable IDs.
+              const isGreeting = input.includes(
+                "[SYSTEM] The user just walked up to the mirror."
+              );
+              const wantsCosmetics =
+                !isGreeting &&
+                (cosmetics_data != null ||
+                  parsed.intent === "COSMETIC" ||
+                  !!parsed.cosmetics_suggestion ||
+                  input.includes("[cosmetics]"));
+              if (wantsCosmetics) {
+                let resolved = await resolveOutlineCosmeticsByIds(
+                  conversationId,
+                  cosmetics_data
+                );
+                if (!resolved.length) {
+                  resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
+                }
+                if (resolved.length) cosmetics_data = { recommendations: resolved };
+              }
 
               const message = stripMarkdownFormatting(
                 parsed.message
@@ -612,6 +665,7 @@ export default class ChatWonderController {
         skinAnalysis,
         gender: gender || undefined,
         sitemapContext,
+        documentContext,
         history,
       });
     } catch (err) {
