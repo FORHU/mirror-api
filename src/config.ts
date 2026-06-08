@@ -55,6 +55,89 @@ export const isDev = NODE_ENV === "development";
 //         true  = call real PerfectCorp/YouCam skin-analysis API + ChatWonder suggestions
 export const SKIN_ANALYSIS_ENABLED = process.env.SKIN_ANALYSIS_ENABLED === "true";
 
+export type SkinType = "OILY" | "DRY" | "COMBINATION" | "NORMAL" | "SENSITIVE";
+
+// Shape consumed by the skin-analysis service (mirrors parsePerfectCorpEntry output).
+// Declared as a type alias (not an interface) so it carries an implicit index
+// signature and stays assignable to Prisma's JSON input types.
+export type SkinVision = {
+  skinType: SkinType;
+  skinTone: string;
+  hydrationPct: number;
+  oilinessPct: number;
+  concerns: string[];
+  routineTip: string;
+  overallScore: number;
+  skinAge: number | null;
+  rawScores: Record<string, number>;
+};
+
+// Pre-built mock skin-analysis results used when SKIN_ANALYSIS_ENABLED=false
+// (or as a fallback when the real YouCam call fails). Kept as an in-memory
+// constant — the service picks a random entry per scan, so no file I/O or
+// parsing is needed for mock data.
+export const SKIN_ANALYSIS_MOCK_DATA: SkinVision[] = [
+  {
+    skinType: "OILY",
+    skinTone: "Natural",
+    hydrationPct: 55,
+    oilinessPct: 78,
+    concerns: ["Oiliness", "Enlarged pores"],
+    routineTip:
+      "Use oil-free, mattifying products. Add a BHA toner to minimise pores and control shine.",
+    overallScore: 72,
+    skinAge: 26,
+    rawScores: { oiliness: 78, pore: 64, acne: 45, moisture: 45, redness: 30, wrinkle: 20 },
+  },
+  {
+    skinType: "DRY",
+    skinTone: "Natural",
+    hydrationPct: 38,
+    oilinessPct: 22,
+    concerns: ["Mild dehydration", "Fine lines / wrinkles"],
+    routineTip:
+      "Focus on ceramide-rich moisturisers and hydrating serums. Avoid harsh stripping cleansers.",
+    overallScore: 70,
+    skinAge: 31,
+    rawScores: { oiliness: 22, moisture: 62, wrinkle: 61, redness: 25, pore: 30 },
+  },
+  {
+    skinType: "COMBINATION",
+    skinTone: "Natural",
+    hydrationPct: 48,
+    oilinessPct: 58,
+    concerns: ["Oiliness", "Mild dehydration"],
+    routineTip:
+      "Apply a lightweight gel moisturiser on the T-zone and a richer formula on dry patches.",
+    overallScore: 75,
+    skinAge: 28,
+    rawScores: { oiliness: 58, moisture: 52, pore: 50, acne: 40 },
+  },
+  {
+    skinType: "NORMAL",
+    skinTone: "Natural",
+    hydrationPct: 62,
+    oilinessPct: 45,
+    concerns: ["General maintenance"],
+    routineTip: "Maintain your routine with a gentle cleanser, daily SPF, and a hydrating serum.",
+    overallScore: 84,
+    skinAge: 24,
+    rawScores: { oiliness: 45, moisture: 38, redness: 20, pore: 28 },
+  },
+  {
+    skinType: "SENSITIVE",
+    skinTone: "Natural",
+    hydrationPct: 50,
+    oilinessPct: 40,
+    concerns: ["Redness / sensitivity"],
+    routineTip:
+      "Choose fragrance-free, calming formulas with centella or oat extract to ease redness.",
+    overallScore: 68,
+    skinAge: 29,
+    rawScores: { redness: 74, oiliness: 40, moisture: 50, acne: 35 },
+  },
+];
+
 // PostgreSQL (raw pg client — used by chatwonder-map script)
 export const PG_HOST = process.env.PG_HOST || "localhost";
 export const PG_PORT = Number(process.env.PG_PORT || 5440);
