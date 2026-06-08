@@ -17,6 +17,7 @@ interface StreamMessage {
 interface PoolEntry {
   ws: WebSocket;
   busy: boolean;
+  pingTimer?: NodeJS.Timeout | null;
 }
 const wsPool = new Map<string, PoolEntry>();
 
@@ -29,11 +30,13 @@ function acquireWS(sessionId: string, wsEndpoint: string): WebSocket {
   }
   // Close stale connection if it exists
   if (entry) {
-    entry.ws.terminate();
+    try {
+      entry.ws.terminate();
+    } catch (_) {}
     wsPool.delete(sessionId);
   }
   const ws = new WebSocket(wsEndpoint);
-  wsPool.set(sessionId, { ws, busy: true });
+  wsPool.set(sessionId, { ws, busy: true, pingTimer: null });
   return ws;
 }
 
@@ -43,7 +46,56 @@ function releaseWS(sessionId: string) {
 }
 
 function evictWS(sessionId: string) {
+  const entry = wsPool.get(sessionId);
+  if (entry) {
+    if (entry.pingTimer) clearInterval(entry.pingTimer);
+    try {
+      entry.ws.terminate();
+    } catch (_) {}
+  }
   wsPool.delete(sessionId);
+}
+
+/**
+ * Pre-warm a WebSocket connection for a session and enable keep-alive pings.
+ * Safe to call repeatedly; noop if an open connection already exists.
+ */
+export function prewarmSession(sessionId: string): void {
+  if (!CHAT_WONDER_API_URL) return;
+  const wsUrl = CHAT_WONDER_API_URL.replace("http://", "ws://").replace("https://", "wss://");
+  const wsEndpoint = `${wsUrl}/chat-stream`;
+  const entry = wsPool.get(sessionId);
+  if (entry && entry.ws.readyState === WebSocket.OPEN) {
+    logger.info(`[CHAT-WONDER-STREAM] Session ${sessionId} already warmed`);
+    return;
+  }
+
+  const ws = acquireWS(sessionId, wsEndpoint);
+
+  ws.on("open", () => {
+    logger.info(`[CHAT-WONDER-STREAM] Prewarmed WebSocket for session ${sessionId}`);
+    // Install a keep-alive ping every 25s to reduce idle disconnects
+    const poolEntry = wsPool.get(sessionId);
+    if (poolEntry) {
+      if (poolEntry.pingTimer) clearInterval(poolEntry.pingTimer);
+      poolEntry.pingTimer = setInterval(() => {
+        try {
+          if (poolEntry.ws.readyState === WebSocket.OPEN) poolEntry.ws.ping();
+        } catch (e) {
+          logger.warn(`[CHAT-WONDER-STREAM] ping failed for ${sessionId}: ${(e as Error).message}`);
+        }
+      }, 25000);
+    }
+  });
+
+  ws.on("close", () => {
+    logger.info(`[CHAT-WONDER-STREAM] Prewarmed WebSocket closed for session ${sessionId}`);
+    evictWS(sessionId);
+  });
+  ws.on("error", (err) => {
+    logger.error(`[CHAT-WONDER-STREAM] Prewarm error for ${sessionId}: ${err.message}`);
+    evictWS(sessionId);
+  });
 }
 // ────────────────────────────────────────────────────────────────────────────
 

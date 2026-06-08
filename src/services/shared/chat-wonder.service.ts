@@ -5,6 +5,7 @@ import axios from "axios";
 import ChatRepository from "../../repositories/chat.repository";
 import OutlineRepo from "../../repositories/outline.repository";
 import UserRepository from "../../repositories/user.repository";
+import { prewarmSession } from "../../utils/chat-wonder-stream";
 
 export default class ChatWonderService {
   // NOTE: ChatWonder personas (Mirror Stylist, [STYLIST] nav rules, etc.) live
@@ -33,6 +34,12 @@ export default class ChatWonderService {
 
         if (sessionId) {
           await CacheUtil.set(cachedKey, sessionId, 24 * 60 * 60); // 24 hours
+          // Pre-warm the WebSocket connection for this session to reduce cold-start latency
+          try {
+            prewarmSession(String(sessionId));
+          } catch (e) {
+            logger.warn(`[ChatWonderService] prewarmSession failed: ${(e as Error).message}`);
+          }
         }
       }
       return sessionId;
