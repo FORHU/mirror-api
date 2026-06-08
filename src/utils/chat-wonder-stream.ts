@@ -122,6 +122,45 @@ export interface StreamChatOptions {
   history?: { role: "user" | "assistant"; content: string }[];
 }
 
+function normalizeGender(value?: string): "MALE" | "FEMALE" | "UNISEX" | null {
+  const normalized = value?.trim().toUpperCase();
+  if (normalized === "MALE" || normalized === "FEMALE" || normalized === "UNISEX") {
+    return normalized;
+  }
+  return null;
+}
+
+function isGarmentRequest(input: string): boolean {
+  return /\[(?:garment|stylist)\]|\b(?:fashion|outfit|outfits|garment|garments|clothes|clothing|wear|dress me|style me)\b/i.test(
+    input
+  );
+}
+
+function buildGenderScopedInput(input: string, gender?: string): string {
+  const normalizedGender = normalizeGender(gender);
+  if (!normalizedGender || !isGarmentRequest(input)) return input;
+
+  const allowed =
+    normalizedGender === "UNISEX"
+      ? "UNISEX garments and clearly gender-neutral styling"
+      : `${normalizedGender} or UNISEX garments`;
+  const avoid =
+    normalizedGender === "MALE"
+      ? "Avoid feminine-coded garments such as dresses, skirts, heels, and women's silhouettes unless the user explicitly asks for them."
+      : normalizedGender === "FEMALE"
+        ? "Avoid masculine-coded garments such as men's suits, men's dress shirts, and men's silhouettes unless the user explicitly asks for them."
+        : "Avoid strongly gendered styling unless the user explicitly asks for it.";
+
+  return [
+    `[SYSTEM] Fashion gender guard: the current user's stored gender is ${normalizedGender}.`,
+    `For garment and outfit recommendations, only choose ${allowed}.`,
+    avoid,
+    "If catalog items include a gender field, treat that field as a hard filter before building outfits.",
+    "[END SYSTEM]",
+    input,
+  ].join("\n");
+}
+
 export async function streamChat(options: StreamChatOptions): Promise<void> {
   const {
     userInput,
@@ -164,16 +203,30 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     const wsUrl = CHAT_WONDER_API_URL.replace("http://", "ws://").replace("https://", "wss://");
     const wsEndpoint = `${wsUrl}/chat-stream`;
 
+    logger.info(`[CHAT-WONDER-STREAM] Connecting to ${wsEndpoint}`);
+
     const ws = acquireWS(sessionId, wsEndpoint);
 
-    // Clear stale per-request listeners from a previous use of this connection
+    // Clear stale per-request listeners from a previous use of this connection.
     ws.removeAllListeners("message");
     ws.removeAllListeners("error");
     ws.removeAllListeners("close");
+    ws.removeAllListeners("open");
+
+    //   const builtPrompt = PromptBuilder.build({
+    //     input: userInput,
+    //     context: {
+    //       weather,
+    //       document_context: documentContext,
+    //     },
+    //     history: userHistorySelect,
+    //   });
 
     const payload = {
       session_id: sessionId,
-      user_input: userInput,
+      // Only assert a gender when we actually know it. When it's unset we send
+      // the input as-is so the (external) persona can ask, rather than faking one.
+      user_input: buildGenderScopedInput(userInput, gender),
       ...(userId ? { user_id: userId } : {}),
       ...(outlineId ? { outline_id: outlineId } : {}),
       weather,
@@ -186,11 +239,21 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     };
 
     const sendPayload = () => {
+      logger.info("[CHAT-WONDER-STREAM] WebSocket connected");
       logger.info(
         `[CHAT-WONDER-STREAM] Sending payload: ${JSON.stringify({ ...payload, user_input: payload.user_input.slice(0, 120) + "..." })}`
       );
       ws.send(JSON.stringify(payload));
     };
+
+    if (ws.readyState === WebSocket.OPEN) {
+      sendPayload();
+    } else if (ws.readyState === WebSocket.CONNECTING) {
+      ws.once("open", sendPayload);
+    } else {
+      wsPool.delete(sessionId);
+      return reject(new Error("ChatWonder WebSocket is not open"));
+    }
 
     ws.on("message", (data: WebSocket.Data) => {
       const raw = data.toString();
@@ -216,6 +279,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
               `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
             );
           });
+          ws.close();
           reject(error);
           return;
         }
@@ -247,7 +311,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
         case "end":
           logger.info("[CHAT-WONDER-STREAM] Stream complete");
-          safeComplete(); // releases busy flag — keeps WS alive for next request
+          safeComplete();
           resolve();
           break;
 
@@ -259,6 +323,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
               `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
             );
           });
+          ws.close();
           reject(new Error(msg.message));
           break;
 
@@ -286,19 +351,9 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     ws.on("close", () => {
       logger.info("[CHAT-WONDER-STREAM] WebSocket closed");
       evictWS(sessionId);
-      // Fallback: server closed without sending end — complete and resolve
+      // Fallback: If the server closes the connection abruptly without sending __END__
       safeComplete();
       resolve();
     });
-
-    // Send immediately if reusing an open connection, otherwise wait for handshake
-    if (ws.readyState === WebSocket.OPEN) {
-      sendPayload();
-    } else {
-      ws.on("open", () => {
-        logger.info(`[CHAT-WONDER-STREAM] WebSocket connected for session ${sessionId}`);
-        sendPayload();
-      });
-    }
   });
 }

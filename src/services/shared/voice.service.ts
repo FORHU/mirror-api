@@ -274,6 +274,10 @@ function stripLinksForSpeech(text: string): string {
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // ![alt](url) markdown image -> remove
     .replace(/\[([^\]]+)\]\(\s*(?:https?:\/\/|www\.|\/)[^)]*\)/g, "$1") // [label](url) -> label
     .replace(/\b(?:https?:\/\/|www\.)\S+/gi, "") // bare URLs -> remove
+    .replace(/\(\s*[.-]\s*\)/g, "") // "(.)" / "(-)" artifacts should not be spoken
+    .replace(/^\s*[.-]\s+/gm, "") // markdown-ish bullet markers -> spoken sentence
+    .replace(/\s+[–—-]\s+/g, ", ") // separator dashes -> natural pause, not "dash"
+    .replace(/(?:^|\n)\s*\.\s+/g, "\n") // stray leading dots from model lists
     .replace(/\s+([.,!?;:])/g, "$1") // drop space left before punctuation
     .replace(/\s{2,}/g, " ") // collapse leftover whitespace
     .trim();
