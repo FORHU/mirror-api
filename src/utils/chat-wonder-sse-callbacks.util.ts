@@ -95,7 +95,16 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       sentenceBuffer += newText;
 
       let match;
-      while ((match = sentenceBuffer.match(/^([\s\S]*?[.!?]+(?:\s+|$))([\s\S]*)$/))) {
+      while (true) {
+        match = sentenceBuffer.match(/^([\s\S]*?[.!?]+(?:\s+|$))([\s\S]*)$/);
+        if (!match) {
+          const softMatch = sentenceBuffer.match(/^([\s\S]*?:)(\s+)([A-Z#\-\*][\s\S]*)$/);
+          if (!softMatch) break;
+          processSentence(`${softMatch[1]}${softMatch[2]}`);
+          sentenceBuffer = softMatch[3];
+          continue;
+        }
+
         processSentence(match[1]);
         sentenceBuffer = match[2];
       }
