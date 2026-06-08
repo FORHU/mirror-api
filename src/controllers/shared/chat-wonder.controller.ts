@@ -10,11 +10,8 @@ import { chatWonderBaseSchema, clearStaleSession } from "../../helpers/chat-wond
 import { weatherService, type WeatherData } from "../../services/shared/weather.service";
 
 function isCosmeticsLikely(input: string): boolean {
-  return (
-    input.includes("[cosmetics]") ||
-    /\b(cosmetic|makeup|make-up|skincare|skin care|foundation|moisturi|lipstick|sunscreen|serum|cleanser|toner|blush|concealer|spf|skin)\b/i.test(
-      input
-    )
+  return /(cosmetic|makeup|make-up|skincare|skin care|foundation|moisturi|lipstick|sunscreen|serum|cleanser|toner|blush|concealer|spf|skin)\b/i.test(
+    input
   );
 }
 
@@ -98,6 +95,8 @@ export default class ChatWonderController {
     let input = value.input || value.user_input || "";
     if (!input.startsWith("[")) {
       input = `[stylist] ${input}`;
+    } else if (/^\[(?:cosmetics|maps?|garment)\]/i.test(input)) {
+      input = input.replace(/^\[[^\]]+\]/, "[stylist]");
     }
 
     const inputConversationId = value.conversationId;
@@ -126,7 +125,7 @@ export default class ChatWonderController {
         : null;
 
     // Helper to build a weather object from the weatherService response
-    const buildWeatherObj = (d: WeatherData) => ({
+    const buildWeatherObj = (d: WeatherData, loc: { lat: number; lng: number }) => ({
       date: new Date().toISOString().split("T")[0],
       description: String(d.condition ?? "").toLowerCase(),
       estimated: false,
@@ -137,8 +136,8 @@ export default class ChatWonderController {
         String(d.condition ?? "")
           .toLowerCase()
           .includes("rain"),
-      lat: location.lat,
-      lon: location.lng,
+      lat: loc.lat,
+      lon: loc.lng,
       temperature_c: Number(d.temperature),
     });
 
@@ -153,7 +152,7 @@ export default class ChatWonderController {
         needsWeather
           ? weatherService
               .getWeather(location.lat, location.lng)
-              .then(buildWeatherObj)
+              .then((d) => buildWeatherObj(d, location))
               .catch(() => undefined as Record<string, unknown> | undefined)
           : Promise.resolve(undefined as Record<string, unknown> | undefined),
       ]);

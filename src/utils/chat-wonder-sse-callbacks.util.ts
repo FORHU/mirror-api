@@ -168,10 +168,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       const isGreeting = input.includes(MIRROR_GREETING);
       const wantsCosmetics =
         !isGreeting &&
-        (cosmetics_data != null ||
-          parsed.intent === "COSMETIC" ||
-          !!parsed.cosmetics_suggestion ||
-          input.includes("[cosmetics]"));
+        (cosmetics_data != null || parsed.intent === "COSMETIC" || !!parsed.cosmetics_suggestion);
       if (wantsCosmetics) {
         let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics_data);
         if (!resolved.length) {
