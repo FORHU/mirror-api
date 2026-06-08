@@ -568,8 +568,12 @@ export default class ChatWonderController {
               sentenceBuffer += newText;
 
               let match;
-              // Extract completed sentences
-              while ((match = sentenceBuffer.match(/^([\s\S]*?[.!?]+[\s\n]+)([\s\S]*)$/))) {
+              // Extract completed sentences and start TTS immediately for each stable chunk.
+              // We allow punctuation at the end-of-buffer so sentences still flush when the
+              // model emits a period, question mark, or exclamation and there is no next token yet.
+              while (
+                (match = sentenceBuffer.match(/^([\s\S]*?[.!?]+(?:\s+|$))([\s\S]*)$/))
+              ) {
                 processSentence(match[1]);
                 sentenceBuffer = match[2];
               }
