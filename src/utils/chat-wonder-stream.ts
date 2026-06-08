@@ -23,13 +23,12 @@ const wsPool = new Map<string, PoolEntry>();
 
 function acquireWS(sessionId: string, wsEndpoint: string): WebSocket {
   const entry = wsPool.get(sessionId);
-  if (entry && entry.ws.readyState === WebSocket.OPEN && !entry.busy) {
-    entry.busy = true;
-    logger.info(`[CHAT-WONDER-STREAM] Reusing connection for session ${sessionId}`);
-    return entry.ws;
-  }
-  // Close stale connection if it exists
-  if (entry) {
+  if (entry && !entry.busy) {
+    if (entry.ws.readyState === WebSocket.OPEN || entry.ws.readyState === WebSocket.CONNECTING) {
+      entry.busy = true;
+      logger.info(`[CHAT-WONDER-STREAM] Reusing connection for session ${sessionId}`);
+      return entry.ws;
+    }
     try {
       entry.ws.terminate();
     } catch (_) {}
@@ -74,9 +73,9 @@ export function prewarmSession(sessionId: string): void {
 
   ws.on("open", () => {
     logger.info(`[CHAT-WONDER-STREAM] Prewarmed WebSocket for session ${sessionId}`);
-    // Install a keep-alive ping every 25s to reduce idle disconnects
     const poolEntry = wsPool.get(sessionId);
     if (poolEntry) {
+      poolEntry.busy = false;
       if (poolEntry.pingTimer) clearInterval(poolEntry.pingTimer);
       poolEntry.pingTimer = setInterval(() => {
         try {
@@ -122,6 +121,54 @@ export interface StreamChatOptions {
   history?: { role: "user" | "assistant"; content: string }[];
 }
 
+const DEFAULT_WS_CONNECT_TIMEOUT_MS = 10000;
+
+function waitForWebSocketOpen(ws: WebSocket, sessionId: string, timeoutMs = DEFAULT_WS_CONNECT_TIMEOUT_MS): Promise<void> {
+  if (ws.readyState === WebSocket.OPEN) return Promise.resolve();
+  if (ws.readyState === WebSocket.CLOSING || ws.readyState === WebSocket.CLOSED) {
+    return Promise.reject(new Error("ChatWonder WebSocket is not open"));
+  }
+
+  return new Promise((resolve, reject) => {
+    let timeout: NodeJS.Timeout | null = setTimeout(() => {
+      cleanup();
+      evictWS(sessionId);
+      reject(new Error("ChatWonder WebSocket connection timed out"));
+    }, timeoutMs);
+
+    const cleanup = () => {
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+      ws.removeListener("open", handleOpen);
+      ws.removeListener("error", handleError);
+      ws.removeListener("close", handleClose);
+    };
+
+    const handleOpen = () => {
+      cleanup();
+      resolve();
+    };
+
+    const handleError = (err: Error) => {
+      cleanup();
+      evictWS(sessionId);
+      reject(err);
+    };
+
+    const handleClose = () => {
+      cleanup();
+      evictWS(sessionId);
+      reject(new Error("ChatWonder WebSocket closed before it was established"));
+    };
+
+    ws.once("open", handleOpen);
+    ws.once("error", handleError);
+    ws.once("close", handleClose);
+  });
+}
+
 export async function streamChat(options: StreamChatOptions): Promise<void> {
   const {
     userInput,
@@ -139,15 +186,16 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
   } = options;
 
   return new Promise((resolve, reject) => {
-    if (!CHAT_WONDER_API_URL) {
-      const error = new Error("CHAT_WONDER_API_URL is not defined in config");
-      Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
-        logger.warn(
-          `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
-        );
-      });
-      return reject(error);
-    }
+    ;(async () => {
+      if (!CHAT_WONDER_API_URL) {
+        const error = new Error("CHAT_WONDER_API_URL is not defined in config");
+        Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
+          logger.warn(
+            `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
+          );
+        });
+        return reject(error);
+      }
 
     let completed = false;
     const safeComplete = () => {
@@ -166,22 +214,38 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
 
     logger.info(`[CHAT-WONDER-STREAM] Connecting to ${wsEndpoint}`);
 
-    const ws = acquireWS(sessionId, wsEndpoint);
+    let ws = acquireWS(sessionId, wsEndpoint);
 
     // Clear stale per-request listeners from a previous use of this connection.
     ws.removeAllListeners("message");
     ws.removeAllListeners("error");
     ws.removeAllListeners("close");
-    ws.removeAllListeners("open");
 
-    //   const builtPrompt = PromptBuilder.build({
-    //     input: userInput,
-    //     context: {
-    //       weather,
-    //       document_context: documentContext,
-    //     },
-    //     history: userHistorySelect,
-    //   });
+
+    let hasConnected = false;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await waitForWebSocketOpen(ws, sessionId);
+        hasConnected = true;
+        break;
+      } catch (connectError) {
+        logger.warn(
+          `[CHAT-WONDER-STREAM] WebSocket connect attempt ${attempt + 1} failed for session ${sessionId}: ${(connectError as Error).message}`
+        );
+        if (attempt === 0) {
+          ws = acquireWS(sessionId, wsEndpoint);
+          ws.removeAllListeners("message");
+          ws.removeAllListeners("error");
+          ws.removeAllListeners("close");
+          continue;
+        }
+        return reject(connectError);
+      }
+    }
+
+    if (!hasConnected) {
+      return reject(new Error("ChatWonder WebSocket failed to connect"));
+    }
 
     const payload = {
       session_id: sessionId,
@@ -207,14 +271,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
       ws.send(JSON.stringify(payload));
     };
 
-    if (ws.readyState === WebSocket.OPEN) {
-      sendPayload();
-    } else if (ws.readyState === WebSocket.CONNECTING) {
-      ws.once("open", sendPayload);
-    } else {
-      wsPool.delete(sessionId);
-      return reject(new Error("ChatWonder WebSocket is not open"));
-    }
+    sendPayload();
 
     ws.on("message", (data: WebSocket.Data) => {
       const raw = data.toString();
@@ -301,6 +358,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     ws.on("error", (error: Error) => {
       logger.error(`[CHAT-WONDER-STREAM] WebSocket error: ${error.message}`);
       evictWS(sessionId);
+      completed = true;
       Promise.resolve(callbacks.onError(error)).catch((callbackError) => {
         logger.warn(
           `[CHAT-WONDER-STREAM] onError callback failed: ${(callbackError as Error).message}`
@@ -316,5 +374,6 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
       safeComplete();
       resolve();
     });
+  })().catch(reject);
   });
 }
