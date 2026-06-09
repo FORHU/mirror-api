@@ -38,7 +38,9 @@ export default class OutfitRepo {
         OR: [
           { name: { contains: outfitTerm, mode: "insensitive" } },
           { description: { contains: outfitTerm, mode: "insensitive" } },
-          { metaData: { string_contains: outfitTerm, mode: "insensitive" } },
+          // Postgres JSON fields do not support `lower(jsonb)` / case-insensitive
+          // string searches across the entire object. Skip metaData search here to
+          // avoid the Prisma/Postgres connector error.
         ],
       });
     }
