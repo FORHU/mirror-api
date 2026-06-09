@@ -202,16 +202,20 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       });
       res.end();
 
-      Promise.all([
-        ctx.userMessagePromise,
-        ChatWonderService.saveAIMessage(userId, conversationId, parsed.message),
-        checkAndFinalizeOutline(input, conversationId, kioskId),
-        persistOutlineOutfits(conversationId, garment_data),
-        persistOutlineMaps(conversationId, maps_data),
-      ]).catch((err) =>
-        logger.error(
-          `[ChatWonderController.chat] background persist failed: ${(err as Error).message}`
-        )
+      ctx.userMessagePromise.catch((err) =>
+        logger.error(`[onComplete] saveUserMessage failed: ${(err as Error).message}`)
+      );
+      ChatWonderService.saveAIMessage(userId, conversationId, parsed.message).catch((err) =>
+        logger.error(`[onComplete] saveAIMessage failed: ${(err as Error).message}`)
+      );
+      checkAndFinalizeOutline(input, conversationId, kioskId).catch((err) =>
+        logger.error(`[onComplete] checkAndFinalizeOutline failed: ${(err as Error).message}`)
+      );
+      persistOutlineOutfits(conversationId, garment_data).catch((err) =>
+        logger.error(`[onComplete] persistOutlineOutfits failed: ${(err as Error).message}`)
+      );
+      persistOutlineMaps(conversationId, maps_data).catch((err) =>
+        logger.error(`[onComplete] persistOutlineMaps failed: ${(err as Error).message}`)
       );
     } catch (err) {
       logger.error(`[ChatWonderController.chat] onComplete error: ${(err as Error).message}`);
