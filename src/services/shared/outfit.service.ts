@@ -31,7 +31,7 @@ export default class OutfitService {
     userId?: string | null,
     query: Record<string, string | undefined> = {}
   ) {
-    const { searchOutfit, searchOutfitItems, systemOnly } = query;
+    const { searchOutfit, systemOnly } = query;
     const { page, limit, search: globalSearch } = parsePagination(query);
     const effectiveUserId = systemOnly === "true" ? null : userId;
     const result = await OutfitRepo.findByUserId(
@@ -39,8 +39,7 @@ export default class OutfitService {
       page,
       limit,
       { includeSystem: systemOnly !== "true" }, // include system outfits unless viewing system-only
-      globalSearch || searchOutfit,
-      searchOutfitItems
+      globalSearch || searchOutfit
     );
     const { sortBy, sortOrder, search, filters } = parsePagination(query);
     return { ...result, sortBy, sortOrder, search, filters };

@@ -7,8 +7,7 @@ export default class OutfitRepo {
     page: number = 1,
     limit: number = 20,
     filters: { fileProvider?: string; fileProviderNot?: string; includeSystem?: boolean } = {},
-    searchOutfit?: string,
-    searchOutfitItems?: string
+    searchOutfit?: string
   ) {
     const skip = (page - 1) * limit;
 
@@ -39,23 +38,8 @@ export default class OutfitRepo {
         OR: [
           { name: { contains: outfitTerm, mode: "insensitive" } },
           { description: { contains: outfitTerm, mode: "insensitive" } },
+          { metaData: { string_contains: outfitTerm, mode: "insensitive" } },
         ],
-      });
-    }
-
-    const itemsTerm = searchOutfitItems?.trim();
-    if (itemsTerm) {
-      andClauses.push({
-        items: {
-          some: {
-            garment: {
-              OR: [
-                { name: { contains: itemsTerm, mode: "insensitive" } },
-                { description: { contains: itemsTerm, mode: "insensitive" } },
-              ],
-            },
-          },
-        },
       });
     }
 
