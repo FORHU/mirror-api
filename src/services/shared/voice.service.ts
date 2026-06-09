@@ -6,6 +6,7 @@ import {
   Engine,
   VoiceId,
   OutputFormat,
+  type LanguageCode,
 } from "@aws-sdk/client-polly";
 
 const GENERATIVE_VOICES = new Set<string>([
@@ -330,46 +331,46 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
 
   // Voice config per language — default to Ruth (generative) for en-US
   const langMap: Record<string, { voiceId: VoiceId; langCode: string }> = {
-    "en-GB":  { voiceId: VoiceId.Amy,       langCode: "en-GB"  },
-    "en-AU":  { voiceId: VoiceId.Olivia,    langCode: "en-AU"  },
-    "en-IN":  { voiceId: VoiceId.Kajal,     langCode: "en-IN"  },
-    "en-SG":  { voiceId: VoiceId.Jasmine,   langCode: "en-SG"  },
-    "en-NZ":  { voiceId: VoiceId.Aria,      langCode: "en-NZ"  },
-    "en-ZA":  { voiceId: VoiceId.Ayanda,    langCode: "en-ZA"  },
-    "en-IE":  { voiceId: VoiceId.Niamh,     langCode: "en-IE"  },
-    "fr-FR":  { voiceId: VoiceId.Lea,       langCode: "fr-FR"  },
-    "fr-CA":  { voiceId: VoiceId.Gabrielle, langCode: "fr-CA"  },
-    "fr-BE":  { voiceId: VoiceId.Isabelle,  langCode: "fr-BE"  },
-    "de-DE":  { voiceId: VoiceId.Daniel,    langCode: "de-DE"  },
-    "de-AT":  { voiceId: VoiceId.Hannah,    langCode: "de-AT"  },
-    "de-CH":  { voiceId: VoiceId.Sabrina,   langCode: "de-CH"  },
-    "es-ES":  { voiceId: VoiceId.Lucia,     langCode: "es-ES"  },
-    "es-MX":  { voiceId: VoiceId.Mia,       langCode: "es-MX"  },
-    "es-US":  { voiceId: VoiceId.Lupe,      langCode: "es-US"  },
-    "it-IT":  { voiceId: VoiceId.Bianca,    langCode: "it-IT"  },
-    "pt-BR":  { voiceId: VoiceId.Camila,    langCode: "pt-BR"  },
-    "pt-PT":  { voiceId: VoiceId.Ines,      langCode: "pt-PT"  },
-    "nl-NL":  { voiceId: VoiceId.Laura,     langCode: "nl-NL"  },
-    "nl-BE":  { voiceId: VoiceId.Lisa,      langCode: "nl-BE"  },
-    "pl-PL":  { voiceId: VoiceId.Ola,       langCode: "pl-PL"  },
-    "ru-RU":  { voiceId: VoiceId.Tatyana,   langCode: "ru-RU"  },
-    "sv-SE":  { voiceId: VoiceId.Elin,      langCode: "sv-SE"  },
-    "da-DK":  { voiceId: VoiceId.Sofie,     langCode: "da-DK"  },
-    "nb-NO":  { voiceId: VoiceId.Ida,       langCode: "nb-NO"  },
-    "fi-FI":  { voiceId: VoiceId.Suvi,      langCode: "fi-FI"  },
-    "cs-CZ":  { voiceId: VoiceId.Jitka,     langCode: "cs-CZ"  },
-    "ro-RO":  { voiceId: VoiceId.Carmen,    langCode: "ro-RO"  },
-    "tr-TR":  { voiceId: VoiceId.Burcu,     langCode: "tr-TR"  },
-    "ca-ES":  { voiceId: VoiceId.Arlet,     langCode: "ca-ES"  },
-    "cy-GB":  { voiceId: VoiceId.Gwyneth,   langCode: "cy-GB"  },
-    "is-IS":  { voiceId: VoiceId.Dora,      langCode: "is-IS"  },
-    "ja-JP":  { voiceId: VoiceId.Kazuha,    langCode: "ja-JP"  },
-    "ko-KR":  { voiceId: VoiceId.Seoyeon,   langCode: "ko-KR"  },
-    "cmn-CN": { voiceId: VoiceId.Zhiyu,     langCode: "cmn-CN" },
-    "yue-CN": { voiceId: VoiceId.Hiujin,    langCode: "yue-CN" },
-    "hi-IN":  { voiceId: VoiceId.Kajal,     langCode: "hi-IN"  },
-    "arb":    { voiceId: VoiceId.Zeina,     langCode: "arb"    },
-    "ar-AE":  { voiceId: VoiceId.Hala,      langCode: "ar-AE"  },
+    "en-GB": { voiceId: VoiceId.Amy, langCode: "en-GB" },
+    "en-AU": { voiceId: VoiceId.Olivia, langCode: "en-AU" },
+    "en-IN": { voiceId: VoiceId.Kajal, langCode: "en-IN" },
+    "en-SG": { voiceId: VoiceId.Jasmine, langCode: "en-SG" },
+    "en-NZ": { voiceId: VoiceId.Aria, langCode: "en-NZ" },
+    "en-ZA": { voiceId: VoiceId.Ayanda, langCode: "en-ZA" },
+    "en-IE": { voiceId: VoiceId.Niamh, langCode: "en-IE" },
+    "fr-FR": { voiceId: VoiceId.Lea, langCode: "fr-FR" },
+    "fr-CA": { voiceId: VoiceId.Gabrielle, langCode: "fr-CA" },
+    "fr-BE": { voiceId: VoiceId.Isabelle, langCode: "fr-BE" },
+    "de-DE": { voiceId: VoiceId.Daniel, langCode: "de-DE" },
+    "de-AT": { voiceId: VoiceId.Hannah, langCode: "de-AT" },
+    "de-CH": { voiceId: VoiceId.Sabrina, langCode: "de-CH" },
+    "es-ES": { voiceId: VoiceId.Lucia, langCode: "es-ES" },
+    "es-MX": { voiceId: VoiceId.Mia, langCode: "es-MX" },
+    "es-US": { voiceId: VoiceId.Lupe, langCode: "es-US" },
+    "it-IT": { voiceId: VoiceId.Bianca, langCode: "it-IT" },
+    "pt-BR": { voiceId: VoiceId.Camila, langCode: "pt-BR" },
+    "pt-PT": { voiceId: VoiceId.Ines, langCode: "pt-PT" },
+    "nl-NL": { voiceId: VoiceId.Laura, langCode: "nl-NL" },
+    "nl-BE": { voiceId: VoiceId.Lisa, langCode: "nl-BE" },
+    "pl-PL": { voiceId: VoiceId.Ola, langCode: "pl-PL" },
+    "ru-RU": { voiceId: VoiceId.Tatyana, langCode: "ru-RU" },
+    "sv-SE": { voiceId: VoiceId.Elin, langCode: "sv-SE" },
+    "da-DK": { voiceId: VoiceId.Sofie, langCode: "da-DK" },
+    "nb-NO": { voiceId: VoiceId.Ida, langCode: "nb-NO" },
+    "fi-FI": { voiceId: VoiceId.Suvi, langCode: "fi-FI" },
+    "cs-CZ": { voiceId: VoiceId.Jitka, langCode: "cs-CZ" },
+    "ro-RO": { voiceId: VoiceId.Carmen, langCode: "ro-RO" },
+    "tr-TR": { voiceId: VoiceId.Burcu, langCode: "tr-TR" },
+    "ca-ES": { voiceId: VoiceId.Arlet, langCode: "ca-ES" },
+    "cy-GB": { voiceId: VoiceId.Gwyneth, langCode: "cy-GB" },
+    "is-IS": { voiceId: VoiceId.Dora, langCode: "is-IS" },
+    "ja-JP": { voiceId: VoiceId.Kazuha, langCode: "ja-JP" },
+    "ko-KR": { voiceId: VoiceId.Seoyeon, langCode: "ko-KR" },
+    "cmn-CN": { voiceId: VoiceId.Zhiyu, langCode: "cmn-CN" },
+    "yue-CN": { voiceId: VoiceId.Hiujin, langCode: "yue-CN" },
+    "hi-IN": { voiceId: VoiceId.Kajal, langCode: "hi-IN" },
+    arb: { voiceId: VoiceId.Zeina, langCode: "arb" },
+    "ar-AE": { voiceId: VoiceId.Hala, langCode: "ar-AE" },
   };
   const { voiceId, langCode } = langMap[language] ?? { voiceId: VoiceId.Ruth, langCode: "en-US" };
   const engine = GENERATIVE_VOICES.has(voiceId) ? Engine.GENERATIVE : Engine.NEURAL;
@@ -393,10 +394,9 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
   // Simple in-memory LRU cache for TTS chunks (small, per-process)
   const TTS_CACHE_SIZE = 200;
   // store on module-level to persist across calls
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore: we attach cache to function to avoid top-level mutable export
-  if (!(synthesize as any)._cache) (synthesize as any)._cache = new Map<string, Buffer>();
-  const ttsCache: Map<string, Buffer> = (synthesize as any)._cache;
+  const synthesizeFn = synthesize as { _cache?: Map<string, Buffer> };
+  if (!synthesizeFn._cache) synthesizeFn._cache = new Map<string, Buffer>();
+  const ttsCache: Map<string, Buffer> = synthesizeFn._cache;
 
   // Polly concurrency control (bounded parallelism)
   const POLLY_CONCURRENCY = 3;
@@ -412,8 +412,8 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
           .update(effectiveText + "|" + voiceId + "|" + langCode + "|" + (emotion || ""))
           .digest("hex");
 
-        if (ttsCache.has(cacheKey)) {
-          const cached = ttsCache.get(cacheKey)!;
+        const cached = ttsCache.get(cacheKey);
+        if (cached) {
           // refresh LRU
           ttsCache.delete(cacheKey);
           ttsCache.set(cacheKey, cached);
@@ -423,8 +423,7 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
 
         const cmd = new SynthesizeSpeechCommand({
           Engine: engine,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          LanguageCode: langCode as any,
+          LanguageCode: langCode as LanguageCode,
           VoiceId: voiceId,
           OutputFormat: OutputFormat.MP3,
           Text: effectiveText,
@@ -434,7 +433,9 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
         const chunkStart = Date.now();
         const res = await pollyClient.send(cmd);
         const dur = Date.now() - chunkStart;
-        logger.info(`[VoiceService] Polly chunk synthesized in ${dur}ms (chars=${chunkText.length})`);
+        logger.info(
+          `[VoiceService] Polly chunk synthesized in ${dur}ms (chars=${chunkText.length})`
+        );
         if (!res.AudioStream) throw new Error("No audio stream returned");
         const audioArray = await res.AudioStream.transformToByteArray();
         const buff = Buffer.from(audioArray);

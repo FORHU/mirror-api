@@ -7,12 +7,9 @@ import {
   type ProductForScoring,
   type WeatherContext,
 } from "../../utils/cosmetics.util";
-import { streamChat } from "../../utils/chat-wonder-stream";
-import ChatWonderService from "./chat-wonder.service";
 import axios from "axios";
 import {
   SKIN_ANALYSIS_ENABLED,
-  CHAT_WONDER_API_URL,
   YOUCAM_API_KEY,
   YOUCAM_API_URL,
   SKIN_ANALYSIS_MOCK_DATA,
@@ -162,20 +159,6 @@ async function callYouCamApi(
 }
 
 // ─── ChatWonder skin-analysis prompt ────────────────────────────────────────
-
-function buildSkinPrompt(vision: ReturnType<typeof parsePerfectCorpEntry>): string {
-  return (
-    `A user's skin analysis shows the following results:\n` +
-    `- Skin Type: ${vision.skinType}\n` +
-    `- Oiliness: ${vision.oilinessPct}%\n` +
-    `- Hydration: ${vision.hydrationPct}%\n` +
-    `- Skin Concerns: ${vision.concerns.join(", ")}\n` +
-    `- Routine Tip: ${vision.routineTip}\n\n` +
-    `Based on this skin profile, recommend the most suitable products for this user. ` +
-    `You MUST reference specific product names from the "Available cosmetic products" list provided in document_context. ` +
-    `Mention 2-3 product names by name and explain briefly why each suits their skin profile.`
-  );
-}
 
 export async function buildSkinCatalogContext(): Promise<string> {
   try {

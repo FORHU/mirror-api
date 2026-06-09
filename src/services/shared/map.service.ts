@@ -316,11 +316,17 @@ export const mapService = {
       // When context filter finds nothing, sort raw by distance to user's location
       // so the nearest result wins (prevents popular far-away POIs like BGC from
       // beating a correct nearby match when the query contains "here in [city]").
+      const proximityLocation =
+        proximityLng != null && proximityLat != null
+          ? { lat: proximityLat, lng: proximityLng }
+          : null;
       const proximityFallback =
-        filtered.length === 0 && proximityLng != null && proximityLat != null
+        filtered.length === 0 && proximityLocation
           ? [...raw].sort((a, b) => {
-              const dA = (a.lat - proximityLat!) ** 2 + (a.lng - proximityLng!) ** 2;
-              const dB = (b.lat - proximityLat!) ** 2 + (b.lng - proximityLng!) ** 2;
+              const dA =
+                (a.lat - proximityLocation.lat) ** 2 + (a.lng - proximityLocation.lng) ** 2;
+              const dB =
+                (b.lat - proximityLocation.lat) ** 2 + (b.lng - proximityLocation.lng) ** 2;
               return dA - dB;
             })
           : null;

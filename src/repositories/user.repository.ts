@@ -84,6 +84,11 @@ export default class UserRepository {
   }
 
   static async upsert(id: string, data: Prisma.UserUpdateInput) {
+    const gender =
+      typeof data.gender === "string"
+        ? (data.gender as Prisma.UserCreateInput["gender"])
+        : undefined;
+
     return prisma.user.upsert({
       where: { id },
       update: data,
@@ -91,7 +96,7 @@ export default class UserRepository {
         id,
         email: data.email as string,
         username: data.username as string,
-        gender: data.gender as any,
+        ...(gender !== undefined ? { gender } : {}),
       },
     });
   }

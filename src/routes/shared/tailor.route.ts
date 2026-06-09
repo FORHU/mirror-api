@@ -6,7 +6,10 @@ import { authenticate } from "../../middleware/auth.middleware";
 import { CHAT_WONDER_API_URL } from "../../config";
 
 const router = Router();
-const memUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const memUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
 
 router.use(authenticate);
 
@@ -30,14 +33,10 @@ router.post(
       });
       form.append("gender", gender.toUpperCase());
 
-      const response = await axios.post(
-        `${CHAT_WONDER_API_URL}/api/tailor/generate`,
-        form,
-        {
-          headers: form.getHeaders(),
-          timeout: 120_000,
-        }
-      );
+      const response = await axios.post(`${CHAT_WONDER_API_URL}/api/tailor/generate`, form, {
+        headers: form.getHeaders(),
+        timeout: 120_000,
+      });
 
       return res.status(200).json(response.data);
     } catch (err) {

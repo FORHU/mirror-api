@@ -72,10 +72,7 @@ export async function resolveItineraryLocations(
  * MAPS_DATA shape: an array of stop objects, e.g.
  *   [{ destination, origin, suggestion, lat, lng, address, placeId }, ...]
  */
-export async function persistOutlineMaps(
-  conversationId: string,
-  mapsData: unknown
-): Promise<void> {
+export async function persistOutlineMaps(conversationId: string, mapsData: unknown): Promise<void> {
   try {
     if (!mapsData) return;
 
@@ -127,7 +124,9 @@ export async function persistOutlineMaps(
             placeId = results[0].id ?? placeId;
           }
         } catch (geoErr) {
-          logger.warn(`[persistOutlineMaps] Geocoding failed for "${destination}": ${(geoErr as Error).message}`);
+          logger.warn(
+            `[persistOutlineMaps] Geocoding failed for "${destination}": ${(geoErr as Error).message}`
+          );
         }
       }
 
@@ -144,7 +143,9 @@ export async function persistOutlineMaps(
       });
     }
 
-    logger.info(`[persistOutlineMaps] Persisted ${stops.length} map stops to outline ${outline.id}`);
+    logger.info(
+      `[persistOutlineMaps] Persisted ${stops.length} map stops to outline ${outline.id}`
+    );
   } catch (error) {
     logger.error(`[persistOutlineMaps] ${(error as Error).message}`);
   }

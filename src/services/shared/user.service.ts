@@ -36,6 +36,6 @@ export default class UserService {
    * Upsert user
    */
   static async upsertUser(id: string, data: Prisma.UserUpdateInput) {
-    return UserRepository.upsert(id, data as any);
+    return UserRepository.upsert(id, data);
   }
 }
