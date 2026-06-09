@@ -24,7 +24,69 @@ const CATEGORY_TO_TYPES: Record<string, string[]> = {
   mall: ["shopping_mall"],
   medical: ["hospital", "pharmacy"],
   transit: ["transit_station", "bus_station", "subway_station"],
+  // common synonyms
+  "coffee shop": ["cafe"],
+  diner: ["restaurant"],
+  dining: ["restaurant"],
+  food: ["restaurant", "cafe"],
+  hospital: ["hospital"],
+  pharmacy: ["pharmacy"],
+  hotel: ["lodging"],
+  lodging: ["lodging"],
+  accommodation: ["lodging"],
+  church: ["church"],
+  school: ["school"],
+  university: ["university"],
+  gym: ["gym"],
+  supermarket: ["supermarket"],
+  grocery: ["grocery_store"],
+  gas: ["gas_station"],
+  "gas station": ["gas_station"],
+  atm: ["atm"],
+  bank: ["bank"],
+  clinic: ["doctor", "hospital"],
+  dentist: ["dentist"],
+  spa: ["spa"],
 };
+
+// Parses a natural-language category string (including plurals and "X and Y" compounds)
+// into a flat list of valid Google Places includedTypes.
+function parseCategory(raw: string): string[] {
+  const lower = raw.toLowerCase().trim();
+
+  // Exact match first
+  if (CATEGORY_TO_TYPES[lower]) return CATEGORY_TO_TYPES[lower];
+
+  // Split compound queries: "restaurants and cafes", "coffee shops, bars"
+  const terms = lower.split(/\s+and\s+|\s*,\s*/);
+  const types: string[] = [];
+
+  for (const term of terms) {
+    const t = term.trim();
+    if (!t) continue;
+
+    if (CATEGORY_TO_TYPES[t]) {
+      types.push(...CATEGORY_TO_TYPES[t]);
+      continue;
+    }
+
+    // Singularize: "restaurants" → "restaurant", "cafes" → "cafe", "pharmacies" → "pharmacy"
+    const singular = t
+      .replace(/ies$/, "y")      // pharmacies → pharmacy
+      .replace(/(?:shes|ches|ses|xes|zes)$/, (m) => m.slice(0, -2))  // churches → church
+      .replace(/s$/, "");         // restaurants → restaurant
+
+    if (CATEGORY_TO_TYPES[singular]) {
+      types.push(...CATEGORY_TO_TYPES[singular]);
+      continue;
+    }
+
+    // Last resort: use the term as-is (may be a valid Google type)
+    types.push(t);
+  }
+
+  return types.length ? [...new Set(types)] : [raw];
+}
 
 const GOOGLE_TYPE_TO_CATEGORY: Record<string, string> = {
   restaurant: "restaurant",
@@ -107,7 +169,7 @@ export const googlePlacesService = {
       throw new Error("GOOGLE_PLACES_KEY_MISSING");
     }
 
-    const includedTypes = category ? (CATEGORY_TO_TYPES[category] ?? [category]) : EXPLORE_TYPES;
+    const includedTypes = category ? parseCategory(category) : EXPLORE_TYPES;
 
     const response = await axios.post(
       `${BASE_URL}/places:searchNearby`,
