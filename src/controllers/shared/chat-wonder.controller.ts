@@ -105,7 +105,7 @@ export default class ChatWonderController {
     const wantsVoice = value.voice === true;
     const ttsLang = value.lang || "en-US";
     const sitemapContext = value.sitemap_context;
-    const history = (value.history ?? []).slice(-10);
+    const history = (value.history ?? []).slice(-6);
 
     const isGarment = pageMode === "garment";
     const isOverview = pageMode === "overview";
