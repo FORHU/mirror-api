@@ -3,6 +3,6 @@ import ExternalOutfitController from "../../controllers/external/outfit.controll
 
 const router = express.Router();
 
-router.get("/", ExternalOutfitController.metaFields); // distinct metaData keys + deduped values for search facets
+router.get("/", ExternalOutfitController.index);
 
 export default router;
