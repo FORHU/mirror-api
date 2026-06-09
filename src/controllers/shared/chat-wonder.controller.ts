@@ -10,7 +10,7 @@ import { chatWonderBaseSchema, clearStaleSession } from "../../helpers/chat-wond
 import { weatherService, type WeatherData } from "../../services/shared/weather.service";
 
 function isCosmeticsLikely(input: string): boolean {
-  return /(cosmetic|makeup|make-up|skincare|skin care|foundation|moisturi|lipstick|sunscreen|serum|cleanser|toner|blush|concealer|spf|skin)\b/i.test(
+  return /(cosmetic|makeup|make-up|skincare|skin care|foundation|moisturi|lipstick|sunscreen|serum|cleanser|toner|blush|concealer|spf|lotion|facial|eyeshadow|eye shadow|eyeliner|eye liner|lip gloss|lipgloss|lip balm|retinol|hyaluronic|niacinamide|exfoliat|acne|primer|essence|bb cream|cc cream|eye cream|face wash|face mask|face cream|sheet mask|clay mask|cream|mask|face oil|facial oil|skin oil|hair oil|body oil)\b/i.test(
     input
   );
 }
@@ -105,7 +105,7 @@ export default class ChatWonderController {
     const wantsVoice = value.voice === true;
     const ttsLang = value.lang || "en-US";
     const sitemapContext = value.sitemap_context;
-    const history = (value.history ?? []).slice(-10);
+    const history = (value.history ?? []).slice(-6);
 
     const isGarment = pageMode === "garment";
     const isOverview = pageMode === "overview";

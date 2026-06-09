@@ -6,6 +6,7 @@ import { authenticate } from "../../middleware/auth.middleware";
 const router = express.Router();
 
 router.get("/", OutfitController.index);
+router.get("/meta-fields", OutfitController.metaFields); // distinct metaData keys + deduped values for search facets
 router.get("/needs-image", OutfitController.indexNeedingImage); // outfits still on the placeholder file — need a real upload via PATCH
 router.get("/complete", OutfitController.indexComplete); // outfits with a real uploaded image (non-EXTERNAL provider)
 router.get("/:id", OutfitController.show);

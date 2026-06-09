@@ -31,7 +31,15 @@ export default class OutfitService {
     userId?: string | null,
     query: Record<string, string | undefined> = {}
   ) {
-    const { searchOutfit, searchOutfitItems, systemOnly } = query;
+    const {
+      searchOutfit,
+      systemOnly,
+      metaCategory,
+      metaGender,
+      metaSilhouette,
+      metaTags,
+      metaGarmentType,
+    } = query;
     const { page, limit, search: globalSearch } = parsePagination(query);
     const effectiveUserId = systemOnly === "true" ? null : userId;
     const result = await OutfitRepo.findByUserId(
@@ -40,10 +48,31 @@ export default class OutfitService {
       limit,
       { includeSystem: systemOnly !== "true" }, // include system outfits unless viewing system-only
       globalSearch || searchOutfit,
-      searchOutfitItems
+      {
+        category: metaCategory,
+        gender: metaGender,
+        silhouette: metaSilhouette,
+        tags: metaTags,
+        garmentType: metaGarmentType,
+      }
     );
     const { sortBy, sortOrder, search, filters } = parsePagination(query);
     return { ...result, sortBy, sortOrder, search, filters };
+  }
+
+  /**
+   * Returns every distinct metaData key and its deduplicated values across the
+   * caller's outfits (+ system outfits). Powers search facets / filter UIs.
+   * Pass `?systemOnly=true` to restrict to system outfits.
+   */
+  static async getMetaDataFields(
+    userId?: string | null,
+    query: Record<string, string | undefined> = {}
+  ) {
+    const { systemOnly } = query;
+    const effectiveUserId = systemOnly === "true" ? null : userId;
+    const fields = await OutfitRepo.getMetaDataFields(effectiveUserId);
+    return { fields };
   }
 
   /**
