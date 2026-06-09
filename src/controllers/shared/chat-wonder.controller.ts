@@ -10,7 +10,7 @@ import { chatWonderBaseSchema, clearStaleSession } from "../../helpers/chat-wond
 import { weatherService, type WeatherData } from "../../services/shared/weather.service";
 
 function isCosmeticsLikely(input: string): boolean {
-  return /(cosmetic|makeup|make-up|skincare|skin care|foundation|moisturi|lipstick|sunscreen|serum|cleanser|toner|blush|concealer|spf|skin)\b/i.test(
+  return /(cosmetic|makeup|make-up|skincare|skin care|foundation|moisturi|lipstick|sunscreen|serum|cleanser|toner|blush|concealer|spf)\b/i.test(
     input
   );
 }
