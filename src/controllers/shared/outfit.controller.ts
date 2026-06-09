@@ -99,6 +99,24 @@ export default class OutfitController {
   }
 
   /**
+   * GET /outfits/meta-fields
+   * Distinct metaData keys and their deduplicated values across the caller's
+   * outfits (+ system outfits). Drives search facets / filter dropdowns.
+   */
+  static async metaFields(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
+      const data = await OutfitService.getMetaDataFields(
+        userId,
+        req.query as unknown as Record<string, string | undefined>
+      );
+      responseSuccess(res, 200, data);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
    * GET /outfits/needs-image
    * Outfits whose display image is still the EXTERNAL placeholder borrowed
    * from a garment. These are the rows a dev/admin needs to PATCH with a
