@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import logger from "./logger";
+import OutfitService from "../services/shared/outfit.service";
 
 /**
  * Fetches a compact outfit catalog from the DB (system + user outfits) and
@@ -220,6 +221,33 @@ export async function resolveSetOutfits(sets: OutfitSet[] | undefined): Promise<
 }
 
 /**
+ * Parses the query string ChatWonder puts in GARMENT_DATA and fetches matching
+ * outfits from the DB. Returns { outfits, reason } ready to forward to the
+ * frontend as garment_data, or null if the block is in the old sets[] format.
+ */
+export async function resolveOutfitsFromQuery(
+  garmentData: unknown,
+  userId: string
+): Promise<{ outfits: unknown[]; reason: string } | null> {
+  if (!garmentData || typeof garmentData !== "object") return null;
+  const data = garmentData as Record<string, unknown>;
+  const queryStr = typeof data.query === "string" ? data.query : "";
+  if (!queryStr) return null;
+
+  const reason = typeof data.reason === "string" ? data.reason : "";
+  const params = Object.fromEntries(new URLSearchParams(queryStr)) as Record<string, string>;
+
+  try {
+    const result = await OutfitService.getUserOutfits(userId, params);
+    logger.info(`[resolveOutfitsFromQuery] Resolved ${result.data.length} outfits for query: ${queryStr}`);
+    return { outfits: result.data, reason };
+  } catch (err) {
+    logger.error(`[resolveOutfitsFromQuery] ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
  * Persists the outfits ChatWonder recommends (GARMENT_DATA block) into the
  * active UserOutline. Because catalog outfits are shared (system-owned), we
  * duplicate each recommended outfit — including its display File row — so the
@@ -227,8 +255,12 @@ export async function resolveSetOutfits(sets: OutfitSet[] | undefined): Promise<
  *
  * Old outline outfits are wiped first, keeping the list fresh each turn.
  *
- * GARMENT_DATA shape: { sets: [{ outfitId, name, ... }, ...] }
+ * GARMENT_DATA shape: { sets: [{ outfit_id, outfit_name, outfit_imageUrl, recommendations[], ... }] }
+ *
+ * Each turn wipes the previous AI outfits and creates fresh Garment + File + Outfit records
+ * directly from ChatWonder's data — no DB catalog lookup required.
  */
+
 export async function persistOutlineOutfits(
   conversationId: string,
   garmentData: unknown
@@ -237,87 +269,103 @@ export async function persistOutlineOutfits(
     if (!garmentData || typeof garmentData !== "object") return;
     const data = garmentData as Record<string, unknown>;
     const sets = Array.isArray(data.sets) ? data.sets : [];
-
-    const outfitIds = new Set<string>();
-    for (const rawSet of sets) {
-      const set = rawSet as Record<string, unknown>;
-      if (set.outfitId && typeof set.outfitId === "string") {
-        outfitIds.add(set.outfitId);
-      }
-    }
-
-    if (outfitIds.size === 0) return;
+    if (sets.length === 0) return;
 
     const outline = await prisma.userOutline.findUnique({
       where: { conversationId },
       select: { id: true, userId: true },
     });
-
     if (!outline) {
       logger.warn(`[persistOutlineOutfits] No outline for conversation ${conversationId}`);
       return;
     }
 
-    // 1. Wipe old outline outfits so it always reflects the latest turn
-    await prisma.outfit.deleteMany({ where: { userOutlineId: outline.id } });
-
-    // 2. Fetch the recommended outfits from the catalog
-    const validIds = Array.from(outfitIds);
-    const outfitsToCopy = await prisma.outfit.findMany({
-      where: { id: { in: validIds } },
-      include: { items: true },
+    // 1. Cascade-delete previous AI outfits for this outline
+    const existingOutfits = await prisma.outfit.findMany({
+      where: { userOutlineId: outline.id },
+      select: {
+        id: true,
+        fileId: true,
+        items: { select: { id: true, garmentId: true, garment: { select: { fileId: true } } } },
+      },
     });
 
-    if (outfitsToCopy.length === 0) {
-      logger.warn(
-        `[persistOutlineOutfits] None of the recommended outfits exist in catalog (outline ${outline.id})`
-      );
-      return;
+    if (existingOutfits.length > 0) {
+      const itemIds = existingOutfits.flatMap((o) => o.items.map((i) => i.id));
+      const garmentIds = existingOutfits.flatMap((o) => o.items.map((i) => i.garmentId));
+      const fileIds = [
+        ...new Set([
+          ...existingOutfits.flatMap((o) => o.items.map((i) => i.garment.fileId)),
+          ...existingOutfits.map((o) => o.fileId),
+        ]),
+      ];
+
+      await prisma.garmentInOutfit.deleteMany({ where: { id: { in: itemIds } } });
+      await prisma.outfit.deleteMany({ where: { userOutlineId: outline.id } });
+      if (garmentIds.length) await prisma.garment.deleteMany({ where: { id: { in: garmentIds } } });
+      if (fileIds.length) await prisma.file.deleteMany({ where: { id: { in: fileIds } } });
     }
 
-    // 3. Duplicate each outfit + its File row for the outline
-    for (const original of outfitsToCopy) {
-      const originalFile = await prisma.file.findUnique({ where: { id: original.fileId } });
-      if (!originalFile) continue;
+    // 2. Create new outfits directly from ChatWonder data
+    let created = 0;
+    for (const rawSet of sets) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const set = rawSet as any;
+      const outfitName: string = set.outfit_name || "AI Outfit";
+      const outfitImageUrl: string = set.outfit_imageUrl ?? "";
+      const recommendations: unknown[] = Array.isArray(set.recommendations) ? set.recommendations : [];
 
-      const newFile = await prisma.file.create({
-        data: {
-          filename: originalFile.filename,
-          originalName: originalFile.originalName,
-          fileUrl: originalFile.fileUrl,
-          thumbnailUrl: originalFile.thumbnailUrl,
-          mimeType: originalFile.mimeType,
-          extension: originalFile.extension,
-          size: originalFile.size,
-          provider: originalFile.provider,
-          bucket: originalFile.bucket,
-          path: originalFile.path,
-        },
+      const outfitFile = await prisma.file.create({
+        data: { filename: outfitName, fileUrl: outfitImageUrl, mimeType: "image/jpeg", provider: "External" },
       });
+
+      const items: Array<{ garmentId: string; slot: string; layerLevel: string }> = [];
+      for (const rawRec of recommendations) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rec = rawRec as any;
+        const name: string = rec.name || "Garment";
+        const imageUrl: string = rec.imageUrl ?? "";
+
+        const garmentFile = await prisma.file.create({
+          data: { filename: name, fileUrl: imageUrl, mimeType: "image/jpeg", provider: "External" },
+        });
+
+        const garment = await prisma.garment.create({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data: {
+            name,
+            description: rec.description ?? undefined,
+            imageUrl,
+            garmentType: Array.isArray(rec.garmentType) ? rec.garmentType : [],
+            fittingSlot: Array.isArray(rec.fittingSlot) ? rec.fittingSlot : ["None"],
+            category: Array.isArray(rec.category) ? rec.category : [],
+            layerLevel: rec.layerLevel ?? "BASE",
+            ...(outline.userId && { userId: outline.userId }),
+            fileId: garmentFile.id,
+          } as any,
+        });
+
+        const slot: string = Array.isArray(rec.fittingSlot) ? (rec.fittingSlot[0] ?? "None") : "None";
+        items.push({ garmentId: garment.id, slot, layerLevel: rec.layerLevel ?? "BASE" });
+      }
 
       await prisma.outfit.create({
         data: {
-          name: original.name,
-          description: original.description,
+          name: outfitName,
+          description: set.reason ?? null,
           designType: "UserDesign",
           isPublic: false,
-          ...(outline.userId && { user: { connect: { id: outline.userId } } }),
-          userOutline: { connect: { id: outline.id } },
-          file: { connect: { id: newFile.id } },
-          items: {
-            create: original.items.map((i) => ({
-              garment: { connect: { id: i.garmentId } },
-              slot: i.slot ?? undefined,
-              layerLevel: i.layerLevel ?? undefined,
-            })),
-          },
+          ...(outline.userId && { userId: outline.userId }),
+          userOutlineId: outline.id,
+          fileId: outfitFile.id,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          items: { create: items.map(({ garmentId, slot, layerLevel }) => ({ garmentId, slot, layerLevel })) as any },
         },
       });
+      created++;
     }
 
-    logger.info(
-      `[persistOutlineOutfits] Persisted ${outfitsToCopy.length} duplicated outfits to outline ${outline.id}`
-    );
+    logger.info(`[persistOutlineOutfits] Persisted ${created} AI outfits to outline ${outline.id}`);
   } catch (error) {
     logger.error(`[persistOutlineOutfits] ${(error as Error).message}`);
   }
