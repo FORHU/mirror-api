@@ -149,6 +149,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         if (resolved) {
           garment_data = {
             success: true,
+            query: queryStr,
             sets: (resolved.outfits as Record<string, unknown>[]).map((o, i) => ({
               set_number: i + 1,
               outfit_id: o.id,
