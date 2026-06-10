@@ -365,10 +365,11 @@ export default class MapController {
       }
       const upstreamStatus = err.response?.status;
       if (upstreamStatus && upstreamStatus >= 400) {
+        const upstreamMessage = err.response?.data?.error?.message ?? err.message ?? "unknown";
         logger.error(
-          `[MapController] Google Places nearbyPOIs failed: ${upstreamStatus} ${err.response?.data?.error?.message ?? err.message}`
+          `[MapController] Google Places nearbyPOIs failed: ${upstreamStatus} ${upstreamMessage}`
         );
-        return res.status(502).json({ error: "POI service unavailable", upstream: upstreamStatus });
+        return res.status(502).json({ error: "POI service unavailable", upstream: upstreamStatus, detail: upstreamMessage });
       }
       next(err);
     }
