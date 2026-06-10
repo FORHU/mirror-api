@@ -8,7 +8,7 @@ import {
   resolveAndPersistOutlineCosmetics,
   resolveOutlineCosmeticsByIds,
 } from "./chat-wonder-cosmetics.util";
-import { persistOutlineOutfits } from "./chat-wonder-outfits.util";
+import { persistOutlineOutfits, resolveOutfitsFromQuery } from "./chat-wonder-outfits.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
@@ -140,6 +140,42 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         extractChatWonderDataBlock(fullResponse, "STYLIST") ??
           extractChatWonderDataBlock(fullResponse, "NAV_DATA"),
       ]);
+
+      if (garment_data && typeof garment_data === "object" && (garment_data as Record<string, unknown>).query) {
+        const queryStr = (garment_data as Record<string, unknown>).query as string;
+        const category = new URLSearchParams(queryStr).get("metaCategory") ?? "";
+        const resolved = await resolveOutfitsFromQuery(garment_data, userId);
+        if (resolved) {
+          garment_data = {
+            success: true,
+            sets: (resolved.outfits as Record<string, unknown>[]).map((o, i) => ({
+              set_number: i + 1,
+              outfit_id: o.id,
+              outfit_name: o.name ?? "",
+              outfit_description: o.description ?? "",
+              outfit_imageUrl: (o.file as Record<string, unknown> | null)?.fileUrl ?? "",
+              vibe: category,
+              reason: resolved.reason,
+              recommendations: ((o.items as Record<string, unknown>[]) ?? []).map((item) => {
+                const g = item.garment as Record<string, unknown> | null;
+                return {
+                  id: g?.id,
+                  name: g?.name ?? "",
+                  description: g?.description ?? "",
+                  imageUrl: g?.imageUrl ?? "",
+                  fittingSlot: g?.fittingSlot ?? [],
+                  garmentType: g?.garmentType ?? [],
+                  category: g?.category ?? [],
+                  layerLevel: g?.layerLevel ?? "",
+                  silhouette: g?.silhouette ?? "",
+                };
+              }),
+            })),
+          };
+        } else {
+          garment_data = null;
+        }
+      }
 
       if (input.includes(MIRROR_GREETING)) {
         garment_data = null;
