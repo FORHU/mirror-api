@@ -1,7 +1,9 @@
 import axios from "axios";
 import { GOOGLE_PLACES_API_KEY } from "../../config";
+import CacheUtil from "../../utils/cache.util";
 
 const BASE_URL = "https://places.googleapis.com/v1";
+const POI_CACHE_TTL = 600; // 10 min — POI data is stable within a short window
 
 const EXPLORE_TYPES = [
   "restaurant",
@@ -169,53 +171,57 @@ export const googlePlacesService = {
       throw new Error("GOOGLE_PLACES_KEY_MISSING");
     }
 
-    const includedTypes = category ? parseCategory(category) : EXPLORE_TYPES;
+    const cacheKey = `poi:${lat.toFixed(3)},${lng.toFixed(3)}:${radiusM}:${category ?? "all"}`;
 
-    const response = await axios.post(
-      `${BASE_URL}/places:searchNearby`,
-      {
-        locationRestriction: {
-          circle: {
-            center: { latitude: lat, longitude: lng },
-            radius: radiusM,
+    return CacheUtil.remember<PlacePOI[]>(cacheKey, POI_CACHE_TTL, async () => {
+      const includedTypes = category ? parseCategory(category) : EXPLORE_TYPES;
+
+      const response = await axios.post(
+        `${BASE_URL}/places:searchNearby`,
+        {
+          locationRestriction: {
+            circle: {
+              center: { latitude: lat, longitude: lng },
+              radius: radiusM,
+            },
           },
+          includedTypes,
+          maxResultCount: 15,
         },
-        includedTypes,
-        maxResultCount: 15,
-      },
-      {
-        headers: {
-          "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
-          "X-Goog-FieldMask":
-            "places.id,places.displayName,places.primaryType,places.primaryTypeDisplayName,places.location,places.formattedAddress,places.photos,places.rating,places.regularOpeningHours,places.internationalPhoneNumber,places.websiteUri",
-        },
-      }
-    );
+        {
+          headers: {
+            "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+            "X-Goog-FieldMask":
+              "places.id,places.displayName,places.primaryType,places.primaryTypeDisplayName,places.location,places.formattedAddress,places.photos,places.rating,places.regularOpeningHours,places.internationalPhoneNumber,places.websiteUri",
+          },
+        }
+      );
 
-    const places: GPlace[] = response.data?.places ?? [];
+      const places: GPlace[] = response.data?.places ?? [];
 
-    return places.map((p) => {
-      const placeLat = p.location?.latitude ?? lat;
-      const placeLng = p.location?.longitude ?? lng;
-      const photoName = p.photos?.[0]?.name;
+      return places.map((p) => {
+        const placeLat = p.location?.latitude ?? lat;
+        const placeLng = p.location?.longitude ?? lng;
+        const photoName = p.photos?.[0]?.name;
 
-      return {
-        placeId: p.id,
-        name: p.displayName?.text ?? "Place",
-        category:
-          GOOGLE_TYPE_TO_CATEGORY[p.primaryType ?? ""] ?? p.primaryTypeDisplayName?.text ?? "Place",
-        categoryIcon: "",
-        lat: placeLat,
-        lng: placeLng,
-        address: p.formattedAddress ?? "",
-        distance: haversineDistance(lat, lng, placeLat, placeLng),
-        photo: photoName ? buildPhotoUrl(photoName) : null,
-        rating: p.rating,
-        openNow: p.regularOpeningHours?.openNow,
-        weekdayDescriptions: p.regularOpeningHours?.weekdayDescriptions,
-        phone: p.internationalPhoneNumber,
-        website: p.websiteUri,
-      };
+        return {
+          placeId: p.id,
+          name: p.displayName?.text ?? "Place",
+          category:
+            GOOGLE_TYPE_TO_CATEGORY[p.primaryType ?? ""] ?? p.primaryTypeDisplayName?.text ?? "Place",
+          categoryIcon: "",
+          lat: placeLat,
+          lng: placeLng,
+          address: p.formattedAddress ?? "",
+          distance: haversineDistance(lat, lng, placeLat, placeLng),
+          photo: photoName ? buildPhotoUrl(photoName) : null,
+          rating: p.rating,
+          openNow: p.regularOpeningHours?.openNow,
+          weekdayDescriptions: p.regularOpeningHours?.weekdayDescriptions,
+          phone: p.internationalPhoneNumber,
+          website: p.websiteUri,
+        };
+      });
     });
   },
 
