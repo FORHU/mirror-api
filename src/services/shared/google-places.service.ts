@@ -156,9 +156,6 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-function buildPhotoUrl(photoName: string): string {
-  return `${BASE_URL}/${photoName}/media?maxHeightPx=400&maxWidthPx=400&key=${GOOGLE_PLACES_API_KEY}`;
-}
 
 export const googlePlacesService = {
   nearbyPOIs: async (
@@ -214,7 +211,7 @@ export const googlePlacesService = {
           lng: placeLng,
           address: p.formattedAddress ?? "",
           distance: haversineDistance(lat, lng, placeLat, placeLng),
-          photo: photoName ? buildPhotoUrl(photoName) : null,
+          photo: photoName ?? null,
           rating: p.rating,
           openNow: p.regularOpeningHours?.openNow,
           weekdayDescriptions: p.regularOpeningHours?.weekdayDescriptions,
@@ -238,6 +235,6 @@ export const googlePlacesService = {
     });
 
     const photos: Array<{ name: string }> = response.data?.photos ?? [];
-    return photos.slice(0, 6).map((p) => buildPhotoUrl(p.name));
+    return photos.slice(0, 6).map((p) => p.name);
   },
 };
