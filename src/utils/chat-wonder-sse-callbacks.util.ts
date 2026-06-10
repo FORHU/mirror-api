@@ -133,7 +133,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         parsed.events = await resolveItineraryLocations(parsed.events);
       }
 
-      let [garment_data, cosmetics_data, maps_data, stylist_data, tailor_data] = await Promise.all([
+      const allData = await Promise.all([
         extractChatWonderDataBlock(fullResponse, "GARMENT_DATA"),
         extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA"),
         extractChatWonderDataBlock(fullResponse, "MAPS_DATA"),
@@ -141,6 +141,8 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
           extractChatWonderDataBlock(fullResponse, "NAV_DATA"),
         extractChatWonderDataBlock(fullResponse, "TAILOR_DATA"),
       ]);
+      let [garment_data, cosmetics_data, maps_data, stylist_data] = allData;
+      const tailor_data = allData[4];
 
       if (garment_data && typeof garment_data === "object" && (garment_data as Record<string, unknown>).query) {
         const queryStr = (garment_data as Record<string, unknown>).query as string;

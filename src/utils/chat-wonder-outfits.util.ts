@@ -331,7 +331,6 @@ export async function persistOutlineOutfits(
         });
 
         const garment = await prisma.garment.create({
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           data: {
             name,
             description: rec.description ?? undefined,
@@ -342,6 +341,7 @@ export async function persistOutlineOutfits(
             layerLevel: rec.layerLevel ?? "BASE",
             ...(outline.userId && { userId: outline.userId }),
             fileId: garmentFile.id,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any,
         });
 
