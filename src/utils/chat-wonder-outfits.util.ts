@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import logger from "./logger";
+import OutfitService from "../services/shared/outfit.service";
 
 /**
  * Fetches a compact outfit catalog from the DB (system + user outfits) and
@@ -217,6 +218,33 @@ export async function resolveSetOutfits(sets: OutfitSet[] | undefined): Promise<
   );
 
   return resolved;
+}
+
+/**
+ * Parses the query string ChatWonder puts in GARMENT_DATA and fetches matching
+ * outfits from the DB. Returns { outfits, reason } ready to forward to the
+ * frontend as garment_data, or null if the block is in the old sets[] format.
+ */
+export async function resolveOutfitsFromQuery(
+  garmentData: unknown,
+  userId: string
+): Promise<{ outfits: unknown[]; reason: string } | null> {
+  if (!garmentData || typeof garmentData !== "object") return null;
+  const data = garmentData as Record<string, unknown>;
+  const queryStr = typeof data.query === "string" ? data.query : "";
+  if (!queryStr) return null;
+
+  const reason = typeof data.reason === "string" ? data.reason : "";
+  const params = Object.fromEntries(new URLSearchParams(queryStr)) as Record<string, string>;
+
+  try {
+    const result = await OutfitService.getUserOutfits(userId, params);
+    logger.info(`[resolveOutfitsFromQuery] Resolved ${result.data.length} outfits for query: ${queryStr}`);
+    return { outfits: result.data, reason };
+  } catch (err) {
+    logger.error(`[resolveOutfitsFromQuery] ${(err as Error).message}`);
+    return null;
+  }
 }
 
 /**
