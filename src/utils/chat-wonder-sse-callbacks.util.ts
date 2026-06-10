@@ -8,7 +8,7 @@ import {
   resolveAndPersistOutlineCosmetics,
   resolveOutlineCosmeticsByIds,
 } from "./chat-wonder-cosmetics.util";
-import { persistOutlineOutfits } from "./chat-wonder-outfits.util";
+import { persistOutlineOutfits, resolveOutfitsFromQuery } from "./chat-wonder-outfits.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
@@ -133,13 +133,50 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         parsed.events = await resolveItineraryLocations(parsed.events);
       }
 
-      let [garment_data, cosmetics_data, maps_data, stylist_data] = await Promise.all([
+      let [garment_data, cosmetics_data, maps_data, stylist_data, tailor_data] = await Promise.all([
         extractChatWonderDataBlock(fullResponse, "GARMENT_DATA"),
         extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA"),
         extractChatWonderDataBlock(fullResponse, "MAPS_DATA"),
         extractChatWonderDataBlock(fullResponse, "STYLIST") ??
           extractChatWonderDataBlock(fullResponse, "NAV_DATA"),
+        extractChatWonderDataBlock(fullResponse, "TAILOR_DATA"),
       ]);
+
+      if (garment_data && typeof garment_data === "object" && (garment_data as Record<string, unknown>).query) {
+        const queryStr = (garment_data as Record<string, unknown>).query as string;
+        const category = new URLSearchParams(queryStr).get("metaCategory") ?? "";
+        const resolved = await resolveOutfitsFromQuery(garment_data, userId);
+        if (resolved) {
+          garment_data = {
+            success: true,
+            sets: (resolved.outfits as Record<string, unknown>[]).map((o, i) => ({
+              set_number: i + 1,
+              outfit_id: o.id,
+              outfit_name: o.name ?? "",
+              outfit_description: o.description ?? "",
+              outfit_imageUrl: (o.file as Record<string, unknown> | null)?.fileUrl ?? "",
+              vibe: category,
+              reason: resolved.reason,
+              recommendations: ((o.items as Record<string, unknown>[]) ?? []).map((item) => {
+                const g = item.garment as Record<string, unknown> | null;
+                return {
+                  id: g?.id,
+                  name: g?.name ?? "",
+                  description: g?.description ?? "",
+                  imageUrl: g?.imageUrl ?? "",
+                  fittingSlot: g?.fittingSlot ?? [],
+                  garmentType: g?.garmentType ?? [],
+                  category: g?.category ?? [],
+                  layerLevel: g?.layerLevel ?? "",
+                  silhouette: g?.silhouette ?? "",
+                };
+              }),
+            })),
+          };
+        } else {
+          garment_data = null;
+        }
+      }
 
       if (input.includes(MIRROR_GREETING)) {
         garment_data = null;
@@ -180,7 +217,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       const message = stripMarkdownFormatting(
         parsed.message
           .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
-          .split(/\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE)\]/)[0]
+          .split(/\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE|TAILOR_DATA)\]/)[0]
           .trim()
       );
 
@@ -192,6 +229,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         cosmetics_data,
         maps_data,
         stylist_data,
+        tailor_data,
         gender_update: gender_data,
         events: parsed.events,
         sets: parsed.sets,
