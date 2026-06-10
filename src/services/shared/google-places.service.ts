@@ -31,6 +31,16 @@ const CATEGORY_TO_TYPES: Record<string, string[]> = {
   diner: ["restaurant"],
   dining: ["restaurant"],
   food: ["restaurant", "cafe"],
+  spot: ["tourist_attraction"],
+  spots: ["tourist_attraction"],
+  "popular spot": ["tourist_attraction", "museum", "amusement_park"],
+  "popular spots": ["tourist_attraction", "museum", "amusement_park"],
+  popular: ["tourist_attraction", "museum"],
+  attractions: ["tourist_attraction", "amusement_park"],
+  "tourist spot": ["tourist_attraction"],
+  "tourist spots": ["tourist_attraction"],
+  landmark: ["tourist_attraction"],
+  landmarks: ["tourist_attraction"],
   hospital: ["hospital"],
   pharmacy: ["pharmacy"],
   hotel: ["lodging"],
@@ -218,6 +228,12 @@ export const googlePlacesService = {
       const useTextSearch =
         category != null && includedTypes.every((t) => !VALID_PLACE_TYPES.has(t));
 
+      // Strip any terms that slipped through parseCategory without a valid mapping.
+      // Mixed arrays like ["popular spots", "tourist_attraction"] would cause Google
+      // to reject the entire request with 400 "Unsupported types".
+      const validTypes = includedTypes.filter((t) => VALID_PLACE_TYPES.has(t));
+      const typesToSearch = validTypes.length > 0 ? validTypes : EXPLORE_TYPES;
+
       let places: GPlace[];
 
       if (useTextSearch) {
@@ -240,7 +256,7 @@ export const googlePlacesService = {
             locationRestriction: {
               circle: { center: { latitude: lat, longitude: lng }, radius: radiusM },
             },
-            includedTypes,
+            includedTypes: typesToSearch,
             maxResultCount: 15,
           },
           { headers: { "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY, "X-Goog-FieldMask": PLACES_FIELD_MASK } },
