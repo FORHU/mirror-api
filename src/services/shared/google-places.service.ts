@@ -42,6 +42,8 @@ const CATEGORY_TO_TYPES: Record<string, string[]> = {
   gym: ["gym"],
   supermarket: ["supermarket"],
   grocery: ["grocery_store"],
+  "convenience store": ["convenience_store"],
+  convenience: ["convenience_store"],
   gas: ["gas_station"],
   "gas station": ["gas_station"],
   atm: ["atm"],
@@ -59,8 +61,8 @@ function parseCategory(raw: string): string[] {
   // Exact match first
   if (CATEGORY_TO_TYPES[lower]) return CATEGORY_TO_TYPES[lower];
 
-  // Split compound queries: "restaurants and cafes", "coffee shops, bars"
-  const terms = lower.split(/\s+and\s+|\s*,\s*/);
+  // Split compound queries: "restaurants and cafes", "coffee shops or bars"
+  const terms = lower.split(/\s+(?:and|or)\s+|\s*,\s*/);
   const types: string[] = [];
 
   for (const term of terms) {
@@ -103,6 +105,8 @@ const GOOGLE_TYPE_TO_CATEGORY: Record<string, string> = {
   shopping_mall: "mall",
   department_store: "shop",
   store: "store",
+  grocery_store: "grocery",
+  convenience_store: "convenience",
   hospital: "hospital",
   pharmacy: "pharmacy",
   transit_station: "transit",
