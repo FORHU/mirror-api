@@ -72,9 +72,9 @@ function parseCategory(raw: string): string[] {
 
     // Singularize: "restaurants" → "restaurant", "cafes" → "cafe", "pharmacies" → "pharmacy"
     const singular = t
-      .replace(/ies$/, "y")      // pharmacies → pharmacy
-      .replace(/(?:shes|ches|ses|xes|zes)$/, (m) => m.slice(0, -2))  // churches → church
-      .replace(/s$/, "");         // restaurants → restaurant
+      .replace(/ies$/, "y") // pharmacies → pharmacy
+      .replace(/(?:shes|ches|ses|xes|zes)$/, (m) => m.slice(0, -2)) // churches → church
+      .replace(/s$/, ""); // restaurants → restaurant
 
     if (CATEGORY_TO_TYPES[singular]) {
       types.push(...CATEGORY_TO_TYPES[singular]);
