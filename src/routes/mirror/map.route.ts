@@ -15,6 +15,7 @@ router.post("/directions", MapController.directions);
 // Google Places nearby POIs + venue photos — no auth required
 router.get("/nearby-pois", MapController.nearbyPOIs);
 router.get("/venue-photos/:placeId", MapController.venuePhotos);
+router.get("/photo-proxy", MapController.photoProxy);
 
 // Home Location — auth required
 router.get("/home-location", authenticate, MapController.getHomeLocation);

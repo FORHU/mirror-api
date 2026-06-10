@@ -1,7 +1,9 @@
 import axios from "axios";
 import { GOOGLE_PLACES_API_KEY } from "../../config";
+import CacheUtil from "../../utils/cache.util";
 
 const BASE_URL = "https://places.googleapis.com/v1";
+const POI_CACHE_TTL = 600; // 10 min — POI data is stable within a short window
 
 const EXPLORE_TYPES = [
   "restaurant",
@@ -40,6 +42,8 @@ const CATEGORY_TO_TYPES: Record<string, string[]> = {
   gym: ["gym"],
   supermarket: ["supermarket"],
   grocery: ["grocery_store"],
+  "convenience store": ["convenience_store"],
+  convenience: ["convenience_store"],
   gas: ["gas_station"],
   "gas station": ["gas_station"],
   atm: ["atm"],
@@ -49,6 +53,42 @@ const CATEGORY_TO_TYPES: Record<string, string[]> = {
   spa: ["spa"],
 };
 
+// All recognized Google Places includedTypes — used to detect brand/venue name queries
+// that need text search instead of type-based nearby search.
+const VALID_PLACE_TYPES = new Set<string>([
+  ...EXPLORE_TYPES,
+  ...Object.values(CATEGORY_TO_TYPES).flat(),
+]);
+
+const PLACES_FIELD_MASK =
+  "places.id,places.displayName,places.primaryType,places.primaryTypeDisplayName," +
+  "places.location,places.formattedAddress,places.photos,places.rating," +
+  "places.regularOpeningHours,places.internationalPhoneNumber,places.websiteUri";
+
+function mapGPlace(p: GPlace, originLat: number, originLng: number): PlacePOI {
+  const placeLat = p.location?.latitude ?? originLat;
+  const placeLng = p.location?.longitude ?? originLng;
+  return {
+    placeId: p.id,
+    name: p.displayName?.text ?? "Place",
+    category:
+      GOOGLE_TYPE_TO_CATEGORY[p.primaryType ?? ""] ??
+      p.primaryTypeDisplayName?.text ??
+      "Place",
+    categoryIcon: "",
+    lat: placeLat,
+    lng: placeLng,
+    address: p.formattedAddress ?? "",
+    distance: haversineDistance(originLat, originLng, placeLat, placeLng),
+    photo: p.photos?.[0]?.name ?? null,
+    rating: p.rating,
+    openNow: p.regularOpeningHours?.openNow,
+    weekdayDescriptions: p.regularOpeningHours?.weekdayDescriptions,
+    phone: p.internationalPhoneNumber,
+    website: p.websiteUri,
+  };
+}
+
 // Parses a natural-language category string (including plurals and "X and Y" compounds)
 // into a flat list of valid Google Places includedTypes.
 function parseCategory(raw: string): string[] {
@@ -57,8 +97,8 @@ function parseCategory(raw: string): string[] {
   // Exact match first
   if (CATEGORY_TO_TYPES[lower]) return CATEGORY_TO_TYPES[lower];
 
-  // Split compound queries: "restaurants and cafes", "coffee shops, bars"
-  const terms = lower.split(/\s+and\s+|\s*,\s*/);
+  // Split compound queries: "restaurants and cafes", "coffee shops or bars"
+  const terms = lower.split(/\s+(?:and|or)\s+|\s*,\s*/);
   const types: string[] = [];
 
   for (const term of terms) {
@@ -101,6 +141,8 @@ const GOOGLE_TYPE_TO_CATEGORY: Record<string, string> = {
   shopping_mall: "mall",
   department_store: "shop",
   store: "store",
+  grocery_store: "grocery",
+  convenience_store: "convenience",
   hospital: "hospital",
   pharmacy: "pharmacy",
   transit_station: "transit",
@@ -154,9 +196,6 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-function buildPhotoUrl(photoName: string): string {
-  return `${BASE_URL}/${photoName}/media?maxHeightPx=400&maxWidthPx=400&key=${GOOGLE_PLACES_API_KEY}`;
-}
 
 export const googlePlacesService = {
   nearbyPOIs: async (
@@ -169,53 +208,47 @@ export const googlePlacesService = {
       throw new Error("GOOGLE_PLACES_KEY_MISSING");
     }
 
-    const includedTypes = category ? parseCategory(category) : EXPLORE_TYPES;
+    const cacheKey = `poi:${lat.toFixed(3)},${lng.toFixed(3)}:${radiusM}:${category ?? "all"}`;
 
-    const response = await axios.post(
-      `${BASE_URL}/places:searchNearby`,
-      {
-        locationRestriction: {
-          circle: {
-            center: { latitude: lat, longitude: lng },
-            radius: radiusM,
+    return CacheUtil.remember<PlacePOI[]>(cacheKey, POI_CACHE_TTL, async () => {
+      const includedTypes = category ? parseCategory(category) : EXPLORE_TYPES;
+
+      // When every parsed type is unrecognized (e.g. "starbucks", "jollibee"),
+      // the category is a brand/venue name — use searchText instead of searchNearby.
+      const useTextSearch =
+        category != null && includedTypes.every((t) => !VALID_PLACE_TYPES.has(t));
+
+      let places: GPlace[];
+
+      if (useTextSearch) {
+        const response = await axios.post(
+          `${BASE_URL}/places:searchText`,
+          {
+            textQuery: category,
+            locationBias: {
+              circle: { center: { latitude: lat, longitude: lng }, radius: radiusM },
+            },
+            maxResultCount: 10,
           },
-        },
-        includedTypes,
-        maxResultCount: 15,
-      },
-      {
-        headers: {
-          "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
-          "X-Goog-FieldMask":
-            "places.id,places.displayName,places.primaryType,places.primaryTypeDisplayName,places.location,places.formattedAddress,places.photos,places.rating,places.regularOpeningHours,places.internationalPhoneNumber,places.websiteUri",
-        },
+          { headers: { "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY, "X-Goog-FieldMask": PLACES_FIELD_MASK } },
+        );
+        places = response.data?.places ?? [];
+      } else {
+        const response = await axios.post(
+          `${BASE_URL}/places:searchNearby`,
+          {
+            locationRestriction: {
+              circle: { center: { latitude: lat, longitude: lng }, radius: radiusM },
+            },
+            includedTypes,
+            maxResultCount: 15,
+          },
+          { headers: { "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY, "X-Goog-FieldMask": PLACES_FIELD_MASK } },
+        );
+        places = response.data?.places ?? [];
       }
-    );
 
-    const places: GPlace[] = response.data?.places ?? [];
-
-    return places.map((p) => {
-      const placeLat = p.location?.latitude ?? lat;
-      const placeLng = p.location?.longitude ?? lng;
-      const photoName = p.photos?.[0]?.name;
-
-      return {
-        placeId: p.id,
-        name: p.displayName?.text ?? "Place",
-        category:
-          GOOGLE_TYPE_TO_CATEGORY[p.primaryType ?? ""] ?? p.primaryTypeDisplayName?.text ?? "Place",
-        categoryIcon: "",
-        lat: placeLat,
-        lng: placeLng,
-        address: p.formattedAddress ?? "",
-        distance: haversineDistance(lat, lng, placeLat, placeLng),
-        photo: photoName ? buildPhotoUrl(photoName) : null,
-        rating: p.rating,
-        openNow: p.regularOpeningHours?.openNow,
-        weekdayDescriptions: p.regularOpeningHours?.weekdayDescriptions,
-        phone: p.internationalPhoneNumber,
-        website: p.websiteUri,
-      };
+      return places.map((p) => mapGPlace(p, lat, lng));
     });
   },
 
@@ -232,6 +265,6 @@ export const googlePlacesService = {
     });
 
     const photos: Array<{ name: string }> = response.data?.photos ?? [];
-    return photos.slice(0, 6).map((p) => buildPhotoUrl(p.name));
+    return photos.slice(0, 6).map((p) => p.name);
   },
 };

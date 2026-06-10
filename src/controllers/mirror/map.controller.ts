@@ -5,7 +5,7 @@ import { mapService } from "../../services/shared/map.service";
 import { googlePlacesService } from "../../services/shared/google-places.service";
 import { PrismaClient } from "@prisma/client";
 import axios from "axios";
-import { MAPBOX_SECRET_TOKEN, ORS_API_KEY } from "../../config";
+import { MAPBOX_SECRET_TOKEN, ORS_API_KEY, GOOGLE_PLACES_API_KEY } from "../../config";
 import logger from "../../utils/logger";
 
 const prisma = new PrismaClient();
@@ -350,7 +350,13 @@ export default class MapController {
         value.radius,
         value.category
       );
-      return res.json({ pois });
+      const poisWithProxy = pois.map((p) => ({
+        ...p,
+        photo: p.photo
+          ? `/api/mirror/map/photo-proxy?name=${encodeURIComponent(p.photo)}`
+          : null,
+      }));
+      return res.json({ pois: poisWithProxy });
     } catch (err: any) {
       if (err.message === "GOOGLE_PLACES_KEY_MISSING") {
         return res.status(502).json({
@@ -377,11 +383,52 @@ export default class MapController {
     if (!placeId) return res.status(400).json({ error: "placeId is required" });
 
     try {
-      const photos = await googlePlacesService.venuePhotos(placeId);
+      const photoNames = await googlePlacesService.venuePhotos(placeId);
+      const photos = photoNames.map(
+        (name) => `/api/mirror/map/photo-proxy?name=${encodeURIComponent(name)}`
+      );
       return res.json({ photos });
     } catch (err: any) {
       if (err.message === "GOOGLE_PLACES_KEY_MISSING") {
         return res.status(502).json({ error: "Google Places API key not configured." });
+      }
+      next(err);
+    }
+  }
+
+  static async photoProxy(req: Request, res: Response, next: NextFunction) {
+    const raw = req.query.name as string;
+    if (!raw) {
+      return res.status(400).json({ error: "Missing photo name" });
+    }
+    if (!GOOGLE_PLACES_API_KEY) {
+      return res.status(502).json({ error: "Google Places API key not configured" });
+    }
+
+    // Accept either a raw photo name ("places/.../photos/...") or a legacy full URL
+    let name = raw;
+    if (raw.startsWith("https://places.googleapis.com/v1/")) {
+      const match = raw.match(/\/v1\/(.+?)\/media/);
+      name = match ? match[1] : "";
+    }
+    if (!name || !name.startsWith("places/")) {
+      return res.status(400).json({ error: "Invalid photo name" });
+    }
+
+    const url = `https://places.googleapis.com/v1/${name}/media?maxHeightPx=400&maxWidthPx=400&key=${GOOGLE_PLACES_API_KEY}`;
+
+    try {
+      const response = await axios.get(url, {
+        responseType: "arraybuffer",
+        maxRedirects: 5,
+      });
+      res.set("Content-Type", (response.headers["content-type"] as string) ?? "image/jpeg");
+      res.set("Cache-Control", "public, max-age=86400");
+      res.send(Buffer.from(response.data as ArrayBuffer));
+    } catch (err: any) {
+      const status = err.response?.status;
+      if (status === 403 || status === 404) {
+        return res.status(status).json({ error: "Photo unavailable" });
       }
       next(err);
     }
