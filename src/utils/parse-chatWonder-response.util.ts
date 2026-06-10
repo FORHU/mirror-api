@@ -303,7 +303,7 @@ function buildFromParsed(
  */
 export function extractChatWonderDataBlock(
   rawResponse: string,
-  block: "GARMENT_DATA" | "COSMETICS_DATA" | "MAPS_DATA" | "NAV_DATA" | "GENDER_UPDATE" | "STYLIST"
+  block: "GARMENT_DATA" | "COSMETICS_DATA" | "MAPS_DATA" | "NAV_DATA" | "GENDER_UPDATE" | "STYLIST" | "TAILOR_DATA"
 ): Record<string, unknown> | unknown[] | null {
   const marker = `[${block}]`;
   const idx = rawResponse.indexOf(marker);
@@ -313,7 +313,7 @@ export function extractChatWonderDataBlock(
   // marker so adjacent blocks don't bleed into this one.
   const after = rawResponse.slice(idx + marker.length);
   const stop = after.search(
-    /\[(?:GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|GENDER_UPDATE|STYLIST|DONE)\]/
+    /\[(?:GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|GENDER_UPDATE|STYLIST|TAILOR_DATA|DONE)\]/
   );
   const segment = stop === -1 ? after : after.slice(0, stop);
 

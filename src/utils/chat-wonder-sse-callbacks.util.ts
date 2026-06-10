@@ -133,12 +133,13 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         parsed.events = await resolveItineraryLocations(parsed.events);
       }
 
-      let [garment_data, cosmetics_data, maps_data, stylist_data] = await Promise.all([
+      let [garment_data, cosmetics_data, maps_data, stylist_data, tailor_data] = await Promise.all([
         extractChatWonderDataBlock(fullResponse, "GARMENT_DATA"),
         extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA"),
         extractChatWonderDataBlock(fullResponse, "MAPS_DATA"),
         extractChatWonderDataBlock(fullResponse, "STYLIST") ??
           extractChatWonderDataBlock(fullResponse, "NAV_DATA"),
+        extractChatWonderDataBlock(fullResponse, "TAILOR_DATA"),
       ]);
 
       if (garment_data && typeof garment_data === "object" && (garment_data as Record<string, unknown>).query) {
@@ -216,7 +217,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       const message = stripMarkdownFormatting(
         parsed.message
           .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
-          .split(/\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE)\]/)[0]
+          .split(/\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE|TAILOR_DATA)\]/)[0]
           .trim()
       );
 
@@ -228,6 +229,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         cosmetics_data,
         maps_data,
         stylist_data,
+        tailor_data,
         gender_update: gender_data,
         events: parsed.events,
         sets: parsed.sets,
