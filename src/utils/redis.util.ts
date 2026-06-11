@@ -5,6 +5,7 @@ import logger from "./logger";
 const redisSocket = () => ({
   host: REDIS_HOST,
   port: REDIS_PORT,
+  connectTimeout: 5000,
   ...(REDIS_TLS ? { tls: true as const } : {}),
 });
 
