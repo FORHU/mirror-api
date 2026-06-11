@@ -2,7 +2,7 @@ import FashnService from "../../platforms/fashnAi/fashn.service";
 import GarmentService from "../shared/garment.service";
 import OutfitService from "../shared/outfit.service";
 import TryOnModelService from "./tryOnModel.service";
-import { emitToKiosk } from "../../utils/socket.util";
+import { notifyCompanion } from "../../utils/socket.util";
 import logger from "../../utils/logger";
 
 const COMPOSED_OUTFIT_CATEGORY = "one-pieces";
@@ -27,7 +27,7 @@ export default class TryOnService {
     userId: string,
     garmentId: string,
     modelImage?: string,
-    kioskId?: string
+    prompt?: string
   ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
     const garment = await GarmentService.getGarmentById(garmentId);
@@ -38,12 +38,11 @@ export default class TryOnService {
     const result = await FashnService.runTryOn(
       modelImageUrl,
       garmentImageUrl,
-      COMPOSED_OUTFIT_CATEGORY
+      COMPOSED_OUTFIT_CATEGORY,
+      prompt
     );
 
-    if (kioskId) {
-      this.pollStatus(result.id, kioskId);
-    }
+    this.pollStatus(result.id, userId);
 
     return { predictionId: result.id, category: COMPOSED_OUTFIT_CATEGORY };
   }
@@ -51,12 +50,7 @@ export default class TryOnService {
   /**
    * Triggers a try-on for a specific outfit
    */
-  static async runByOutfit(
-    userId: string,
-    outfitId: string,
-    modelImage?: string,
-    kioskId?: string
-  ) {
+  static async runByOutfit(userId: string, outfitId: string, modelImage?: string, prompt?: string) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
     const outfit = await OutfitService.getOutfitById(outfitId, userId);
     const outfitImageUrl = outfit?.file?.fileUrl;
@@ -66,12 +60,11 @@ export default class TryOnService {
     const result = await FashnService.runTryOn(
       modelImageUrl,
       outfitImageUrl,
-      COMPOSED_OUTFIT_CATEGORY
+      COMPOSED_OUTFIT_CATEGORY,
+      prompt
     );
 
-    if (kioskId) {
-      this.pollStatus(result.id, kioskId);
-    }
+    this.pollStatus(result.id, userId);
 
     return { predictionId: result.id, category: COMPOSED_OUTFIT_CATEGORY };
   }
@@ -83,7 +76,7 @@ export default class TryOnService {
     userId: string,
     garmentId: string,
     modelImage?: string,
-    kioskId?: string
+    prompt?: string
   ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
     const garment = await GarmentService.getGarmentById(garmentId);
@@ -94,12 +87,11 @@ export default class TryOnService {
     const result = await FashnService.runVideoTryOn(
       modelImageUrl,
       garmentImageUrl,
-      COMPOSED_OUTFIT_CATEGORY
+      COMPOSED_OUTFIT_CATEGORY,
+      prompt
     );
 
-    if (kioskId) {
-      this.pollStatus(result.id, kioskId, { media: "video" });
-    }
+    this.pollStatus(result.id, userId, { media: "video" });
 
     return { predictionId: result.id, category: COMPOSED_OUTFIT_CATEGORY, media: "video" as const };
   }
@@ -111,7 +103,7 @@ export default class TryOnService {
     userId: string,
     outfitId: string,
     modelImage?: string,
-    kioskId?: string
+    prompt?: string
   ) {
     const modelImageUrl = await this.resolveModelImage(userId, modelImage);
     const outfit = await OutfitService.getOutfitById(outfitId, userId);
@@ -122,12 +114,11 @@ export default class TryOnService {
     const result = await FashnService.runVideoTryOn(
       modelImageUrl,
       outfitImageUrl,
-      COMPOSED_OUTFIT_CATEGORY
+      COMPOSED_OUTFIT_CATEGORY,
+      prompt
     );
 
-    if (kioskId) {
-      this.pollStatus(result.id, kioskId, { media: "video" });
-    }
+    this.pollStatus(result.id, userId, { media: "video" });
 
     return { predictionId: result.id, category: COMPOSED_OUTFIT_CATEGORY, media: "video" as const };
   }
@@ -139,7 +130,7 @@ export default class TryOnService {
    */
   static async pollStatus(
     predictionId: string,
-    kioskId: string,
+    userId: string,
     options: { media?: "image" | "video" } = {}
   ) {
     const isVideo = options.media === "video";
@@ -161,7 +152,7 @@ export default class TryOnService {
           // Emit FASHN's URL directly. Persistence to our S3 is intentionally
           // deferred — see notes on the TODO follow-up to re-add a non-presigned
           // persistence path (CDN-backed or public-read bucket).
-          emitToKiosk(kioskId, "tryon_completed", {
+          notifyCompanion(userId, "tryon_completed", {
             predictionId,
             media: isVideo ? "video" : "image",
             ...(isVideo ? { videoUrl: fashnUrl } : { imageUrl: fashnUrl }),
@@ -171,13 +162,13 @@ export default class TryOnService {
           logger.error(
             `FASHN.AI failed [${predictionId}] full response: ${JSON.stringify(statusData)}`
           );
-          emitToKiosk(kioskId, "tryon_failed", {
+          notifyCompanion(userId, "tryon_failed", {
             predictionId,
             media: isVideo ? "video" : "image",
             error: statusData.error || "Generation failed",
           });
         } else {
-          emitToKiosk(kioskId, "tryon_progress", {
+          notifyCompanion(userId, "tryon_progress", {
             predictionId,
             media: isVideo ? "video" : "image",
             status: statusData.status,
@@ -187,7 +178,7 @@ export default class TryOnService {
         if (attempts >= maxAttempts) {
           clearInterval(interval);
           logger.warn(`Polling timed out for ${predictionId}`);
-          emitToKiosk(kioskId, "tryon_failed", {
+          notifyCompanion(userId, "tryon_failed", {
             media: isVideo ? "video" : "image",
             error: "Generation timed out",
           });

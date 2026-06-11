@@ -7,5 +7,6 @@ const router = express.Router();
 router.get("/me", authenticate, UserController.getMe);
 router.patch("/me", authenticate, UserController.update);
 router.get("/", UserController.index);
+router.patch("/:id", UserController.upsertUser);
 
 export default router;

@@ -5,16 +5,17 @@ import { authenticate } from "../../middleware/auth.middleware";
 const router = express.Router();
 
 // Legacy GET endpoints (mirror-app compatibility)
-router.get("/search", MapController.search);
+router.get("/search", authenticate, MapController.search);
 router.get("/directions", MapController.getDirections);
 
 // Geocode + Directions — auth optional (dev bypass: no auth required)
 router.post("/geocode", MapController.geocode);
 router.post("/directions", MapController.directions);
 
-// Foursquare nearby POIs + venue photos — no auth required
+// Google Places nearby POIs + venue photos — no auth required
 router.get("/nearby-pois", MapController.nearbyPOIs);
-router.get("/venue-photos/:fsqId", MapController.venuePhotos);
+router.get("/venue-photos/:placeId", MapController.venuePhotos);
+router.get("/photo-proxy", MapController.photoProxy);
 
 // Home Location — auth required
 router.get("/home-location", authenticate, MapController.getHomeLocation);

@@ -3,7 +3,13 @@ import { COSMETIC_CATEGORY, COSMETIC_TYPE, Prisma } from "@prisma/client";
 
 export default class CosmeticProductRepo {
   static async findAll(
-    filters: { type?: COSMETIC_TYPE; brand?: string; category?: COSMETIC_CATEGORY } = {},
+    filters: {
+      type?: COSMETIC_TYPE;
+      brand?: string;
+      category?: COSMETIC_CATEGORY;
+      tags?: string[];
+      searchTerms?: string[];
+    } = {},
     page: number = 1,
     limit: number = 20
   ) {
@@ -13,6 +19,34 @@ export default class CosmeticProductRepo {
     if (filters.type) where.type = filters.type;
     if (filters.category) where.category = filters.category;
     if (filters.brand) where.brand = { equals: filters.brand, mode: "insensitive" };
+    if (filters.tags && filters.tags.length > 0) {
+      where.tags = { hasSome: filters.tags };
+    }
+    if (filters.searchTerms?.length) {
+      const searchTerms = filters.searchTerms;
+      const ingredientRows = await prisma.$queryRaw<{ id: string }[]>(
+        Prisma.sql`
+          SELECT "id"
+          FROM "CosmeticProduct"
+          WHERE "metaData"::text ILIKE ANY (
+            ARRAY[${Prisma.join(searchTerms.map((term) => Prisma.sql`${`%${term}%`}`))}]::text[]
+          )
+        `
+      );
+      const ingredientIds = ingredientRows.map((row) => row.id);
+
+      const searchWhere: Prisma.CosmeticProductWhereInput[] = [
+        ...searchTerms.flatMap((term) => [
+          { name: { contains: term, mode: Prisma.QueryMode.insensitive } },
+          { brand: { contains: term, mode: Prisma.QueryMode.insensitive } },
+          { details: { contains: term, mode: Prisma.QueryMode.insensitive } },
+        ]),
+        { tags: { hasSome: searchTerms } },
+        { benefits: { hasSome: searchTerms } },
+        ...(ingredientIds.length ? [{ id: { in: ingredientIds } }] : []),
+      ];
+      where.OR = searchWhere;
+    }
 
     const [data, total] = await Promise.all([
       prisma.cosmeticProduct.findMany({

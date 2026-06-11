@@ -1,13 +1,12 @@
 import InteractionRepo from "../../repositories/interaction.repository";
 
+import { parsePagination } from "../../helpers/pagination.helper";
+
 export default class InteractionService {
   static async getOutfitInteractions(outfitId: string, query: Record<string, string | undefined>) {
-    const { page, limit } = query;
-    return InteractionRepo.findByOutfitId(
-      outfitId,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20
-    );
+    const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
+    const result = await InteractionRepo.findByOutfitId(outfitId, page, limit);
+    return { ...result, sortBy, sortOrder, search, filters };
   }
 
   static async logInteraction(data: { type: string; garmentId: string; outfitId?: string }) {

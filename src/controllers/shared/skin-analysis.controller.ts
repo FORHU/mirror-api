@@ -3,6 +3,8 @@ import Joi from "joi";
 import SkinAnalysisService from "../../services/shared/skin-analysis.service";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
 import { pageFromRepo } from "../../helpers/pagination.helper";
+import { notifyCompanion } from "../../utils/socket.util";
+import logger from "../../utils/logger";
 
 const createSchema = Joi.object({
   fileId: Joi.string().required(),
@@ -36,19 +38,21 @@ export default class SkinAnalysisController {
     }
   }
 
-  static async create(req: Request, res: Response, next: NextFunction) {
+  static async create(req: Request, res: Response) {
     const userId = (req as AuthenticatedRequest).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     const { error, value } = createSchema.validate(req.body, { abortEarly: false });
     if (error) return responseError(res, 400, error.message);
 
-    try {
-      const data = await SkinAnalysisService.create(value, userId);
-      return responseSuccess(res, 201, data, "Skin analysis created");
-    } catch (err) {
-      next(err);
-    }
+    responseSuccess(res, 202, null, "Skin analysis started");
+
+    SkinAnalysisService.create(value, userId).catch((err) => {
+      logger.error(`[SkinAnalysis] Background job failed: ${(err as Error).message}`);
+      notifyCompanion(userId, "skin_analysis_error", {
+        message: (err as Error).message ?? "Skin analysis failed",
+      });
+    });
   }
 
   static async destroy(req: Request, res: Response, next: NextFunction) {

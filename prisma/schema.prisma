@@ -11,7 +11,7 @@ model User {
   id       String      @id @default(cuid())
   email    String      @unique
   username String      @unique
-  gender   USER_GENDER
+  gender   USER_GENDER?
 
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -21,6 +21,8 @@ model User {
   homeLocationLng Float?
 
   userMeasurement Json? // For detailed { height: 90, wight: 70, usualSize: "M" }
+  preferences     Json? // To store long-term AI memories, preferred styles, etc.
+  
   avatarId        String?       @unique
   avatar          File?         @relation("UserAvatar", fields: [avatarId], references: [id])
   outlines        UserOutline[]
@@ -398,6 +400,7 @@ enum GARMENT_GENDER {
 enum USER_GENDER {
   MALE
   FEMALE
+  UNISEX
 }
 
 /// Defines where on the body the garment or accessory is anchored.

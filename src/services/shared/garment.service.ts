@@ -12,15 +12,17 @@ import {
 import FileService from "./file.service";
 import CacheUtil from "../../utils/cache.util";
 import { evaluateGarmentImage, GarmentEvaluation } from "../../utils/openai/evaluate-garment.util";
+import { parsePagination } from "../../helpers/pagination.helper";
 
 const GARMENT_CACHE_TTL = 1800; // 30 minutes — matches a typical user session
 const garmentKey = (id: string) => `garment:${id}`;
 
 export default class GarmentService {
   static async getGarments(query: Record<string, string | string[] | undefined>) {
+    const { page, limit, search: globalSearch } = parsePagination(query as Record<string, unknown>);
     const {
-      page,
-      limit,
+      searchGarment,
+      searchGarmentTags,
       garmentType,
       fittingSlot,
       category,
@@ -30,6 +32,9 @@ export default class GarmentService {
       userId,
       systemOnly,
     } = query;
+
+    const pickStr = (v: string | string[] | undefined) =>
+      v === undefined ? undefined : Array.isArray(v) ? v[0] : v;
 
     const filters: Prisma.GarmentWhereInput = {};
     if (systemOnly === "true") {
@@ -97,11 +102,20 @@ export default class GarmentService {
       filters.tags = { some: { name: Array.isArray(tag) ? tag[0] : tag } };
     }
 
-    return GarmentRepo.findAll(
+    const result = await GarmentRepo.findAll(
       filters,
-      page ? parseInt(page as string) : 1,
-      limit ? parseInt(limit as string) : 20
+      page,
+      limit,
+      globalSearch || pickStr(searchGarment),
+      pickStr(searchGarmentTags)
     );
+    const {
+      sortBy,
+      sortOrder,
+      search,
+      filters: parsedFilters,
+    } = parsePagination(query as Record<string, unknown>);
+    return { ...result, sortBy, sortOrder, search, filters: parsedFilters };
   }
 
   static async getGarmentById(id: string) {
@@ -156,8 +170,9 @@ export default class GarmentService {
     }
 
     if (data.tags && Array.isArray(data.tags)) {
+      const uniqueTags = Array.from(new Set(data.tags));
       garmentData.tags = {
-        connectOrCreate: data.tags.map((tag: string) => ({
+        connectOrCreate: uniqueTags.map((tag: string) => ({
           where: { name: tag },
           create: { name: tag },
         })),
@@ -215,9 +230,10 @@ export default class GarmentService {
     }
 
     if (data.tags && Array.isArray(data.tags)) {
+      const uniqueTags = Array.from(new Set(data.tags));
       garmentData.tags = {
         set: [], // Clear existing tags
-        connectOrCreate: data.tags.map((tag: string) => ({
+        connectOrCreate: uniqueTags.map((tag: string) => ({
           where: { name: tag },
           create: { name: tag },
         })),

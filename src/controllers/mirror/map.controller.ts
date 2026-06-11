@@ -2,10 +2,10 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import { mapService } from "../../services/shared/map.service";
-import { foursquareService } from "../../services/shared/foursquare.service";
+import { googlePlacesService } from "../../services/shared/google-places.service";
 import { PrismaClient } from "@prisma/client";
 import axios from "axios";
-import { MAPBOX_SECRET_TOKEN, ORS_API_KEY } from "../../config";
+import { MAPBOX_SECRET_TOKEN, ORS_API_KEY, GOOGLE_PLACES_API_KEY } from "../../config";
 import logger from "../../utils/logger";
 
 const prisma = new PrismaClient();
@@ -252,11 +252,7 @@ export default class MapController {
     if (error) return res.status(400).json({ error: error.message });
 
     try {
-      const results = await mapService.geocodeAddress(
-        value.query,
-        value.lng ?? 120.596,
-        value.lat ?? 16.3971
-      );
+      const results = await mapService.geocodeAddress(value.query, value.lng, value.lat);
       res.status(200).json({ results });
     } catch (err) {
       if ((err as Error).message === "Geocoding service unavailable") {
@@ -335,45 +331,105 @@ export default class MapController {
 
   /**
    * GET /mirror/map/nearby-pois?lat=&lng=&radius=
-   * Returns nearby Foursquare places around a destination.
+   * Returns nearby Google Places around a destination.
    */
   static async nearbyPOIs(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
       lat: Joi.number().min(-90).max(90).required(),
       lng: Joi.number().min(-180).max(180).required(),
       radius: Joi.number().min(100).max(5000).default(1000),
+      category: Joi.string().optional(),
     });
-
-    const { error, value } = schema.validate(req.query);
+    const { error, value } = schema.validate(req.query, { allowUnknown: false });
     if (error) return res.status(400).json({ error: error.message });
 
     try {
-      const pois = await foursquareService.nearbyPOIs(value.lat, value.lng, value.radius);
-      return res.json({ pois });
+      const pois = await googlePlacesService.nearbyPOIs(
+        value.lat,
+        value.lng,
+        value.radius,
+        value.category
+      );
+      const poisWithProxy = pois.map((p) => ({
+        ...p,
+        photo: p.photo
+          ? `/api/mirror/map/photo-proxy?name=${encodeURIComponent(p.photo)}`
+          : null,
+      }));
+      return res.json({ pois: poisWithProxy });
     } catch (err: any) {
-      if (err.message === "FOURSQUARE_KEY_MISSING") {
-        return res
-          .status(502)
-          .json({ error: "Foursquare API key not configured. Set FOURSQUARE_API_KEY in .env" });
+      if (err.message === "GOOGLE_PLACES_KEY_MISSING") {
+        return res.status(502).json({
+          error: "Google Places API key not configured. Set GOOGLE_PLACES_API_KEY in .env",
+        });
+      }
+      const upstreamStatus = err.response?.status;
+      if (upstreamStatus && upstreamStatus >= 400) {
+        const upstreamMessage = err.response?.data?.error?.message ?? err.message ?? "unknown";
+        logger.error(
+          `[MapController] Google Places nearbyPOIs failed: ${upstreamStatus} ${upstreamMessage}`
+        );
+        return res.status(502).json({ error: "POI service unavailable", upstream: upstreamStatus, detail: upstreamMessage });
       }
       next(err);
     }
   }
 
   /**
-   * GET /mirror/map/venue-photos/:fsqId
-   * Returns Foursquare photos for a specific venue.
+   * GET /mirror/map/venue-photos/:placeId
+   * Returns Google Places photos for a specific venue.
    */
   static async venuePhotos(req: Request, res: Response, next: NextFunction) {
-    const { fsqId } = req.params;
-    if (!fsqId) return res.status(400).json({ error: "fsqId is required" });
+    const { placeId } = req.params;
+    if (!placeId) return res.status(400).json({ error: "placeId is required" });
 
     try {
-      const photos = await foursquareService.venuePhotos(fsqId);
+      const photoNames = await googlePlacesService.venuePhotos(placeId);
+      const photos = photoNames.map(
+        (name) => `/api/mirror/map/photo-proxy?name=${encodeURIComponent(name)}`
+      );
       return res.json({ photos });
     } catch (err: any) {
-      if (err.message === "FOURSQUARE_KEY_MISSING") {
-        return res.status(502).json({ error: "Foursquare API key not configured." });
+      if (err.message === "GOOGLE_PLACES_KEY_MISSING") {
+        return res.status(502).json({ error: "Google Places API key not configured." });
+      }
+      next(err);
+    }
+  }
+
+  static async photoProxy(req: Request, res: Response, next: NextFunction) {
+    const raw = req.query.name as string;
+    if (!raw) {
+      return res.status(400).json({ error: "Missing photo name" });
+    }
+    if (!GOOGLE_PLACES_API_KEY) {
+      return res.status(502).json({ error: "Google Places API key not configured" });
+    }
+
+    // Accept either a raw photo name ("places/.../photos/...") or a legacy full URL
+    let name = raw;
+    if (raw.startsWith("https://places.googleapis.com/v1/")) {
+      const match = raw.match(/\/v1\/(.+?)\/media/);
+      name = match ? match[1] : "";
+    }
+    if (!name || !name.startsWith("places/")) {
+      return res.status(400).json({ error: "Invalid photo name" });
+    }
+
+    const url = `https://places.googleapis.com/v1/${name}/media?maxHeightPx=400&maxWidthPx=400&key=${GOOGLE_PLACES_API_KEY}`;
+
+    try {
+      const response = await axios.get(url, {
+        responseType: "arraybuffer",
+        maxRedirects: 5,
+      });
+      res.set("Content-Type", (response.headers["content-type"] as string) ?? "image/jpeg");
+      res.set("Cache-Control", "public, max-age=86400");
+      res.send(Buffer.from(response.data as ArrayBuffer));
+    } catch (err: any) {
+      const status = err.response?.status;
+      if (status === 403 || status === 404) {
+        return res.status(status).json({ error: "Photo unavailable" });
       }
       next(err);
     }

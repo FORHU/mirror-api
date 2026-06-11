@@ -1,6 +1,8 @@
 import UserRepository from "../../repositories/user.repository";
 import { Prisma } from "@prisma/client";
 
+import { parsePagination } from "../../helpers/pagination.helper";
+
 export default class UserService {
   /**
    * Get user by ID
@@ -16,8 +18,10 @@ export default class UserService {
   /**
    * List users hehe
    */
-  static async listUsers(page?: number, limit?: number) {
-    return UserRepository.findAll(page, limit);
+  static async listUsers(query: Record<string, string | undefined> = {}) {
+    const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
+    const result = await UserRepository.findAll(page, limit);
+    return { ...result, sortBy, sortOrder, search, filters };
   }
 
   /**
@@ -26,5 +30,12 @@ export default class UserService {
   static async updateUser(id: string, data: Prisma.UserUpdateInput) {
     const user = await this.getUser(id);
     return UserRepository.update(user.id, data);
+  }
+
+  /**
+   * Upsert user
+   */
+  static async upsertUser(id: string, data: Prisma.UserUpdateInput) {
+    return UserRepository.upsert(id, data);
   }
 }

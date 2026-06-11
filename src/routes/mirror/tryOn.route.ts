@@ -12,6 +12,7 @@ router.get("/model", authenticate, TryOnModelController.get);
 
 // Try-on runs (image)
 router.post("/run", authenticate, TryOnController.run);
+router.post("/upload-and-run", authenticate, upload.single("file"), TryOnController.uploadAndRun);
 router.post("/garment", authenticate, TryOnController.runByGarment);
 router.post("/outfit", authenticate, TryOnController.runByOutfit);
 

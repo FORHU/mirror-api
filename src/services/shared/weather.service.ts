@@ -106,7 +106,17 @@ export const weatherService = {
       return data;
     } catch (error) {
       logger.error(`Open-Meteo Error: ${(error as Error).message}`);
-      throw new Error("Weather service unavailable");
+      // Fallback to default weather so the AI doesn't refuse to generate data when the external API is down.
+      return {
+        temperature: 22,
+        condition: "Clear sky",
+        icon: "Sun",
+        windspeed: 0,
+        humidity: 50,
+        uvIndex: 0,
+        precipitationProb: 0,
+        unit: "celsius",
+      };
     }
   },
 };

@@ -5,13 +5,13 @@ import { authenticate } from "../../middleware/auth.middleware";
 
 const router = express.Router();
 
-router.get("/", authenticate, GarmentController.index);
-router.get("/:id", authenticate, GarmentController.show);
+router.get("/", GarmentController.index);
+router.get("/:id", GarmentController.show);
 
 // Publicly accessible for administration
-router.post("/", authenticate, handleSingleUpload, GarmentController.create);
+router.post("/", handleSingleUpload, GarmentController.create);
 router.post("/evaluate", authenticate, handleSingleUpload, GarmentController.evaluate);
-router.patch("/:id", authenticate, handleSingleUpload, GarmentController.update);
-router.delete("/:id", authenticate, GarmentController.destroy);
+router.patch("/:id", handleSingleUpload, GarmentController.update);
+router.delete("/:id", GarmentController.destroy);
 
 export default router;

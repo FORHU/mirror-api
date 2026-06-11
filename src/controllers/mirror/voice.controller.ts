@@ -4,6 +4,8 @@ import { voiceService, VoiceContext } from "../../services/shared/voice.service"
 export default class VoiceController {
   static async transcribe(req: Request, res: Response, next: NextFunction) {
     const pcmBuffer = req.body as Buffer;
+    const lang = (req.query.lang as string) || "en-US";
+    const provider = (req.query.provider as string) === "openai" ? "openai" : "aws";
 
     if (!Buffer.isBuffer(pcmBuffer) || pcmBuffer.length === 0) {
       return res.status(400).json({ error: "No audio data received" });
@@ -13,7 +15,11 @@ export default class VoiceController {
     }
 
     try {
-      const transcript = await voiceService.transcribeAudio(pcmBuffer);
+      const transcript = await voiceService.transcribeAudio(
+        pcmBuffer,
+        lang,
+        provider as "aws" | "openai"
+      );
       return res.json({ transcript });
     } catch (err) {
       if ((err as Error).message === "EMPTY_TRANSCRIPT") {
@@ -21,31 +27,6 @@ export default class VoiceController {
           .status(422)
           .json({ error: "Could not transcribe audio. Please speak clearly and try again." });
       }
-      next(err);
-    }
-  }
-
-  static async ask(req: Request, res: Response, next: NextFunction) {
-    const { transcript, ctx } = req.body;
-
-    if (!transcript) return res.status(400).json({ error: "transcript is required" });
-
-    const voiceCtx: VoiceContext = ctx || {};
-
-    try {
-      const { speech, action, audio, events, sessionId } = await voiceService.askAI(
-        transcript,
-        voiceCtx
-      );
-
-      return res.json({
-        reply: speech,
-        action,
-        events: events || [],
-        sessionId,
-        audioBase64: audio.toString("base64"),
-      });
-    } catch (err) {
       next(err);
     }
   }

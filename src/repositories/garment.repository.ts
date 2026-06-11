@@ -2,22 +2,48 @@ import { prisma } from "../utils/prisma";
 import { Prisma } from "@prisma/client";
 
 export default class GarmentRepo {
-  static async findAll(filters: Prisma.GarmentWhereInput, page: number = 1, limit: number = 20) {
+  static async findAll(
+    filters: Prisma.GarmentWhereInput,
+    page: number = 1,
+    limit: number = 20,
+    searchGarment?: string,
+    searchGarmentTags?: string
+  ) {
     const skip = (page - 1) * limit;
 
-    const where: Prisma.GarmentWhereInput = {
-      ...filters,
-    };
+    const where: Prisma.GarmentWhereInput = { ...filters };
+
+    const andClauses: Prisma.GarmentWhereInput[] = Array.isArray(where.AND)
+      ? where.AND
+      : where.AND
+        ? [where.AND]
+        : [];
+
+    const garmentTerm = searchGarment?.trim();
+    if (garmentTerm) {
+      andClauses.push({
+        OR: [
+          { name: { contains: garmentTerm, mode: "insensitive" } },
+          { description: { contains: garmentTerm, mode: "insensitive" } },
+        ],
+      });
+    }
+
+    const tagsTerm = searchGarmentTags?.trim();
+    if (tagsTerm) {
+      andClauses.push({
+        tags: { some: { name: { contains: tagsTerm, mode: "insensitive" } } },
+      });
+    }
+
+    if (andClauses.length) where.AND = andClauses;
 
     const [data, total] = await Promise.all([
       prisma.garment.findMany({
         where,
         skip,
         take: limit,
-        include: {
-          tags: true,
-          file: true,
-        },
+        include: { tags: true, file: true },
         orderBy: { createdAt: "desc" },
       }),
       prisma.garment.count({ where }),

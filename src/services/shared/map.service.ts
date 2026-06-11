@@ -5,6 +5,7 @@ import logger from "../../utils/logger";
 export interface GeocodingFeature {
   id: string;
   place_name: string;
+  place_type: string[];
   center: [number, number];
   geometry: {
     type: "Point";
@@ -23,6 +24,7 @@ export interface GeocodeResult {
   lat: number;
   lng: number;
   placeId: string;
+  placeType: string;
 }
 
 export interface DirectionsStep {
@@ -58,6 +60,26 @@ export interface DirectionsResponse {
 }
 
 export const mapService = {
+  reverseGeocode: async (lat: number, lng: number): Promise<string> => {
+    try {
+      const response = await axios.get<GeocodingResponse>(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json`,
+        {
+          params: {
+            access_token: MAPBOX_SECRET_TOKEN,
+            types: "place,district,locality,neighborhood,poi",
+            limit: 1,
+          },
+        }
+      );
+      const feature = response.data.features?.[0];
+      return feature?.place_name ?? `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    } catch (error) {
+      logger.warn(`[MapService] reverseGeocode failed: ${(error as Error).message}`);
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  },
+
   search: async (query: string, proximity?: string): Promise<GeocodingFeature[]> => {
     if (!query) return [];
 
@@ -111,30 +133,231 @@ export const mapService = {
 
   geocodeAddress: async (
     query: string,
-    proximityLng: number = 120.596,
-    proximityLat: number = 16.3971
+    proximityLng?: number,
+    proximityLat?: number
   ): Promise<GeocodeResult[]> => {
     try {
       const encoded = encodeURIComponent(query);
+      const params: Record<string, string | number> = {
+        access_token: MAPBOX_SECRET_TOKEN,
+        country: "PH",
+        limit: 5,
+        types: "address,place,poi,region,district",
+      };
+      if (proximityLng != null && proximityLat != null) {
+        params.proximity = `${proximityLng},${proximityLat}`;
+      }
       const response = await axios.get<GeocodingResponse>(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json`,
-        {
-          params: {
-            access_token: MAPBOX_SECRET_TOKEN,
-            proximity: `${proximityLng},${proximityLat}`,
-            country: "PH",
-            limit: 5,
-            types: "address,place,poi",
-          },
-        }
+        { params }
       );
-      return response.data.features.map((f) => ({
+      const raw = response.data.features.map((f) => ({
         name: f.place_name.split(",")[0],
         address: f.place_name,
         lat: f.center[1],
         lng: f.center[0],
         placeId: f.id,
+        placeType: f.place_type?.[0] ?? "other",
       }));
+      // Venue-type descriptor words — excluded from context matching because they
+      // are part of a POI name, not an administrative area (e.g. "mall", "church").
+      // They are also used to detect POI queries so we can apply name-match guards.
+      // Venue-type words across English, French, Spanish, German, Italian.
+      // Both accented and unaccented French forms are included because Whisper
+      // (speech-to-text) preserves diacritics but typed queries may not.
+      const VENUE_TYPE_WORDS = new Set([
+        // English
+        "mall",
+        "center",
+        "centre",
+        "plaza",
+        "complex",
+        "building",
+        "tower",
+        "restaurant",
+        "cafe",
+        "cafeteria",
+        "eatery",
+        "diner",
+        "bistro",
+        "bar",
+        "bakery",
+        "grill",
+        "kitchen",
+        "buffet",
+        "food",
+        "court",
+        "church",
+        "chapel",
+        "cathedral",
+        "basilica",
+        "shrine",
+        "parish",
+        "convent",
+        "monastery",
+        "grotto",
+        "school",
+        "university",
+        "college",
+        "academy",
+        "institute",
+        "campus",
+        "hospital",
+        "clinic",
+        "pharmacy",
+        "hotel",
+        "resort",
+        "inn",
+        "lodge",
+        "hostel",
+        "park",
+        "garden",
+        "farm",
+        "market",
+        "supermarket",
+        "museum",
+        "library",
+        "theater",
+        "theatre",
+        "cinema",
+        "gallery",
+        "station",
+        "terminal",
+        "gym",
+        "spa",
+        // French (accented + unaccented)
+        "musée",
+        "musee",
+        "école",
+        "ecole",
+        "lycée",
+        "lycee",
+        "gare",
+        "hôpital",
+        "hopital",
+        "église",
+        "eglise",
+        "cathédrale",
+        "cathedrale",
+        "université",
+        "universite",
+        "bibliothèque",
+        "bibliotheque",
+        "théâtre",
+        "cinéma",
+        "galerie",
+        "mairie",
+        "pharmacie",
+        "palais",
+        "stade",
+        "marché",
+        "marche",
+        "arrondissement",
+        "quartier",
+        // Spanish
+        "escuela",
+        "universidad",
+        "iglesia",
+        "mercado",
+        "parque",
+        "farmacia",
+        // German
+        "schule",
+        "kirche",
+        "krankenhaus",
+        "bahnhof",
+        "markt",
+        // Italian
+        "scuola",
+        "chiesa",
+        "ospedale",
+        "stazione",
+      ]);
+      // Filter results by checking whether any key query word appears in the
+      // administrative context (everything after the first comma in place_name).
+      // This rejects road/street results whose name contains a region word but
+      // whose location is outside that region — e.g. "Benguet Road, Antipolo,
+      // Rizal" for "bugias benguet" (context "Antipolo, Rizal" has no query
+      // word) while keeping "Buguias, Benguet" (context "Benguet, Cordillera"
+      // matches "benguet"). Generic place-type words and venue descriptors are
+      // stripped first so "good taste center mall" doesn't try to match "mall"
+      // against the administrative context of Baguio City.
+      const PLACE_TYPE_WORDS = new Set([
+        "city",
+        "municipality",
+        "province",
+        "barangay",
+        "village",
+        "near",
+        "nearest",
+        "closest",
+        "in",
+        "at",
+        "along",
+        "beside",
+      ]);
+      const ALL_SKIP_WORDS = new Set([...PLACE_TYPE_WORDS, ...VENUE_TYPE_WORDS]);
+      const queryWords = query
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 1 && !ALL_SKIP_WORDS.has(w));
+      const filtered = raw.filter((r) => {
+        const contextLower = r.address.split(",").slice(1).join(",").toLowerCase();
+        return queryWords.some((w) => contextLower.includes(w));
+      });
+      // Secondary guard: reject place/region results (municipalities, cities) whose
+      // name shares no words with the query. This kills fuzzy mismatches like
+      // "Mallig, Isabela" for "good taste center mall" where the query words
+      // ("good", "taste") appear nowhere in "Mallig".
+      const nameWords = query
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !ALL_SKIP_WORDS.has(w));
+      // When context filter finds nothing, sort raw by distance to user's location
+      // so the nearest result wins (prevents popular far-away POIs like BGC from
+      // beating a correct nearby match when the query contains "here in [city]").
+      const proximityLocation =
+        proximityLng != null && proximityLat != null
+          ? { lat: proximityLat, lng: proximityLng }
+          : null;
+      const proximityFallback =
+        filtered.length === 0 && proximityLocation
+          ? [...raw].sort((a, b) => {
+              const dA =
+                (a.lat - proximityLocation.lat) ** 2 + (a.lng - proximityLocation.lng) ** 2;
+              const dB =
+                (b.lat - proximityLocation.lat) ** 2 + (b.lng - proximityLocation.lng) ** 2;
+              return dA - dB;
+            })
+          : null;
+      const base = filtered.length > 0 ? filtered : (proximityFallback ?? raw);
+      const nameGuarded = base.filter((r) => {
+        if (r.placeType === "poi" || r.placeType === "address" || r.placeType === "neighborhood")
+          return true;
+        if (nameWords.length === 0) return true;
+        const resultWords = r.name.toLowerCase().split(/[\s,-]+/);
+        return nameWords.some((qw) => resultWords.some((rw) => rw.includes(qw) || qw.includes(rw)));
+      });
+      const result = nameGuarded.length > 0 ? nameGuarded : base;
+      // For venue-type queries, surface POI results first so the client's
+      // placeType preference can reliably pick the right destination over a
+      // bare address with the same road name (e.g. "Saint Louis University"
+      // poi over "Bonifacio Road, Banaba" address).
+      // Treat ALL-CAPS abbreviations (e.g. "SLU", "UB") as venue queries so POI
+      // results are surfaced first even when no full venue-type word is present.
+      const isVenueQuery =
+        query
+          .toLowerCase()
+          .split(/\s+/)
+          .some((w) => VENUE_TYPE_WORDS.has(w)) || /\b[A-Z]{2,6}\b/.test(query);
+      if (isVenueQuery) {
+        return [...result].sort((a, b) => {
+          const rank = (r: typeof a) =>
+            r.placeType === "poi" ? 0 : r.placeType === "address" ? 1 : 2;
+          return rank(a) - rank(b);
+        });
+      }
+      return result;
     } catch (error) {
       logger.error(`Mapbox Geocode Error: ${(error as Error).message}`);
       throw new Error("Geocoding service unavailable");

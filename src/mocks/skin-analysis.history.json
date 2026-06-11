@@ -1,0 +1,1839 @@
+[
+  {
+    "success": true,
+    "overallScore": 62,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 78 },
+      { "type": "moisture",            "ui_score": 30 },
+      { "type": "acne",                "ui_score": 65 },
+      { "type": "pore",                "ui_score": 70 },
+      { "type": "redness",             "ui_score": 35 },
+      { "type": "wrinkle",             "ui_score": 10 },
+      { "type": "dark_circle_v2",      "ui_score": 40 },
+      { "type": "age_spot",            "ui_score": 15 },
+      { "type": "eye_bag",             "ui_score": 30 },
+      { "type": "droopy_lower_eyelid", "ui_score": 20 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 55,
+    "skinAge": 34,
+    "output": [
+      { "type": "oiliness",            "ui_score": 20 },
+      { "type": "moisture",            "ui_score": 72 },
+      { "type": "acne",                "ui_score": 15 },
+      { "type": "pore",                "ui_score": 20 },
+      { "type": "redness",             "ui_score": 40 },
+      { "type": "wrinkle",             "ui_score": 55 },
+      { "type": "dark_circle_v2",      "ui_score": 45 },
+      { "type": "age_spot",            "ui_score": 30 },
+      { "type": "eye_bag",             "ui_score": 40 },
+      { "type": "droopy_lower_eyelid", "ui_score": 35 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 80,
+    "skinAge": 22,
+    "output": [
+      { "type": "oiliness",            "ui_score": 40 },
+      { "type": "moisture",            "ui_score": 35 },
+      { "type": "acne",                "ui_score": 20 },
+      { "type": "pore",                "ui_score": 25 },
+      { "type": "redness",             "ui_score": 25 },
+      { "type": "wrinkle",             "ui_score": 10 },
+      { "type": "dark_circle_v2",      "ui_score": 30 },
+      { "type": "age_spot",            "ui_score": 10 },
+      { "type": "eye_bag",             "ui_score": 20 },
+      { "type": "droopy_lower_eyelid", "ui_score": 15 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 58,
+    "skinAge": 30,
+    "output": [
+      { "type": "oiliness",            "ui_score": 62 },
+      { "type": "moisture",            "ui_score": 58 },
+      { "type": "acne",                "ui_score": 45 },
+      { "type": "pore",                "ui_score": 55 },
+      { "type": "redness",             "ui_score": 42 },
+      { "type": "wrinkle",             "ui_score": 20 },
+      { "type": "dark_circle_v2",      "ui_score": 50 },
+      { "type": "age_spot",            "ui_score": 20 },
+      { "type": "eye_bag",             "ui_score": 35 },
+      { "type": "droopy_lower_eyelid", "ui_score": 30 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 50,
+    "skinAge": 38,
+    "output": [
+      { "type": "oiliness",            "ui_score": 35 },
+      { "type": "moisture",            "ui_score": 45 },
+      { "type": "acne",                "ui_score": 25 },
+      { "type": "pore",                "ui_score": 30 },
+      { "type": "redness",             "ui_score": 75 },
+      { "type": "wrinkle",             "ui_score": 40 },
+      { "type": "dark_circle_v2",      "ui_score": 55 },
+      { "type": "age_spot",            "ui_score": 35 },
+      { "type": "eye_bag",             "ui_score": 50 },
+      { "type": "droopy_lower_eyelid", "ui_score": 45 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 45,
+    "skinAge": 42,
+    "output": [
+      { "type": "oiliness",            "ui_score": 25 },
+      { "type": "moisture",            "ui_score": 68 },
+      { "type": "acne",                "ui_score": 10 },
+      { "type": "pore",                "ui_score": 20 },
+      { "type": "redness",             "ui_score": 45 },
+      { "type": "wrinkle",             "ui_score": 65 },
+      { "type": "dark_circle_v2",      "ui_score": 62 },
+      { "type": "age_spot",            "ui_score": 65 },
+      { "type": "eye_bag",             "ui_score": 68 },
+      { "type": "droopy_lower_eyelid", "ui_score": 60 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 70,
+    "skinAge": 25,
+    "output": [
+      { "type": "oiliness",            "ui_score": 80 },
+      { "type": "moisture",            "ui_score": 25 },
+      { "type": "acne",                "ui_score": 72 },
+      { "type": "pore",                "ui_score": 68 },
+      { "type": "redness",             "ui_score": 50 },
+      { "type": "wrinkle",             "ui_score": 8 },
+      { "type": "dark_circle_v2",      "ui_score": 35 },
+      { "type": "age_spot",            "ui_score": 10 },
+      { "type": "eye_bag",             "ui_score": 25 },
+      { "type": "droopy_lower_eyelid", "ui_score": 15 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 60,
+    "skinAge": 29,
+    "output": [
+      { "type": "oiliness",            "ui_score": 15 },
+      { "type": "moisture",            "ui_score": 62 },
+      { "type": "acne",                "ui_score": 30 },
+      { "type": "pore",                "ui_score": 25 },
+      { "type": "redness",             "ui_score": 55 },
+      { "type": "wrinkle",             "ui_score": 30 },
+      { "type": "dark_circle_v2",      "ui_score": 65 },
+      { "type": "age_spot",            "ui_score": 25 },
+      { "type": "eye_bag",             "ui_score": 60 },
+      { "type": "droopy_lower_eyelid", "ui_score": 55 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 85,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 24 },
+      { "type": "moisture",            "ui_score": 16 },
+      { "type": "acne",                "ui_score": 18 },
+      { "type": "pore",                "ui_score": 18 },
+      { "type": "redness",             "ui_score": 11 },
+      { "type": "wrinkle",             "ui_score": 17 },
+      { "type": "dark_circle_v2",      "ui_score": 15 },
+      { "type": "age_spot",            "ui_score": 4 },
+      { "type": "eye_bag",             "ui_score": 15 },
+      { "type": "droopy_lower_eyelid", "ui_score": 8 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 58,
+    "skinAge": 26,
+    "output": [
+      { "type": "oiliness",            "ui_score": 92 },
+      { "type": "moisture",            "ui_score": 45 },
+      { "type": "acne",                "ui_score": 85 },
+      { "type": "pore",                "ui_score": 87 },
+      { "type": "redness",             "ui_score": 54 },
+      { "type": "wrinkle",             "ui_score": 18 },
+      { "type": "dark_circle_v2",      "ui_score": 35 },
+      { "type": "age_spot",            "ui_score": 14 },
+      { "type": "eye_bag",             "ui_score": 20 },
+      { "type": "droopy_lower_eyelid", "ui_score": 13 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 73,
+    "skinAge": 24,
+    "output": [
+      { "type": "oiliness",            "ui_score": 20 },
+      { "type": "moisture",            "ui_score": 83 },
+      { "type": "acne",                "ui_score": 19 },
+      { "type": "pore",                "ui_score": 27 },
+      { "type": "redness",             "ui_score": 42 },
+      { "type": "wrinkle",             "ui_score": 41 },
+      { "type": "dark_circle_v2",      "ui_score": 53 },
+      { "type": "age_spot",            "ui_score": 30 },
+      { "type": "eye_bag",             "ui_score": 50 },
+      { "type": "droopy_lower_eyelid", "ui_score": 40 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 60,
+    "skinAge": 26,
+    "output": [
+      { "type": "oiliness",            "ui_score": 63 },
+      { "type": "moisture",            "ui_score": 42 },
+      { "type": "acne",                "ui_score": 45 },
+      { "type": "pore",                "ui_score": 62 },
+      { "type": "redness",             "ui_score": 31 },
+      { "type": "wrinkle",             "ui_score": 12 },
+      { "type": "dark_circle_v2",      "ui_score": 41 },
+      { "type": "age_spot",            "ui_score": 16 },
+      { "type": "eye_bag",             "ui_score": 36 },
+      { "type": "droopy_lower_eyelid", "ui_score": 29 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 71,
+    "skinAge": 23,
+    "output": [
+      { "type": "oiliness",            "ui_score": 37 },
+      { "type": "moisture",            "ui_score": 63 },
+      { "type": "acne",                "ui_score": 29 },
+      { "type": "pore",                "ui_score": 31 },
+      { "type": "redness",             "ui_score": 89 },
+      { "type": "wrinkle",             "ui_score": 30 },
+      { "type": "dark_circle_v2",      "ui_score": 33 },
+      { "type": "age_spot",            "ui_score": 26 },
+      { "type": "eye_bag",             "ui_score": 39 },
+      { "type": "droopy_lower_eyelid", "ui_score": 24 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 65,
+    "skinAge": 48,
+    "output": [
+      { "type": "oiliness",            "ui_score": 29 },
+      { "type": "moisture",            "ui_score": 63 },
+      { "type": "acne",                "ui_score": 20 },
+      { "type": "pore",                "ui_score": 46 },
+      { "type": "redness",             "ui_score": 48 },
+      { "type": "wrinkle",             "ui_score": 98 },
+      { "type": "dark_circle_v2",      "ui_score": 58 },
+      { "type": "age_spot",            "ui_score": 90 },
+      { "type": "eye_bag",             "ui_score": 58 },
+      { "type": "droopy_lower_eyelid", "ui_score": 69 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 67,
+    "skinAge": 40,
+    "output": [
+      { "type": "oiliness",            "ui_score": 37 },
+      { "type": "moisture",            "ui_score": 42 },
+      { "type": "acne",                "ui_score": 17 },
+      { "type": "pore",                "ui_score": 31 },
+      { "type": "redness",             "ui_score": 32 },
+      { "type": "wrinkle",             "ui_score": 38 },
+      { "type": "dark_circle_v2",      "ui_score": 89 },
+      { "type": "age_spot",            "ui_score": 33 },
+      { "type": "eye_bag",             "ui_score": 88 },
+      { "type": "droopy_lower_eyelid", "ui_score": 76 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 54,
+    "skinAge": 29,
+    "output": [
+      { "type": "oiliness",            "ui_score": 55 },
+      { "type": "moisture",            "ui_score": 36 },
+      { "type": "acne",                "ui_score": 48 },
+      { "type": "pore",                "ui_score": 89 },
+      { "type": "redness",             "ui_score": 47 },
+      { "type": "wrinkle",             "ui_score": 22 },
+      { "type": "dark_circle_v2",      "ui_score": 23 },
+      { "type": "age_spot",            "ui_score": 23 },
+      { "type": "eye_bag",             "ui_score": 27 },
+      { "type": "droopy_lower_eyelid", "ui_score": 24 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 81,
+    "skinAge": 26,
+    "output": [
+      { "type": "oiliness",            "ui_score": 35 },
+      { "type": "moisture",            "ui_score": 26 },
+      { "type": "acne",                "ui_score": 26 },
+      { "type": "pore",                "ui_score": 30 },
+      { "type": "redness",             "ui_score": 23 },
+      { "type": "wrinkle",             "ui_score": 22 },
+      { "type": "dark_circle_v2",      "ui_score": 26 },
+      { "type": "age_spot",            "ui_score": 20 },
+      { "type": "eye_bag",             "ui_score": 32 },
+      { "type": "droopy_lower_eyelid", "ui_score": 25 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 62,
+    "skinAge": 33,
+    "output": [
+      { "type": "oiliness",            "ui_score": 46 },
+      { "type": "moisture",            "ui_score": 67 },
+      { "type": "acne",                "ui_score": 80 },
+      { "type": "pore",                "ui_score": 66 },
+      { "type": "redness",             "ui_score": 69 },
+      { "type": "wrinkle",             "ui_score": 33 },
+      { "type": "dark_circle_v2",      "ui_score": 70 },
+      { "type": "age_spot",            "ui_score": 17 },
+      { "type": "eye_bag",             "ui_score": 69 },
+      { "type": "droopy_lower_eyelid", "ui_score": 45 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 95,
+    "skinAge": 22,
+    "output": [
+      { "type": "oiliness",            "ui_score": 19 },
+      { "type": "moisture",            "ui_score": 28 },
+      { "type": "acne",                "ui_score": 9 },
+      { "type": "pore",                "ui_score": 21 },
+      { "type": "redness",             "ui_score": 20 },
+      { "type": "wrinkle",             "ui_score": 14 },
+      { "type": "dark_circle_v2",      "ui_score": 27 },
+      { "type": "age_spot",            "ui_score": 2 },
+      { "type": "eye_bag",             "ui_score": 19 },
+      { "type": "droopy_lower_eyelid", "ui_score": 10 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 59,
+    "skinAge": 18,
+    "output": [
+      { "type": "oiliness",            "ui_score": 96 },
+      { "type": "moisture",            "ui_score": 34 },
+      { "type": "acne",                "ui_score": 90 },
+      { "type": "pore",                "ui_score": 80 },
+      { "type": "redness",             "ui_score": 66 },
+      { "type": "wrinkle",             "ui_score": 3 },
+      { "type": "dark_circle_v2",      "ui_score": 31 },
+      { "type": "age_spot",            "ui_score": 7 },
+      { "type": "eye_bag",             "ui_score": 25 },
+      { "type": "droopy_lower_eyelid", "ui_score": 8 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 66,
+    "skinAge": 32,
+    "output": [
+      { "type": "oiliness",            "ui_score": 9 },
+      { "type": "moisture",            "ui_score": 76 },
+      { "type": "acne",                "ui_score": 8 },
+      { "type": "pore",                "ui_score": 25 },
+      { "type": "redness",             "ui_score": 42 },
+      { "type": "wrinkle",             "ui_score": 44 },
+      { "type": "dark_circle_v2",      "ui_score": 45 },
+      { "type": "age_spot",            "ui_score": 32 },
+      { "type": "eye_bag",             "ui_score": 43 },
+      { "type": "droopy_lower_eyelid", "ui_score": 33 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 76,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 63 },
+      { "type": "moisture",            "ui_score": 35 },
+      { "type": "acne",                "ui_score": 51 },
+      { "type": "pore",                "ui_score": 64 },
+      { "type": "redness",             "ui_score": 41 },
+      { "type": "wrinkle",             "ui_score": 22 },
+      { "type": "dark_circle_v2",      "ui_score": 32 },
+      { "type": "age_spot",            "ui_score": 16 },
+      { "type": "eye_bag",             "ui_score": 26 },
+      { "type": "droopy_lower_eyelid", "ui_score": 26 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 74,
+    "skinAge": 19,
+    "output": [
+      { "type": "oiliness",            "ui_score": 30 },
+      { "type": "moisture",            "ui_score": 52 },
+      { "type": "acne",                "ui_score": 37 },
+      { "type": "pore",                "ui_score": 30 },
+      { "type": "redness",             "ui_score": 79 },
+      { "type": "wrinkle",             "ui_score": 17 },
+      { "type": "dark_circle_v2",      "ui_score": 41 },
+      { "type": "age_spot",            "ui_score": 28 },
+      { "type": "eye_bag",             "ui_score": 25 },
+      { "type": "droopy_lower_eyelid", "ui_score": 38 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 54,
+    "skinAge": 54,
+    "output": [
+      { "type": "oiliness",            "ui_score": 22 },
+      { "type": "moisture",            "ui_score": 61 },
+      { "type": "acne",                "ui_score": 18 },
+      { "type": "pore",                "ui_score": 47 },
+      { "type": "redness",             "ui_score": 46 },
+      { "type": "wrinkle",             "ui_score": 96 },
+      { "type": "dark_circle_v2",      "ui_score": 48 },
+      { "type": "age_spot",            "ui_score": 100 },
+      { "type": "eye_bag",             "ui_score": 55 },
+      { "type": "droopy_lower_eyelid", "ui_score": 67 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 70,
+    "skinAge": 37,
+    "output": [
+      { "type": "oiliness",            "ui_score": 25 },
+      { "type": "moisture",            "ui_score": 44 },
+      { "type": "acne",                "ui_score": 20 },
+      { "type": "pore",                "ui_score": 33 },
+      { "type": "redness",             "ui_score": 39 },
+      { "type": "wrinkle",             "ui_score": 39 },
+      { "type": "dark_circle_v2",      "ui_score": 92 },
+      { "type": "age_spot",            "ui_score": 29 },
+      { "type": "eye_bag",             "ui_score": 84 },
+      { "type": "droopy_lower_eyelid", "ui_score": 79 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 52,
+    "skinAge": 39,
+    "output": [
+      { "type": "oiliness",            "ui_score": 64 },
+      { "type": "moisture",            "ui_score": 37 },
+      { "type": "acne",                "ui_score": 48 },
+      { "type": "pore",                "ui_score": 93 },
+      { "type": "redness",             "ui_score": 38 },
+      { "type": "wrinkle",             "ui_score": 23 },
+      { "type": "dark_circle_v2",      "ui_score": 26 },
+      { "type": "age_spot",            "ui_score": 15 },
+      { "type": "eye_bag",             "ui_score": 32 },
+      { "type": "droopy_lower_eyelid", "ui_score": 19 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 81,
+    "skinAge": 31,
+    "output": [
+      { "type": "oiliness",            "ui_score": 29 },
+      { "type": "moisture",            "ui_score": 33 },
+      { "type": "acne",                "ui_score": 26 },
+      { "type": "pore",                "ui_score": 29 },
+      { "type": "redness",             "ui_score": 26 },
+      { "type": "wrinkle",             "ui_score": 21 },
+      { "type": "dark_circle_v2",      "ui_score": 27 },
+      { "type": "age_spot",            "ui_score": 15 },
+      { "type": "eye_bag",             "ui_score": 24 },
+      { "type": "droopy_lower_eyelid", "ui_score": 16 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 51,
+    "skinAge": 31,
+    "output": [
+      { "type": "oiliness",            "ui_score": 50 },
+      { "type": "moisture",            "ui_score": 78 },
+      { "type": "acne",                "ui_score": 82 },
+      { "type": "pore",                "ui_score": 55 },
+      { "type": "redness",             "ui_score": 64 },
+      { "type": "wrinkle",             "ui_score": 29 },
+      { "type": "dark_circle_v2",      "ui_score": 65 },
+      { "type": "age_spot",            "ui_score": 25 },
+      { "type": "eye_bag",             "ui_score": 66 },
+      { "type": "droopy_lower_eyelid", "ui_score": 32 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 91,
+    "skinAge": 32,
+    "output": [
+      { "type": "oiliness",            "ui_score": 18 },
+      { "type": "moisture",            "ui_score": 21 },
+      { "type": "acne",                "ui_score": 15 },
+      { "type": "pore",                "ui_score": 22 },
+      { "type": "redness",             "ui_score": 21 },
+      { "type": "wrinkle",             "ui_score": 14 },
+      { "type": "dark_circle_v2",      "ui_score": 25 },
+      { "type": "age_spot",            "ui_score": 12 },
+      { "type": "eye_bag",             "ui_score": 11 },
+      { "type": "droopy_lower_eyelid", "ui_score": 8 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 51,
+    "skinAge": 19,
+    "output": [
+      { "type": "oiliness",            "ui_score": 87 },
+      { "type": "moisture",            "ui_score": 33 },
+      { "type": "acne",                "ui_score": 78 },
+      { "type": "pore",                "ui_score": 90 },
+      { "type": "redness",             "ui_score": 62 },
+      { "type": "wrinkle",             "ui_score": 4 },
+      { "type": "dark_circle_v2",      "ui_score": 28 },
+      { "type": "age_spot",            "ui_score": 6 },
+      { "type": "eye_bag",             "ui_score": 25 },
+      { "type": "droopy_lower_eyelid", "ui_score": 20 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 56,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 20 },
+      { "type": "moisture",            "ui_score": 79 },
+      { "type": "acne",                "ui_score": 22 },
+      { "type": "pore",                "ui_score": 31 },
+      { "type": "redness",             "ui_score": 52 },
+      { "type": "wrinkle",             "ui_score": 53 },
+      { "type": "dark_circle_v2",      "ui_score": 50 },
+      { "type": "age_spot",            "ui_score": 34 },
+      { "type": "eye_bag",             "ui_score": 47 },
+      { "type": "droopy_lower_eyelid", "ui_score": 33 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 73,
+    "skinAge": 27,
+    "output": [
+      { "type": "oiliness",            "ui_score": 73 },
+      { "type": "moisture",            "ui_score": 39 },
+      { "type": "acne",                "ui_score": 46 },
+      { "type": "pore",                "ui_score": 65 },
+      { "type": "redness",             "ui_score": 29 },
+      { "type": "wrinkle",             "ui_score": 13 },
+      { "type": "dark_circle_v2",      "ui_score": 37 },
+      { "type": "age_spot",            "ui_score": 12 },
+      { "type": "eye_bag",             "ui_score": 32 },
+      { "type": "droopy_lower_eyelid", "ui_score": 31 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 73,
+    "skinAge": 32,
+    "output": [
+      { "type": "oiliness",            "ui_score": 31 },
+      { "type": "moisture",            "ui_score": 63 },
+      { "type": "acne",                "ui_score": 41 },
+      { "type": "pore",                "ui_score": 43 },
+      { "type": "redness",             "ui_score": 90 },
+      { "type": "wrinkle",             "ui_score": 31 },
+      { "type": "dark_circle_v2",      "ui_score": 49 },
+      { "type": "age_spot",            "ui_score": 16 },
+      { "type": "eye_bag",             "ui_score": 35 },
+      { "type": "droopy_lower_eyelid", "ui_score": 22 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 48,
+    "skinAge": 60,
+    "output": [
+      { "type": "oiliness",            "ui_score": 29 },
+      { "type": "moisture",            "ui_score": 56 },
+      { "type": "acne",                "ui_score": 15 },
+      { "type": "pore",                "ui_score": 50 },
+      { "type": "redness",             "ui_score": 46 },
+      { "type": "wrinkle",             "ui_score": 93 },
+      { "type": "dark_circle_v2",      "ui_score": 51 },
+      { "type": "age_spot",            "ui_score": 99 },
+      { "type": "eye_bag",             "ui_score": 57 },
+      { "type": "droopy_lower_eyelid", "ui_score": 77 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 66,
+    "skinAge": 30,
+    "output": [
+      { "type": "oiliness",            "ui_score": 32 },
+      { "type": "moisture",            "ui_score": 40 },
+      { "type": "acne",                "ui_score": 20 },
+      { "type": "pore",                "ui_score": 42 },
+      { "type": "redness",             "ui_score": 38 },
+      { "type": "wrinkle",             "ui_score": 38 },
+      { "type": "dark_circle_v2",      "ui_score": 95 },
+      { "type": "age_spot",            "ui_score": 32 },
+      { "type": "eye_bag",             "ui_score": 88 },
+      { "type": "droopy_lower_eyelid", "ui_score": 79 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 52,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 69 },
+      { "type": "moisture",            "ui_score": 48 },
+      { "type": "acne",                "ui_score": 60 },
+      { "type": "pore",                "ui_score": 91 },
+      { "type": "redness",             "ui_score": 40 },
+      { "type": "wrinkle",             "ui_score": 20 },
+      { "type": "dark_circle_v2",      "ui_score": 36 },
+      { "type": "age_spot",            "ui_score": 10 },
+      { "type": "eye_bag",             "ui_score": 22 },
+      { "type": "droopy_lower_eyelid", "ui_score": 24 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 81,
+    "skinAge": 26,
+    "output": [
+      { "type": "oiliness",            "ui_score": 35 },
+      { "type": "moisture",            "ui_score": 33 },
+      { "type": "acne",                "ui_score": 19 },
+      { "type": "pore",                "ui_score": 30 },
+      { "type": "redness",             "ui_score": 28 },
+      { "type": "wrinkle",             "ui_score": 25 },
+      { "type": "dark_circle_v2",      "ui_score": 25 },
+      { "type": "age_spot",            "ui_score": 17 },
+      { "type": "eye_bag",             "ui_score": 21 },
+      { "type": "droopy_lower_eyelid", "ui_score": 16 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 53,
+    "skinAge": 33,
+    "output": [
+      { "type": "oiliness",            "ui_score": 58 },
+      { "type": "moisture",            "ui_score": 63 },
+      { "type": "acne",                "ui_score": 69 },
+      { "type": "pore",                "ui_score": 67 },
+      { "type": "redness",             "ui_score": 67 },
+      { "type": "wrinkle",             "ui_score": 24 },
+      { "type": "dark_circle_v2",      "ui_score": 76 },
+      { "type": "age_spot",            "ui_score": 11 },
+      { "type": "eye_bag",             "ui_score": 58 },
+      { "type": "droopy_lower_eyelid", "ui_score": 39 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 83,
+    "skinAge": 19,
+    "output": [
+      { "type": "oiliness",            "ui_score": 16 },
+      { "type": "moisture",            "ui_score": 16 },
+      { "type": "acne",                "ui_score": 16 },
+      { "type": "pore",                "ui_score": 19 },
+      { "type": "redness",             "ui_score": 16 },
+      { "type": "wrinkle",             "ui_score": 15 },
+      { "type": "dark_circle_v2",      "ui_score": 21 },
+      { "type": "age_spot",            "ui_score": 6 },
+      { "type": "eye_bag",             "ui_score": 14 },
+      { "type": "droopy_lower_eyelid", "ui_score": 9 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 59,
+    "skinAge": 19,
+    "output": [
+      { "type": "oiliness",            "ui_score": 97 },
+      { "type": "moisture",            "ui_score": 42 },
+      { "type": "acne",                "ui_score": 80 },
+      { "type": "pore",                "ui_score": 82 },
+      { "type": "redness",             "ui_score": 56 },
+      { "type": "wrinkle",             "ui_score": 6 },
+      { "type": "dark_circle_v2",      "ui_score": 27 },
+      { "type": "age_spot",            "ui_score": 11 },
+      { "type": "eye_bag",             "ui_score": 16 },
+      { "type": "droopy_lower_eyelid", "ui_score": 25 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 53,
+    "skinAge": 27,
+    "output": [
+      { "type": "oiliness",            "ui_score": 9 },
+      { "type": "moisture",            "ui_score": 76 },
+      { "type": "acne",                "ui_score": 18 },
+      { "type": "pore",                "ui_score": 25 },
+      { "type": "redness",             "ui_score": 45 },
+      { "type": "wrinkle",             "ui_score": 55 },
+      { "type": "dark_circle_v2",      "ui_score": 56 },
+      { "type": "age_spot",            "ui_score": 33 },
+      { "type": "eye_bag",             "ui_score": 44 },
+      { "type": "droopy_lower_eyelid", "ui_score": 36 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 72,
+    "skinAge": 34,
+    "output": [
+      { "type": "oiliness",            "ui_score": 66 },
+      { "type": "moisture",            "ui_score": 40 },
+      { "type": "acne",                "ui_score": 42 },
+      { "type": "pore",                "ui_score": 65 },
+      { "type": "redness",             "ui_score": 27 },
+      { "type": "wrinkle",             "ui_score": 14 },
+      { "type": "dark_circle_v2",      "ui_score": 42 },
+      { "type": "age_spot",            "ui_score": 11 },
+      { "type": "eye_bag",             "ui_score": 40 },
+      { "type": "droopy_lower_eyelid", "ui_score": 30 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 55,
+    "skinAge": 31,
+    "output": [
+      { "type": "oiliness",            "ui_score": 33 },
+      { "type": "moisture",            "ui_score": 57 },
+      { "type": "acne",                "ui_score": 44 },
+      { "type": "pore",                "ui_score": 29 },
+      { "type": "redness",             "ui_score": 90 },
+      { "type": "wrinkle",             "ui_score": 14 },
+      { "type": "dark_circle_v2",      "ui_score": 32 },
+      { "type": "age_spot",            "ui_score": 13 },
+      { "type": "eye_bag",             "ui_score": 38 },
+      { "type": "droopy_lower_eyelid", "ui_score": 19 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 45,
+    "skinAge": 56,
+    "output": [
+      { "type": "oiliness",            "ui_score": 24 },
+      { "type": "moisture",            "ui_score": 67 },
+      { "type": "acne",                "ui_score": 9 },
+      { "type": "pore",                "ui_score": 43 },
+      { "type": "redness",             "ui_score": 40 },
+      { "type": "wrinkle",             "ui_score": 100 },
+      { "type": "dark_circle_v2",      "ui_score": 49 },
+      { "type": "age_spot",            "ui_score": 92 },
+      { "type": "eye_bag",             "ui_score": 69 },
+      { "type": "droopy_lower_eyelid", "ui_score": 65 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 58,
+    "skinAge": 40,
+    "output": [
+      { "type": "oiliness",            "ui_score": 38 },
+      { "type": "moisture",            "ui_score": 46 },
+      { "type": "acne",                "ui_score": 30 },
+      { "type": "pore",                "ui_score": 42 },
+      { "type": "redness",             "ui_score": 33 },
+      { "type": "wrinkle",             "ui_score": 33 },
+      { "type": "dark_circle_v2",      "ui_score": 91 },
+      { "type": "age_spot",            "ui_score": 34 },
+      { "type": "eye_bag",             "ui_score": 81 },
+      { "type": "droopy_lower_eyelid", "ui_score": 78 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 57,
+    "skinAge": 26,
+    "output": [
+      { "type": "oiliness",            "ui_score": 61 },
+      { "type": "moisture",            "ui_score": 42 },
+      { "type": "acne",                "ui_score": 49 },
+      { "type": "pore",                "ui_score": 83 },
+      { "type": "redness",             "ui_score": 43 },
+      { "type": "wrinkle",             "ui_score": 26 },
+      { "type": "dark_circle_v2",      "ui_score": 28 },
+      { "type": "age_spot",            "ui_score": 7 },
+      { "type": "eye_bag",             "ui_score": 27 },
+      { "type": "droopy_lower_eyelid", "ui_score": 17 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 72,
+    "skinAge": 39,
+    "output": [
+      { "type": "oiliness",            "ui_score": 37 },
+      { "type": "moisture",            "ui_score": 33 },
+      { "type": "acne",                "ui_score": 23 },
+      { "type": "pore",                "ui_score": 27 },
+      { "type": "redness",             "ui_score": 29 },
+      { "type": "wrinkle",             "ui_score": 22 },
+      { "type": "dark_circle_v2",      "ui_score": 36 },
+      { "type": "age_spot",            "ui_score": 22 },
+      { "type": "eye_bag",             "ui_score": 30 },
+      { "type": "droopy_lower_eyelid", "ui_score": 23 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 61,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 59 },
+      { "type": "moisture",            "ui_score": 62 },
+      { "type": "acne",                "ui_score": 66 },
+      { "type": "pore",                "ui_score": 61 },
+      { "type": "redness",             "ui_score": 63 },
+      { "type": "wrinkle",             "ui_score": 26 },
+      { "type": "dark_circle_v2",      "ui_score": 62 },
+      { "type": "age_spot",            "ui_score": 9 },
+      { "type": "eye_bag",             "ui_score": 55 },
+      { "type": "droopy_lower_eyelid", "ui_score": 44 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 83,
+    "skinAge": 19,
+    "output": [
+      { "type": "oiliness",            "ui_score": 23 },
+      { "type": "moisture",            "ui_score": 27 },
+      { "type": "acne",                "ui_score": 6 },
+      { "type": "pore",                "ui_score": 14 },
+      { "type": "redness",             "ui_score": 15 },
+      { "type": "wrinkle",             "ui_score": 16 },
+      { "type": "dark_circle_v2",      "ui_score": 23 },
+      { "type": "age_spot",            "ui_score": 10 },
+      { "type": "eye_bag",             "ui_score": 23 },
+      { "type": "droopy_lower_eyelid", "ui_score": 18 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 54,
+    "skinAge": 19,
+    "output": [
+      { "type": "oiliness",            "ui_score": 85 },
+      { "type": "moisture",            "ui_score": 36 },
+      { "type": "acne",                "ui_score": 83 },
+      { "type": "pore",                "ui_score": 77 },
+      { "type": "redness",             "ui_score": 60 },
+      { "type": "wrinkle",             "ui_score": 17 },
+      { "type": "dark_circle_v2",      "ui_score": 34 },
+      { "type": "age_spot",            "ui_score": 3 },
+      { "type": "eye_bag",             "ui_score": 18 },
+      { "type": "droopy_lower_eyelid", "ui_score": 18 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 63,
+    "skinAge": 41,
+    "output": [
+      { "type": "oiliness",            "ui_score": 21 },
+      { "type": "moisture",            "ui_score": 82 },
+      { "type": "acne",                "ui_score": 21 },
+      { "type": "pore",                "ui_score": 36 },
+      { "type": "redness",             "ui_score": 45 },
+      { "type": "wrinkle",             "ui_score": 55 },
+      { "type": "dark_circle_v2",      "ui_score": 58 },
+      { "type": "age_spot",            "ui_score": 38 },
+      { "type": "eye_bag",             "ui_score": 41 },
+      { "type": "droopy_lower_eyelid", "ui_score": 42 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 68,
+    "skinAge": 34,
+    "output": [
+      { "type": "oiliness",            "ui_score": 61 },
+      { "type": "moisture",            "ui_score": 37 },
+      { "type": "acne",                "ui_score": 39 },
+      { "type": "pore",                "ui_score": 62 },
+      { "type": "redness",             "ui_score": 29 },
+      { "type": "wrinkle",             "ui_score": 24 },
+      { "type": "dark_circle_v2",      "ui_score": 36 },
+      { "type": "age_spot",            "ui_score": 11 },
+      { "type": "eye_bag",             "ui_score": 34 },
+      { "type": "droopy_lower_eyelid", "ui_score": 22 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 69,
+    "skinAge": 24,
+    "output": [
+      { "type": "oiliness",            "ui_score": 29 },
+      { "type": "moisture",            "ui_score": 56 },
+      { "type": "acne",                "ui_score": 45 },
+      { "type": "pore",                "ui_score": 25 },
+      { "type": "redness",             "ui_score": 86 },
+      { "type": "wrinkle",             "ui_score": 31 },
+      { "type": "dark_circle_v2",      "ui_score": 43 },
+      { "type": "age_spot",            "ui_score": 14 },
+      { "type": "eye_bag",             "ui_score": 32 },
+      { "type": "droopy_lower_eyelid", "ui_score": 37 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 56,
+    "skinAge": 63,
+    "output": [
+      { "type": "oiliness",            "ui_score": 29 },
+      { "type": "moisture",            "ui_score": 62 },
+      { "type": "acne",                "ui_score": 20 },
+      { "type": "pore",                "ui_score": 44 },
+      { "type": "redness",             "ui_score": 34 },
+      { "type": "wrinkle",             "ui_score": 100 },
+      { "type": "dark_circle_v2",      "ui_score": 58 },
+      { "type": "age_spot",            "ui_score": 100 },
+      { "type": "eye_bag",             "ui_score": 60 },
+      { "type": "droopy_lower_eyelid", "ui_score": 75 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 64,
+    "skinAge": 29,
+    "output": [
+      { "type": "oiliness",            "ui_score": 30 },
+      { "type": "moisture",            "ui_score": 39 },
+      { "type": "acne",                "ui_score": 20 },
+      { "type": "pore",                "ui_score": 30 },
+      { "type": "redness",             "ui_score": 31 },
+      { "type": "wrinkle",             "ui_score": 34 },
+      { "type": "dark_circle_v2",      "ui_score": 85 },
+      { "type": "age_spot",            "ui_score": 26 },
+      { "type": "eye_bag",             "ui_score": 82 },
+      { "type": "droopy_lower_eyelid", "ui_score": 77 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 68,
+    "skinAge": 31,
+    "output": [
+      { "type": "oiliness",            "ui_score": 56 },
+      { "type": "moisture",            "ui_score": 42 },
+      { "type": "acne",                "ui_score": 59 },
+      { "type": "pore",                "ui_score": 91 },
+      { "type": "redness",             "ui_score": 53 },
+      { "type": "wrinkle",             "ui_score": 18 },
+      { "type": "dark_circle_v2",      "ui_score": 27 },
+      { "type": "age_spot",            "ui_score": 13 },
+      { "type": "eye_bag",             "ui_score": 28 },
+      { "type": "droopy_lower_eyelid", "ui_score": 17 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 75,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 37 },
+      { "type": "moisture",            "ui_score": 26 },
+      { "type": "acne",                "ui_score": 25 },
+      { "type": "pore",                "ui_score": 35 },
+      { "type": "redness",             "ui_score": 22 },
+      { "type": "wrinkle",             "ui_score": 22 },
+      { "type": "dark_circle_v2",      "ui_score": 33 },
+      { "type": "age_spot",            "ui_score": 15 },
+      { "type": "eye_bag",             "ui_score": 21 },
+      { "type": "droopy_lower_eyelid", "ui_score": 15 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 50,
+    "skinAge": 34,
+    "output": [
+      { "type": "oiliness",            "ui_score": 52 },
+      { "type": "moisture",            "ui_score": 73 },
+      { "type": "acne",                "ui_score": 71 },
+      { "type": "pore",                "ui_score": 65 },
+      { "type": "redness",             "ui_score": 55 },
+      { "type": "wrinkle",             "ui_score": 21 },
+      { "type": "dark_circle_v2",      "ui_score": 78 },
+      { "type": "age_spot",            "ui_score": 10 },
+      { "type": "eye_bag",             "ui_score": 59 },
+      { "type": "droopy_lower_eyelid", "ui_score": 31 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 95,
+    "skinAge": 23,
+    "output": [
+      { "type": "oiliness",            "ui_score": 18 },
+      { "type": "moisture",            "ui_score": 28 },
+      { "type": "acne",                "ui_score": 7 },
+      { "type": "pore",                "ui_score": 20 },
+      { "type": "redness",             "ui_score": 17 },
+      { "type": "wrinkle",             "ui_score": 12 },
+      { "type": "dark_circle_v2",      "ui_score": 27 },
+      { "type": "age_spot",            "ui_score": 10 },
+      { "type": "eye_bag",             "ui_score": 22 },
+      { "type": "droopy_lower_eyelid", "ui_score": 9 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 66,
+    "skinAge": 15,
+    "output": [
+      { "type": "oiliness",            "ui_score": 91 },
+      { "type": "moisture",            "ui_score": 41 },
+      { "type": "acne",                "ui_score": 92 },
+      { "type": "pore",                "ui_score": 88 },
+      { "type": "redness",             "ui_score": 65 },
+      { "type": "wrinkle",             "ui_score": 3 },
+      { "type": "dark_circle_v2",      "ui_score": 42 },
+      { "type": "age_spot",            "ui_score": 9 },
+      { "type": "eye_bag",             "ui_score": 16 },
+      { "type": "droopy_lower_eyelid", "ui_score": 18 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 53,
+    "skinAge": 43,
+    "output": [
+      { "type": "oiliness",            "ui_score": 12 },
+      { "type": "moisture",            "ui_score": 82 },
+      { "type": "acne",                "ui_score": 24 },
+      { "type": "pore",                "ui_score": 22 },
+      { "type": "redness",             "ui_score": 48 },
+      { "type": "wrinkle",             "ui_score": 46 },
+      { "type": "dark_circle_v2",      "ui_score": 54 },
+      { "type": "age_spot",            "ui_score": 28 },
+      { "type": "eye_bag",             "ui_score": 47 },
+      { "type": "droopy_lower_eyelid", "ui_score": 30 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 66,
+    "skinAge": 25,
+    "output": [
+      { "type": "oiliness",            "ui_score": 64 },
+      { "type": "moisture",            "ui_score": 35 },
+      { "type": "acne",                "ui_score": 53 },
+      { "type": "pore",                "ui_score": 60 },
+      { "type": "redness",             "ui_score": 27 },
+      { "type": "wrinkle",             "ui_score": 14 },
+      { "type": "dark_circle_v2",      "ui_score": 43 },
+      { "type": "age_spot",            "ui_score": 19 },
+      { "type": "eye_bag",             "ui_score": 29 },
+      { "type": "droopy_lower_eyelid", "ui_score": 23 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 68,
+    "skinAge": 21,
+    "output": [
+      { "type": "oiliness",            "ui_score": 25 },
+      { "type": "moisture",            "ui_score": 59 },
+      { "type": "acne",                "ui_score": 35 },
+      { "type": "pore",                "ui_score": 35 },
+      { "type": "redness",             "ui_score": 96 },
+      { "type": "wrinkle",             "ui_score": 31 },
+      { "type": "dark_circle_v2",      "ui_score": 46 },
+      { "type": "age_spot",            "ui_score": 15 },
+      { "type": "eye_bag",             "ui_score": 37 },
+      { "type": "droopy_lower_eyelid", "ui_score": 27 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 67,
+    "skinAge": 62,
+    "output": [
+      { "type": "oiliness",            "ui_score": 17 },
+      { "type": "moisture",            "ui_score": 70 },
+      { "type": "acne",                "ui_score": 6 },
+      { "type": "pore",                "ui_score": 51 },
+      { "type": "redness",             "ui_score": 35 },
+      { "type": "wrinkle",             "ui_score": 100 },
+      { "type": "dark_circle_v2",      "ui_score": 46 },
+      { "type": "age_spot",            "ui_score": 100 },
+      { "type": "eye_bag",             "ui_score": 64 },
+      { "type": "droopy_lower_eyelid", "ui_score": 74 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 63,
+    "skinAge": 45,
+    "output": [
+      { "type": "oiliness",            "ui_score": 30 },
+      { "type": "moisture",            "ui_score": 43 },
+      { "type": "acne",                "ui_score": 28 },
+      { "type": "pore",                "ui_score": 43 },
+      { "type": "redness",             "ui_score": 28 },
+      { "type": "wrinkle",             "ui_score": 41 },
+      { "type": "dark_circle_v2",      "ui_score": 88 },
+      { "type": "age_spot",            "ui_score": 25 },
+      { "type": "eye_bag",             "ui_score": 81 },
+      { "type": "droopy_lower_eyelid", "ui_score": 75 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 63,
+    "skinAge": 25,
+    "output": [
+      { "type": "oiliness",            "ui_score": 59 },
+      { "type": "moisture",            "ui_score": 39 },
+      { "type": "acne",                "ui_score": 60 },
+      { "type": "pore",                "ui_score": 92 },
+      { "type": "redness",             "ui_score": 42 },
+      { "type": "wrinkle",             "ui_score": 22 },
+      { "type": "dark_circle_v2",      "ui_score": 33 },
+      { "type": "age_spot",            "ui_score": 18 },
+      { "type": "eye_bag",             "ui_score": 30 },
+      { "type": "droopy_lower_eyelid", "ui_score": 24 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 73,
+    "skinAge": 29,
+    "output": [
+      { "type": "oiliness",            "ui_score": 34 },
+      { "type": "moisture",            "ui_score": 35 },
+      { "type": "acne",                "ui_score": 29 },
+      { "type": "pore",                "ui_score": 33 },
+      { "type": "redness",             "ui_score": 30 },
+      { "type": "wrinkle",             "ui_score": 24 },
+      { "type": "dark_circle_v2",      "ui_score": 31 },
+      { "type": "age_spot",            "ui_score": 22 },
+      { "type": "eye_bag",             "ui_score": 25 },
+      { "type": "droopy_lower_eyelid", "ui_score": 21 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 53,
+    "skinAge": 35,
+    "output": [
+      { "type": "oiliness",            "ui_score": 58 },
+      { "type": "moisture",            "ui_score": 80 },
+      { "type": "acne",                "ui_score": 82 },
+      { "type": "pore",                "ui_score": 49 },
+      { "type": "redness",             "ui_score": 57 },
+      { "type": "wrinkle",             "ui_score": 25 },
+      { "type": "dark_circle_v2",      "ui_score": 76 },
+      { "type": "age_spot",            "ui_score": 17 },
+      { "type": "eye_bag",             "ui_score": 61 },
+      { "type": "droopy_lower_eyelid", "ui_score": 29 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 95,
+    "skinAge": 25,
+    "output": [
+      { "type": "oiliness",            "ui_score": 13 },
+      { "type": "moisture",            "ui_score": 19 },
+      { "type": "acne",                "ui_score": 13 },
+      { "type": "pore",                "ui_score": 11 },
+      { "type": "redness",             "ui_score": 13 },
+      { "type": "wrinkle",             "ui_score": 13 },
+      { "type": "dark_circle_v2",      "ui_score": 27 },
+      { "type": "age_spot",            "ui_score": 11 },
+      { "type": "eye_bag",             "ui_score": 10 },
+      { "type": "droopy_lower_eyelid", "ui_score": 13 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 54,
+    "skinAge": 19,
+    "output": [
+      { "type": "oiliness",            "ui_score": 82 },
+      { "type": "moisture",            "ui_score": 47 },
+      { "type": "acne",                "ui_score": 89 },
+      { "type": "pore",                "ui_score": 73 },
+      { "type": "redness",             "ui_score": 56 },
+      { "type": "wrinkle",             "ui_score": 9 },
+      { "type": "dark_circle_v2",      "ui_score": 39 },
+      { "type": "age_spot",            "ui_score": 11 },
+      { "type": "eye_bag",             "ui_score": 22 },
+      { "type": "droopy_lower_eyelid", "ui_score": 14 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 60,
+    "skinAge": 25,
+    "output": [
+      { "type": "oiliness",            "ui_score": 22 },
+      { "type": "moisture",            "ui_score": 83 },
+      { "type": "acne",                "ui_score": 10 },
+      { "type": "pore",                "ui_score": 33 },
+      { "type": "redness",             "ui_score": 52 },
+      { "type": "wrinkle",             "ui_score": 49 },
+      { "type": "dark_circle_v2",      "ui_score": 48 },
+      { "type": "age_spot",            "ui_score": 27 },
+      { "type": "eye_bag",             "ui_score": 44 },
+      { "type": "droopy_lower_eyelid", "ui_score": 45 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 61,
+    "skinAge": 37,
+    "output": [
+      { "type": "oiliness",            "ui_score": 68 },
+      { "type": "moisture",            "ui_score": 50 },
+      { "type": "acne",                "ui_score": 46 },
+      { "type": "pore",                "ui_score": 69 },
+      { "type": "redness",             "ui_score": 36 },
+      { "type": "wrinkle",             "ui_score": 13 },
+      { "type": "dark_circle_v2",      "ui_score": 40 },
+      { "type": "age_spot",            "ui_score": 22 },
+      { "type": "eye_bag",             "ui_score": 35 },
+      { "type": "droopy_lower_eyelid", "ui_score": 19 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 66,
+    "skinAge": 26,
+    "output": [
+      { "type": "oiliness",            "ui_score": 26 },
+      { "type": "moisture",            "ui_score": 61 },
+      { "type": "acne",                "ui_score": 29 },
+      { "type": "pore",                "ui_score": 29 },
+      { "type": "redness",             "ui_score": 93 },
+      { "type": "wrinkle",             "ui_score": 15 },
+      { "type": "dark_circle_v2",      "ui_score": 42 },
+      { "type": "age_spot",            "ui_score": 15 },
+      { "type": "eye_bag",             "ui_score": 32 },
+      { "type": "droopy_lower_eyelid", "ui_score": 24 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 64,
+    "skinAge": 66,
+    "output": [
+      { "type": "oiliness",            "ui_score": 15 },
+      { "type": "moisture",            "ui_score": 66 },
+      { "type": "acne",                "ui_score": 8 },
+      { "type": "pore",                "ui_score": 48 },
+      { "type": "redness",             "ui_score": 34 },
+      { "type": "wrinkle",             "ui_score": 99 },
+      { "type": "dark_circle_v2",      "ui_score": 58 },
+      { "type": "age_spot",            "ui_score": 100 },
+      { "type": "eye_bag",             "ui_score": 61 },
+      { "type": "droopy_lower_eyelid", "ui_score": 76 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 72,
+    "skinAge": 43,
+    "output": [
+      { "type": "oiliness",            "ui_score": 39 },
+      { "type": "moisture",            "ui_score": 41 },
+      { "type": "acne",                "ui_score": 20 },
+      { "type": "pore",                "ui_score": 35 },
+      { "type": "redness",             "ui_score": 33 },
+      { "type": "wrinkle",             "ui_score": 35 },
+      { "type": "dark_circle_v2",      "ui_score": 87 },
+      { "type": "age_spot",            "ui_score": 37 },
+      { "type": "eye_bag",             "ui_score": 90 },
+      { "type": "droopy_lower_eyelid", "ui_score": 73 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 54,
+    "skinAge": 37,
+    "output": [
+      { "type": "oiliness",            "ui_score": 57 },
+      { "type": "moisture",            "ui_score": 43 },
+      { "type": "acne",                "ui_score": 46 },
+      { "type": "pore",                "ui_score": 83 },
+      { "type": "redness",             "ui_score": 43 },
+      { "type": "wrinkle",             "ui_score": 14 },
+      { "type": "dark_circle_v2",      "ui_score": 25 },
+      { "type": "age_spot",            "ui_score": 23 },
+      { "type": "eye_bag",             "ui_score": 22 },
+      { "type": "droopy_lower_eyelid", "ui_score": 21 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 85,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 35 },
+      { "type": "moisture",            "ui_score": 34 },
+      { "type": "acne",                "ui_score": 29 },
+      { "type": "pore",                "ui_score": 30 },
+      { "type": "redness",             "ui_score": 31 },
+      { "type": "wrinkle",             "ui_score": 22 },
+      { "type": "dark_circle_v2",      "ui_score": 32 },
+      { "type": "age_spot",            "ui_score": 19 },
+      { "type": "eye_bag",             "ui_score": 24 },
+      { "type": "droopy_lower_eyelid", "ui_score": 14 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 58,
+    "skinAge": 32,
+    "output": [
+      { "type": "oiliness",            "ui_score": 59 },
+      { "type": "moisture",            "ui_score": 75 },
+      { "type": "acne",                "ui_score": 78 },
+      { "type": "pore",                "ui_score": 61 },
+      { "type": "redness",             "ui_score": 62 },
+      { "type": "wrinkle",             "ui_score": 21 },
+      { "type": "dark_circle_v2",      "ui_score": 63 },
+      { "type": "age_spot",            "ui_score": 15 },
+      { "type": "eye_bag",             "ui_score": 57 },
+      { "type": "droopy_lower_eyelid", "ui_score": 34 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 96,
+    "skinAge": 31,
+    "output": [
+      { "type": "oiliness",            "ui_score": 22 },
+      { "type": "moisture",            "ui_score": 26 },
+      { "type": "acne",                "ui_score": 8 },
+      { "type": "pore",                "ui_score": 22 },
+      { "type": "redness",             "ui_score": 16 },
+      { "type": "wrinkle",             "ui_score": 11 },
+      { "type": "dark_circle_v2",      "ui_score": 24 },
+      { "type": "age_spot",            "ui_score": 2 },
+      { "type": "eye_bag",             "ui_score": 20 },
+      { "type": "droopy_lower_eyelid", "ui_score": 12 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 62,
+    "skinAge": 20,
+    "output": [
+      { "type": "oiliness",            "ui_score": 86 },
+      { "type": "moisture",            "ui_score": 36 },
+      { "type": "acne",                "ui_score": 86 },
+      { "type": "pore",                "ui_score": 79 },
+      { "type": "redness",             "ui_score": 63 },
+      { "type": "wrinkle",             "ui_score": 11 },
+      { "type": "dark_circle_v2",      "ui_score": 25 },
+      { "type": "age_spot",            "ui_score": 9 },
+      { "type": "eye_bag",             "ui_score": 25 },
+      { "type": "droopy_lower_eyelid", "ui_score": 16 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 73,
+    "skinAge": 25,
+    "output": [
+      { "type": "oiliness",            "ui_score": 21 },
+      { "type": "moisture",            "ui_score": 82 },
+      { "type": "acne",                "ui_score": 20 },
+      { "type": "pore",                "ui_score": 30 },
+      { "type": "redness",             "ui_score": 46 },
+      { "type": "wrinkle",             "ui_score": 48 },
+      { "type": "dark_circle_v2",      "ui_score": 56 },
+      { "type": "age_spot",            "ui_score": 38 },
+      { "type": "eye_bag",             "ui_score": 46 },
+      { "type": "droopy_lower_eyelid", "ui_score": 42 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 76,
+    "skinAge": 29,
+    "output": [
+      { "type": "oiliness",            "ui_score": 59 },
+      { "type": "moisture",            "ui_score": 48 },
+      { "type": "acne",                "ui_score": 53 },
+      { "type": "pore",                "ui_score": 68 },
+      { "type": "redness",             "ui_score": 40 },
+      { "type": "wrinkle",             "ui_score": 13 },
+      { "type": "dark_circle_v2",      "ui_score": 32 },
+      { "type": "age_spot",            "ui_score": 10 },
+      { "type": "eye_bag",             "ui_score": 24 },
+      { "type": "droopy_lower_eyelid", "ui_score": 17 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 73,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 36 },
+      { "type": "moisture",            "ui_score": 56 },
+      { "type": "acne",                "ui_score": 30 },
+      { "type": "pore",                "ui_score": 26 },
+      { "type": "redness",             "ui_score": 83 },
+      { "type": "wrinkle",             "ui_score": 22 },
+      { "type": "dark_circle_v2",      "ui_score": 36 },
+      { "type": "age_spot",            "ui_score": 18 },
+      { "type": "eye_bag",             "ui_score": 34 },
+      { "type": "droopy_lower_eyelid", "ui_score": 25 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 45,
+    "skinAge": 46,
+    "output": [
+      { "type": "oiliness",            "ui_score": 25 },
+      { "type": "moisture",            "ui_score": 63 },
+      { "type": "acne",                "ui_score": 19 },
+      { "type": "pore",                "ui_score": 51 },
+      { "type": "redness",             "ui_score": 41 },
+      { "type": "wrinkle",             "ui_score": 84 },
+      { "type": "dark_circle_v2",      "ui_score": 58 },
+      { "type": "age_spot",            "ui_score": 89 },
+      { "type": "eye_bag",             "ui_score": 69 },
+      { "type": "droopy_lower_eyelid", "ui_score": 73 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 59,
+    "skinAge": 49,
+    "output": [
+      { "type": "oiliness",            "ui_score": 27 },
+      { "type": "moisture",            "ui_score": 50 },
+      { "type": "acne",                "ui_score": 30 },
+      { "type": "pore",                "ui_score": 35 },
+      { "type": "redness",             "ui_score": 32 },
+      { "type": "wrinkle",             "ui_score": 39 },
+      { "type": "dark_circle_v2",      "ui_score": 89 },
+      { "type": "age_spot",            "ui_score": 28 },
+      { "type": "eye_bag",             "ui_score": 92 },
+      { "type": "droopy_lower_eyelid", "ui_score": 74 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 69,
+    "skinAge": 37,
+    "output": [
+      { "type": "oiliness",            "ui_score": 59 },
+      { "type": "moisture",            "ui_score": 44 },
+      { "type": "acne",                "ui_score": 47 },
+      { "type": "pore",                "ui_score": 94 },
+      { "type": "redness",             "ui_score": 41 },
+      { "type": "wrinkle",             "ui_score": 14 },
+      { "type": "dark_circle_v2",      "ui_score": 37 },
+      { "type": "age_spot",            "ui_score": 15 },
+      { "type": "eye_bag",             "ui_score": 25 },
+      { "type": "droopy_lower_eyelid", "ui_score": 29 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 84,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 28 },
+      { "type": "moisture",            "ui_score": 26 },
+      { "type": "acne",                "ui_score": 24 },
+      { "type": "pore",                "ui_score": 28 },
+      { "type": "redness",             "ui_score": 24 },
+      { "type": "wrinkle",             "ui_score": 18 },
+      { "type": "dark_circle_v2",      "ui_score": 27 },
+      { "type": "age_spot",            "ui_score": 20 },
+      { "type": "eye_bag",             "ui_score": 28 },
+      { "type": "droopy_lower_eyelid", "ui_score": 16 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 60,
+    "skinAge": 35,
+    "output": [
+      { "type": "oiliness",            "ui_score": 50 },
+      { "type": "moisture",            "ui_score": 76 },
+      { "type": "acne",                "ui_score": 78 },
+      { "type": "pore",                "ui_score": 65 },
+      { "type": "redness",             "ui_score": 51 },
+      { "type": "wrinkle",             "ui_score": 33 },
+      { "type": "dark_circle_v2",      "ui_score": 61 },
+      { "type": "age_spot",            "ui_score": 26 },
+      { "type": "eye_bag",             "ui_score": 66 },
+      { "type": "droopy_lower_eyelid", "ui_score": 42 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 88,
+    "skinAge": 22,
+    "output": [
+      { "type": "oiliness",            "ui_score": 19 },
+      { "type": "moisture",            "ui_score": 16 },
+      { "type": "acne",                "ui_score": 13 },
+      { "type": "pore",                "ui_score": 16 },
+      { "type": "redness",             "ui_score": 18 },
+      { "type": "wrinkle",             "ui_score": 9 },
+      { "type": "dark_circle_v2",      "ui_score": 17 },
+      { "type": "age_spot",            "ui_score": 11 },
+      { "type": "eye_bag",             "ui_score": 20 },
+      { "type": "droopy_lower_eyelid", "ui_score": 19 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 63,
+    "skinAge": 23,
+    "output": [
+      { "type": "oiliness",            "ui_score": 84 },
+      { "type": "moisture",            "ui_score": 42 },
+      { "type": "acne",                "ui_score": 84 },
+      { "type": "pore",                "ui_score": 76 },
+      { "type": "redness",             "ui_score": 70 },
+      { "type": "wrinkle",             "ui_score": 3 },
+      { "type": "dark_circle_v2",      "ui_score": 34 },
+      { "type": "age_spot",            "ui_score": 13 },
+      { "type": "eye_bag",             "ui_score": 15 },
+      { "type": "droopy_lower_eyelid", "ui_score": 17 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 72,
+    "skinAge": 27,
+    "output": [
+      { "type": "oiliness",            "ui_score": 6 },
+      { "type": "moisture",            "ui_score": 87 },
+      { "type": "acne",                "ui_score": 12 },
+      { "type": "pore",                "ui_score": 26 },
+      { "type": "redness",             "ui_score": 44 },
+      { "type": "wrinkle",             "ui_score": 50 },
+      { "type": "dark_circle_v2",      "ui_score": 45 },
+      { "type": "age_spot",            "ui_score": 22 },
+      { "type": "eye_bag",             "ui_score": 42 },
+      { "type": "droopy_lower_eyelid", "ui_score": 35 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 69,
+    "skinAge": 32,
+    "output": [
+      { "type": "oiliness",            "ui_score": 72 },
+      { "type": "moisture",            "ui_score": 41 },
+      { "type": "acne",                "ui_score": 50 },
+      { "type": "pore",                "ui_score": 61 },
+      { "type": "redness",             "ui_score": 32 },
+      { "type": "wrinkle",             "ui_score": 22 },
+      { "type": "dark_circle_v2",      "ui_score": 44 },
+      { "type": "age_spot",            "ui_score": 18 },
+      { "type": "eye_bag",             "ui_score": 32 },
+      { "type": "droopy_lower_eyelid", "ui_score": 17 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 73,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 29 },
+      { "type": "moisture",            "ui_score": 50 },
+      { "type": "acne",                "ui_score": 29 },
+      { "type": "pore",                "ui_score": 30 },
+      { "type": "redness",             "ui_score": 81 },
+      { "type": "wrinkle",             "ui_score": 27 },
+      { "type": "dark_circle_v2",      "ui_score": 37 },
+      { "type": "age_spot",            "ui_score": 11 },
+      { "type": "eye_bag",             "ui_score": 24 },
+      { "type": "droopy_lower_eyelid", "ui_score": 36 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 58,
+    "skinAge": 57,
+    "output": [
+      { "type": "oiliness",            "ui_score": 26 },
+      { "type": "moisture",            "ui_score": 67 },
+      { "type": "acne",                "ui_score": 8 },
+      { "type": "pore",                "ui_score": 49 },
+      { "type": "redness",             "ui_score": 37 },
+      { "type": "wrinkle",             "ui_score": 100 },
+      { "type": "dark_circle_v2",      "ui_score": 52 },
+      { "type": "age_spot",            "ui_score": 93 },
+      { "type": "eye_bag",             "ui_score": 67 },
+      { "type": "droopy_lower_eyelid", "ui_score": 69 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 65,
+    "skinAge": 32,
+    "output": [
+      { "type": "oiliness",            "ui_score": 34 },
+      { "type": "moisture",            "ui_score": 43 },
+      { "type": "acne",                "ui_score": 21 },
+      { "type": "pore",                "ui_score": 30 },
+      { "type": "redness",             "ui_score": 33 },
+      { "type": "wrinkle",             "ui_score": 35 },
+      { "type": "dark_circle_v2",      "ui_score": 88 },
+      { "type": "age_spot",            "ui_score": 34 },
+      { "type": "eye_bag",             "ui_score": 93 },
+      { "type": "droopy_lower_eyelid", "ui_score": 74 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 64,
+    "skinAge": 28,
+    "output": [
+      { "type": "oiliness",            "ui_score": 67 },
+      { "type": "moisture",            "ui_score": 41 },
+      { "type": "acne",                "ui_score": 60 },
+      { "type": "pore",                "ui_score": 91 },
+      { "type": "redness",             "ui_score": 52 },
+      { "type": "wrinkle",             "ui_score": 16 },
+      { "type": "dark_circle_v2",      "ui_score": 37 },
+      { "type": "age_spot",            "ui_score": 21 },
+      { "type": "eye_bag",             "ui_score": 33 },
+      { "type": "droopy_lower_eyelid", "ui_score": 15 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 73,
+    "skinAge": 27,
+    "output": [
+      { "type": "oiliness",            "ui_score": 37 },
+      { "type": "moisture",            "ui_score": 27 },
+      { "type": "acne",                "ui_score": 23 },
+      { "type": "pore",                "ui_score": 34 },
+      { "type": "redness",             "ui_score": 22 },
+      { "type": "wrinkle",             "ui_score": 21 },
+      { "type": "dark_circle_v2",      "ui_score": 27 },
+      { "type": "age_spot",            "ui_score": 13 },
+      { "type": "eye_bag",             "ui_score": 22 },
+      { "type": "droopy_lower_eyelid", "ui_score": 21 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 62,
+    "skinAge": 22,
+    "output": [
+      { "type": "oiliness",            "ui_score": 62 },
+      { "type": "moisture",            "ui_score": 71 },
+      { "type": "acne",                "ui_score": 74 },
+      { "type": "pore",                "ui_score": 51 },
+      { "type": "redness",             "ui_score": 61 },
+      { "type": "wrinkle",             "ui_score": 20 },
+      { "type": "dark_circle_v2",      "ui_score": 78 },
+      { "type": "age_spot",            "ui_score": 22 },
+      { "type": "eye_bag",             "ui_score": 57 },
+      { "type": "droopy_lower_eyelid", "ui_score": 35 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 90,
+    "skinAge": 26,
+    "output": [
+      { "type": "oiliness",            "ui_score": 14 },
+      { "type": "moisture",            "ui_score": 23 },
+      { "type": "acne",                "ui_score": 18 },
+      { "type": "pore",                "ui_score": 22 },
+      { "type": "redness",             "ui_score": 21 },
+      { "type": "wrinkle",             "ui_score": 13 },
+      { "type": "dark_circle_v2",      "ui_score": 20 },
+      { "type": "age_spot",            "ui_score": 5 },
+      { "type": "eye_bag",             "ui_score": 11 },
+      { "type": "droopy_lower_eyelid", "ui_score": 17 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 60,
+    "skinAge": 15,
+    "output": [
+      { "type": "oiliness",            "ui_score": 95 },
+      { "type": "moisture",            "ui_score": 44 },
+      { "type": "acne",                "ui_score": 79 },
+      { "type": "pore",                "ui_score": 89 },
+      { "type": "redness",             "ui_score": 56 },
+      { "type": "wrinkle",             "ui_score": 5 },
+      { "type": "dark_circle_v2",      "ui_score": 28 },
+      { "type": "age_spot",            "ui_score": 18 },
+      { "type": "eye_bag",             "ui_score": 18 },
+      { "type": "droopy_lower_eyelid", "ui_score": 15 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 54,
+    "skinAge": 45,
+    "output": [
+      { "type": "oiliness",            "ui_score": 16 },
+      { "type": "moisture",            "ui_score": 77 },
+      { "type": "acne",                "ui_score": 19 },
+      { "type": "pore",                "ui_score": 35 },
+      { "type": "redness",             "ui_score": 47 },
+      { "type": "wrinkle",             "ui_score": 60 },
+      { "type": "dark_circle_v2",      "ui_score": 59 },
+      { "type": "age_spot",            "ui_score": 33 },
+      { "type": "eye_bag",             "ui_score": 42 },
+      { "type": "droopy_lower_eyelid", "ui_score": 36 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 75,
+    "skinAge": 30,
+    "output": [
+      { "type": "oiliness",            "ui_score": 60 },
+      { "type": "moisture",            "ui_score": 43 },
+      { "type": "acne",                "ui_score": 40 },
+      { "type": "pore",                "ui_score": 56 },
+      { "type": "redness",             "ui_score": 36 },
+      { "type": "wrinkle",             "ui_score": 12 },
+      { "type": "dark_circle_v2",      "ui_score": 40 },
+      { "type": "age_spot",            "ui_score": 21 },
+      { "type": "eye_bag",             "ui_score": 35 },
+      { "type": "droopy_lower_eyelid", "ui_score": 32 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 63,
+    "skinAge": 20,
+    "output": [
+      { "type": "oiliness",            "ui_score": 39 },
+      { "type": "moisture",            "ui_score": 57 },
+      { "type": "acne",                "ui_score": 41 },
+      { "type": "pore",                "ui_score": 29 },
+      { "type": "redness",             "ui_score": 91 },
+      { "type": "wrinkle",             "ui_score": 30 },
+      { "type": "dark_circle_v2",      "ui_score": 40 },
+      { "type": "age_spot",            "ui_score": 22 },
+      { "type": "eye_bag",             "ui_score": 35 },
+      { "type": "droopy_lower_eyelid", "ui_score": 19 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 47,
+    "skinAge": 67,
+    "output": [
+      { "type": "oiliness",            "ui_score": 27 },
+      { "type": "moisture",            "ui_score": 58 },
+      { "type": "acne",                "ui_score": 14 },
+      { "type": "pore",                "ui_score": 52 },
+      { "type": "redness",             "ui_score": 43 },
+      { "type": "wrinkle",             "ui_score": 100 },
+      { "type": "dark_circle_v2",      "ui_score": 53 },
+      { "type": "age_spot",            "ui_score": 100 },
+      { "type": "eye_bag",             "ui_score": 55 },
+      { "type": "droopy_lower_eyelid", "ui_score": 82 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 73,
+    "skinAge": 41,
+    "output": [
+      { "type": "oiliness",            "ui_score": 39 },
+      { "type": "moisture",            "ui_score": 53 },
+      { "type": "acne",                "ui_score": 22 },
+      { "type": "pore",                "ui_score": 33 },
+      { "type": "redness",             "ui_score": 27 },
+      { "type": "wrinkle",             "ui_score": 36 },
+      { "type": "dark_circle_v2",      "ui_score": 93 },
+      { "type": "age_spot",            "ui_score": 27 },
+      { "type": "eye_bag",             "ui_score": 85 },
+      { "type": "droopy_lower_eyelid", "ui_score": 78 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 56,
+    "skinAge": 21,
+    "output": [
+      { "type": "oiliness",            "ui_score": 64 },
+      { "type": "moisture",            "ui_score": 43 },
+      { "type": "acne",                "ui_score": 50 },
+      { "type": "pore",                "ui_score": 92 },
+      { "type": "redness",             "ui_score": 44 },
+      { "type": "wrinkle",             "ui_score": 14 },
+      { "type": "dark_circle_v2",      "ui_score": 37 },
+      { "type": "age_spot",            "ui_score": 14 },
+      { "type": "eye_bag",             "ui_score": 27 },
+      { "type": "droopy_lower_eyelid", "ui_score": 19 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 81,
+    "skinAge": 23,
+    "output": [
+      { "type": "oiliness",            "ui_score": 36 },
+      { "type": "moisture",            "ui_score": 31 },
+      { "type": "acne",                "ui_score": 29 },
+      { "type": "pore",                "ui_score": 34 },
+      { "type": "redness",             "ui_score": 23 },
+      { "type": "wrinkle",             "ui_score": 17 },
+      { "type": "dark_circle_v2",      "ui_score": 26 },
+      { "type": "age_spot",            "ui_score": 16 },
+      { "type": "eye_bag",             "ui_score": 22 },
+      { "type": "droopy_lower_eyelid", "ui_score": 21 }
+    ]
+  },
+  {
+    "success": true,
+    "overallScore": 54,
+    "skinAge": 30,
+    "output": [
+      { "type": "oiliness",            "ui_score": 47 },
+      { "type": "moisture",            "ui_score": 61 },
+      { "type": "acne",                "ui_score": 75 },
+      { "type": "pore",                "ui_score": 58 },
+      { "type": "redness",             "ui_score": 60 },
+      { "type": "wrinkle",             "ui_score": 18 },
+      { "type": "dark_circle_v2",      "ui_score": 75 },
+      { "type": "age_spot",            "ui_score": 19 },
+      { "type": "eye_bag",             "ui_score": 59 },
+      { "type": "droopy_lower_eyelid", "ui_score": 34 }
+    ]
+  }
+]
+

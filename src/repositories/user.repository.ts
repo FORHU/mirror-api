@@ -12,6 +12,16 @@ export default class UserRepository {
   }
 
   /**
+   * Find user gender by ID
+   */
+  static async findGenderById(id: string) {
+    return prisma.user.findFirst({
+      where: { id, isDeleted: false },
+      select: { gender: true },
+    });
+  }
+
+  /**
    * Find a user by email
    */
   static async findByEmail(email: string) {
@@ -71,5 +81,23 @@ export default class UserRepository {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  static async upsert(id: string, data: Prisma.UserUpdateInput) {
+    const gender =
+      typeof data.gender === "string"
+        ? (data.gender as Prisma.UserCreateInput["gender"])
+        : undefined;
+
+    return prisma.user.upsert({
+      where: { id },
+      update: data,
+      create: {
+        id,
+        email: data.email as string,
+        username: data.username as string,
+        ...(gender !== undefined ? { gender } : {}),
+      },
+    });
   }
 }

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
-import OutlineRepo from "../../repositories/outline.repository";
+import OutlineRepo, { MapStop } from "../../repositories/outline.repository";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
 
 const createSchema = Joi.object({
@@ -32,10 +32,8 @@ export default class OutlineController {
     if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {
-      const outlines = await OutlineRepo.findByUserId(userId);
-      // Most recent non-deleted outline is "active"
-      const active = outlines.find((o) => !o.deletedAt) ?? null;
-      return responseSuccess(res, 200, active);
+      const active = await OutlineRepo.findActiveWithOverview(userId);
+      return responseSuccess(res, 200, active ?? null);
     } catch (err) {
       next(err);
     }
@@ -55,6 +53,21 @@ export default class OutlineController {
     }
   }
 
+  /**
+   * EXTERNAL GET — used by 3rd party AI (ChatWonder) to read an outline via API Key.
+   * Does not require a user JWT session.
+   */
+  static async externalGetById(req: Request, res: Response, next: NextFunction) {
+    try {
+      // Find the outline including its events so the AI can see the itinerary
+      const outline = await OutlineRepo.findByIdWithEvents(req.params.id);
+      if (!outline) return responseError(res, 404, "Outline not found");
+      return responseSuccess(res, 200, outline);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async list(req: Request, res: Response, next: NextFunction) {
     const userId = (req as Request & { user?: { id: string } }).user?.id;
     if (!userId) return responseError(res, 401, "Unauthorized");
@@ -62,6 +75,65 @@ export default class OutlineController {
     try {
       const outlines = await OutlineRepo.findByUserId(userId);
       return responseSuccess(res, 200, outlines);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * RESET — two modes (see ADR 0001):
+   *   - No `scope` → full wipe: soft-delete all active outlines. Used by Restart.
+   *   - `scope` = "fashion" | "cosmetic" | "itinerary" → scoped per-feature reset
+   *     on the active outline, used by the per-screen Reset command.
+   */
+  static async saveMapStops(req: Request, res: Response, next: NextFunction) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) return responseError(res, 401, "Unauthorized");
+
+    const stops: MapStop[] = req.body?.stops;
+    if (!Array.isArray(stops)) return responseError(res, 400, "stops must be an array");
+
+    try {
+      const outline = await OutlineRepo.findActiveWithEvents(userId);
+      if (!outline) return responseError(res, 404, "No active outline");
+      await OutlineRepo.saveMapStops(outline.id, stops);
+      return responseSuccess(res, 200, { saved: stops.length });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async reset(req: Request, res: Response, next: NextFunction) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) return responseError(res, 401, "Unauthorized");
+
+    const scope = req.body?.scope as string | undefined;
+
+    try {
+      if (!scope) {
+        const result = await OutlineRepo.softDeleteAllByUserId(userId);
+        return responseSuccess(res, 200, { cleared: result.count }, "Outline reset");
+      }
+
+      if (!["fashion", "cosmetic", "itinerary"].includes(scope)) {
+        return responseError(res, 400, "Invalid scope");
+      }
+
+      const outline = await OutlineRepo.findActiveWithEvents(userId);
+      if (!outline) {
+        return responseSuccess(res, 200, { cleared: 0, scope }, "No active outline");
+      }
+
+      let result: { count: number };
+      if (scope === "fashion") {
+        result = await OutlineRepo.clearFashionByOutlineId(outline.id);
+      } else if (scope === "cosmetic") {
+        result = await OutlineRepo.clearCosmeticsByOutlineId(outline.id);
+      } else {
+        result = await OutlineRepo.clearItineraryByOutlineId(outline.id);
+      }
+
+      return responseSuccess(res, 200, { cleared: result.count, scope }, `${scope} reset`);
     } catch (err) {
       next(err);
     }

@@ -2,180 +2,213 @@ import { Request, Response } from "express";
 import Joi from "joi";
 import ChatWonderService from "../../services/shared/chat-wonder.service";
 import { streamChat } from "../../utils/chat-wonder-stream";
-import { stripSourcesPrefix } from "../../utils/source-metadata.util";
-import { parseChatWonderResponse } from "../../utils/parse-chatWonder-response.util";
-import { resolveItineraryCosmetics } from "../../utils/chat-wonder-cosmetics.util";
-import { emitToKiosk } from "../../utils/socket.util";
-import { prisma } from "../../utils/prisma";
+import { createChatWonderSseCallbacks } from "../../utils/chat-wonder-sse-callbacks.util";
+import { buildCatalogContext } from "../../utils/chat-wonder-cosmetics.util";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
+import { chatWonderBaseSchema, clearStaleSession } from "../../helpers/chat-wonder.helper";
+import { weatherService, type WeatherData } from "../../services/shared/weather.service";
+
+function isCosmeticsLikely(input: string): boolean {
+  return /(cosmetic|makeup|make-up|skincare|skin care|foundation|moisturi|lipstick|sunscreen|serum|cleanser|toner|blush|concealer|spf|lotion|facial|eyeshadow|eye shadow|eyeliner|eye liner|lip gloss|lipgloss|lip balm|retinol|hyaluronic|niacinamide|exfoliat|acne|primer|essence|bb cream|cc cream|eye cream|face wash|face mask|face cream|sheet mask|clay mask|cream|mask|face oil|facial oil|skin oil|hair oil|body oil)\b/i.test(
+    input
+  );
+}
 
 export default class ChatWonderController {
   /**
-   * Handles streaming chat requests using Server-Sent Events (SSE).
+   * Retrieves or generates a ChatWonder session ID for the user.
    */
-  static async streamChat(req: Request, res: Response) {
-    const { input, conversationId: inputConversationId, personas, kioskId } = req.body;
+  static async getSessionId(req: Request, res: Response) {
     const userId = (req as Request & { user?: { id: string } }).user?.id;
-
     if (!userId) {
       return responseError(res, 401, "Unauthorized");
     }
 
-    const schema = Joi.object({
-      input: Joi.string().min(1).max(500).required(),
-      conversationId: Joi.string().optional(),
-      personas: Joi.object({
-        system: Joi.string().optional().allow(null, ""),
-        fashion: Joi.string().optional().allow(null, ""),
-        cosmetics: Joi.string().optional().allow(null, ""),
-        maps: Joi.string().optional().allow(null, ""),
-      }).optional(),
-      kioskId: Joi.string().optional(),
-    });
+    try {
+      // Always force a new session when the landing page requests it to clear history
+      const sessionId = await ChatWonderService.generateChatSessionId(userId, true);
+      return res.json({ status: "success", data: { sessionId } });
+    } catch (err) {
+      logger.error(`[ChatWonderController] getSessionId error: ${(err as Error).message}`);
+      return responseError(res, 500, (err as Error).message || "Internal server error");
+    }
+  }
 
-    const { error } = schema.validate(req.body);
+  /**
+   * RESTART — gender + ChatWonder session only:
+   *   1. Null the user's stored gender (app will re-ask).
+   *   2. Force a brand-new ChatWonder session (clears conversation history).
+   *
+   * Does NOT wipe the Outline. The Outline wipe lives in `/outlines/reset`
+   * (no-scope = `softDeleteAllByUserId`), which the client fires alongside this
+   * on a true "next person" Restart (see ADR 0001). Keeping the wipe out of here
+   * is deliberate: `restart` is also the 409 stale-session recovery path
+   * (useChatWonderStream / overview retry), and that must NOT delete the
+   * in-progress Outline.
+   */
+  static async restart(req: Request, res: Response) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) {
+      return responseError(res, 401, "Unauthorized");
+    }
+
+    try {
+      await ChatWonderService.clearUserGender(userId);
+      const sessionId = await ChatWonderService.generateChatSessionId(userId, true);
+      return res.json({
+        status: "success",
+        data: { sessionId, gender: null },
+        message: "Restarted",
+      });
+    } catch (err) {
+      logger.error(`[ChatWonderController] restart error: ${(err as Error).message}`);
+      return responseError(res, 500, (err as Error).message || "Internal server error");
+    }
+  }
+
+  /**
+   * Primary chat endpoint (`POST /message`). Streams SSE events identical to
+   * `streamChat` (`chunk`, `complete`, `error`) plus interleaved `audio_chunk`
+   * events carrying base64-encoded TTS audio when `voice: true` is sent in the
+   * body. Session-expired errors arrive as an in-band `error` SSE event (the
+   * client retries by calling `restart` then resending).
+   *
+   * Extra body fields vs `streamChat`: `voice` (boolean) and `lang` (BCP-47
+   * string, e.g. `"en-US"`) for TTS language selection.
+   */
+  static async chat(req: Request, res: Response) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) {
+      return responseError(res, 401, "Unauthorized");
+    }
+
+    const chatSchema = chatWonderBaseSchema.keys({
+      voice: Joi.boolean().optional(),
+      lang: Joi.string().optional(),
+    });
+    const { error, value } = chatSchema.validate(req.body, { allowUnknown: true });
     if (error) {
       return responseError(res, 400, error.message);
     }
 
+    let input = value.input || value.user_input || "";
+    if (!input.startsWith("[")) {
+      input = `[stylist] ${input}`;
+    } else if (/^\[(?:cosmetics|maps?|garment)\]/i.test(input)) {
+      input = input.replace(/^\[[^\]]+\]/, "[stylist]");
+    }
+
+    const inputConversationId = value.conversationId;
+    const kioskId = value.kioskId;
+    const pageMode: string | null = value.page_mode ?? null;
+    const wantsVoice = value.voice === true;
+    const ttsLang = value.lang || "en-US";
+    const sitemapContext = value.sitemap_context;
+    const history = (value.history ?? []).slice(-6);
+
+    const isGarment = pageMode === "garment";
+    const isOverview = pageMode === "overview";
+
+    const frontendLocation = value.location;
+    const skinAnalysis = value.skin_analysis;
+
+    logger.info(
+      `[ChatWonderController.chat] page_mode=${pageMode ?? "none"} | input=${input.slice(0, 80)}...`
+    );
+
+    const location =
+      frontendLocation &&
+      typeof frontendLocation.lat === "number" &&
+      typeof frontendLocation.lng === "number"
+        ? { lat: frontendLocation.lat, lng: frontendLocation.lng }
+        : null;
+
+    // Helper to build a weather object from the weatherService response
+    const buildWeatherObj = (d: WeatherData, loc: { lat: number; lng: number }) => ({
+      date: new Date().toISOString().split("T")[0],
+      description: String(d.condition ?? "").toLowerCase(),
+      estimated: false,
+      is_cold: Number(d.temperature) < 20,
+      is_hot: Number(d.temperature) >= 30,
+      is_rainy:
+        Number(d.precipitationProb) >= 50 ||
+        String(d.condition ?? "")
+          .toLowerCase()
+          .includes("rain"),
+      lat: loc.lat,
+      lon: loc.lng,
+      temperature_c: Number(d.temperature),
+    });
+
+    const needsWeather = !!(location && (isGarment || isOverview || !pageMode));
+
     try {
-      // 1. Ensure conversation exists
-      const conversationId = await ChatWonderService.ensureConversation(
-        userId,
-        input.substring(0, 50),
-        inputConversationId
-      );
+      // Fix 2: Run weather fetch IN PARALLEL with DB setup instead of sequentially before it
+      const [conversationId, sessionId, gender, frontendWeather] = await Promise.all([
+        ChatWonderService.ensureConversation(userId, input.substring(0, 50), inputConversationId),
+        ChatWonderService.generateChatSessionId(userId),
+        ChatWonderService.getUserGender(userId),
+        needsWeather
+          ? weatherService
+              .getWeather(location.lat, location.lng)
+              .then((d) => buildWeatherObj(d, location))
+              .catch(() => undefined as Record<string, unknown> | undefined)
+          : Promise.resolve(undefined as Record<string, unknown> | undefined),
+      ]);
 
-      // 2. Generate/Retrieve session ID
-      const sessionId = await ChatWonderService.generateChatSessionId(userId);
+      // Fix 3: Fire saveUserMessage without blocking SSE headers — awaited in onComplete
+      const userMessagePromise = ChatWonderService.saveUserMessage(userId, conversationId, input);
 
-      // 3. Save user message
-      const userMessage = await ChatWonderService.saveUserMessage(userId, conversationId, input);
-
-      // 4. Build user wardrobe & weather context for prompt enrichment
-      const userContext = await ChatWonderService.buildUserContext(userId, conversationId);
-
-      // 5. Prepare prompt for external API
-      const wrappedInput = await ChatWonderService.getAdditionalPrompt(
-        input,
-        personas,
-        userContext
-      );
-
-      // 6. Set SSE headers
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache, no-transform");
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
 
-      let fullResponse = "";
+      const documentContext = isCosmeticsLikely(input)
+        ? await buildCatalogContext(skinAnalysis)
+        : undefined;
 
-      // 7. Stream from external ChatWonder API
-      await streamChat(wrappedInput, sessionId as string, personas?.system ?? "", {
-        onChunk: (chunk: string) => {
-          fullResponse += chunk;
-          res.write(`data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`);
-          if ((res as Response & { flush?: () => void }).flush)
-            (res as Response & { flush?: () => void }).flush?.();
-        },
-        onComplete: async () => {
-          try {
-            // Clean up the response
-            const { cleaned } = stripSourcesPrefix(fullResponse);
-            const parsed = parseChatWonderResponse(cleaned);
+      const callbacks = createChatWonderSseCallbacks({
+        res,
+        userId,
+        conversationId,
+        input,
+        kioskId,
+        skinAnalysis,
+        wantsVoice,
+        ttsLang,
+        userMessagePromise,
+      });
 
-            // Enrich the itinerary events with resolved physical database products
-            const enrichedEvents = await resolveItineraryCosmetics(
-              userId,
-              parsed.events,
-              conversationId
-            );
-
-            // Check if user input contains finalization keywords to save/finalize the plan draft
-            const isFinalization =
-              /(?:save|confirm|finalize|looks? good|perfect|lock in|looks? awesome|looks? perfect)\b/i.test(
-                input
-              );
-            if (isFinalization) {
-              await prisma.userOutline.update({
-                where: { conversationId },
-                data: { status: "FINALIZED" },
-              });
-              logger.info(
-                `[ChatWonderController] Finalized UserOutline status for conversation: ${conversationId}`
-              );
-
-              if (kioskId) {
-                emitToKiosk(kioskId, "itinerary_locked", { conversationId });
-                logger.info(`[ChatWonderController] Emitted itinerary_locked to kiosk: ${kioskId}`);
-              }
-            }
-
-            // Save AI response to history
-            const aiMessage = await ChatWonderService.saveAIMessage(
-              userId,
-              conversationId,
-              parsed.message
-            );
-            logger.debug(
-              `parsed data -- - - - -- - -\n` +
-                `data: ${JSON.stringify({
-                  type: "complete",
-                  message: parsed.message,
-                  outfit_suggestion: parsed.outfit_suggestion,
-                  mood: parsed.mood,
-                  cosmetics_suggestion: parsed.cosmetics_suggestion,
-                  route_suggestion: parsed.route_suggestion,
-                  images: parsed.images,
-                  events: enrichedEvents,
-                  metadata: {
-                    conversationId,
-                    userMessageId: userMessage.id,
-                    aiMessageId: aiMessage.id,
-                  },
-                })}\n\n`
-            );
-            res.write(
-              `data: ${JSON.stringify({
-                type: "complete",
-                message: parsed.message,
-                outfit_suggestion: parsed.outfit_suggestion,
-                mood: parsed.mood,
-                cosmetics_suggestion: parsed.cosmetics_suggestion,
-                route_suggestion: parsed.route_suggestion,
-                images: parsed.images,
-                events: enrichedEvents,
-                metadata: {
-                  conversationId,
-                  userMessageId: userMessage.id,
-                  aiMessageId: aiMessage.id,
-                },
-              })}\n\n`
-            );
-            res.end();
-          } catch (err) {
-            logger.error(`[ChatWonderController] Error saving response: ${(err as Error).message}`);
-            res.write(
-              `data: ${JSON.stringify({ type: "error", message: "Failed to save response" })}\n\n`
-            );
-            res.end();
-          }
-        },
-        onError: (err: Error) => {
-          logger.error(`[ChatWonderController] Stream error: ${err.message}`);
-          if (!res.headersSent) {
-            responseError(res, 500, err.message || "Stream failed");
-          } else {
-            res.write(`data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`);
-            res.end();
-          }
-        },
+      await streamChat({
+        userInput: input,
+        sessionId: sessionId as string,
+        callbacks,
+        userId,
+        weather: frontendWeather,
+        location: frontendLocation,
+        skinAnalysis,
+        gender: gender || undefined,
+        sitemapContext,
+        documentContext,
+        history,
       });
     } catch (err) {
-      logger.error(`[ChatWonderController] Controller error: ${(err as Error).message}`);
+      const message = (err as Error).message || "Internal server error";
+      logger.error(`[ChatWonderController.chat] ${message}`);
+
+      if (message.includes("Unknown session")) {
+        await clearStaleSession(userId);
+        if (!res.headersSent) {
+          return responseError(res, 409, "Session expired. Please resend your message.", {
+            code: "session_expired",
+          });
+        }
+      }
+
       if (!res.headersSent) {
-        responseError(res, 500, (err as Error).message || "Internal server error");
+        return responseError(res, 500, message);
       }
     }
   }

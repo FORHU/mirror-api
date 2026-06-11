@@ -74,12 +74,12 @@ const updateSchema = Joi.object({
 
 export default class CosmeticProductController {
   static async index(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as Request & { user?: { id: string } }).user?.id;
-    if (!userId) return responseError(res, 401, "Unauthorized");
+    // const userId = (req as Request & { user?: { id: string } }).user?.id;
+    // if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {
       const result = await CosmeticProductService.getProducts(
-        req.query as unknown as Record<string, string | undefined>
+        req.query as unknown as Record<string, string | undefined | string[]>
       );
       return responseSuccess(res, 200, pageFromRepo(result));
     } catch (err) {
@@ -88,8 +88,8 @@ export default class CosmeticProductController {
   }
 
   static async show(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as Request & { user?: { id: string } }).user?.id;
-    if (!userId) return responseError(res, 401, "Unauthorized");
+    // const userId = (req as Request & { user?: { id: string } }).user?.id;
+    // if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {
       const data = await CosmeticProductService.getProductById(req.params.id);
@@ -100,8 +100,8 @@ export default class CosmeticProductController {
   }
 
   static async create(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as Request & { user?: { id: string } }).user?.id;
-    if (!userId) return responseError(res, 401, "Unauthorized");
+    // const userId = (req as Request & { user?: { id: string } }).user?.id;
+    // if (!userId) return responseError(res, 401, "Unauthorized");
 
     const { error, value } = createSchema.validate(req.body, { abortEarly: false });
     if (error) return responseError(res, 400, error.message);
@@ -123,8 +123,8 @@ export default class CosmeticProductController {
   }
 
   static async update(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as Request & { user?: { id: string } }).user?.id;
-    if (!userId) return responseError(res, 401, "Unauthorized");
+    const _userId = (req as Request & { user?: { id: string } }).user?.id;
+    // if (!_userId) return responseError(res, 401, "Unauthorized");
 
     const { error, value } = updateSchema.validate(req.body, { abortEarly: false });
     if (error) return responseError(res, 400, error.message);
@@ -146,8 +146,8 @@ export default class CosmeticProductController {
   }
 
   static async destroy(req: Request, res: Response, next: NextFunction) {
-    const userId = (req as Request & { user?: { id: string } }).user?.id;
-    if (!userId) return responseError(res, 401, "Unauthorized");
+    // const userId = (req as Request & { user?: { id: string } }).user?.id;
+    // if (!userId) return responseError(res, 401, "Unauthorized");
 
     try {
       const data = await CosmeticProductService.deleteProduct(req.params.id);

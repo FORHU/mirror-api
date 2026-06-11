@@ -5,6 +5,7 @@ import FileService from "./file.service";
 import logger from "../../utils/logger";
 import { s3Client } from "../../utils/s3";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { parsePagination } from "../../helpers/pagination.helper";
 import {
   CATEGORY,
   FITTING_SLOT,
@@ -30,13 +31,48 @@ export default class OutfitService {
     userId?: string | null,
     query: Record<string, string | undefined> = {}
   ) {
-    const { page, limit, systemOnly } = query;
+    const {
+      searchOutfit,
+      systemOnly,
+      metaCategory,
+      metaGender,
+      metaSilhouette,
+      metaTags,
+      metaGarmentType,
+    } = query;
+    const { page, limit, search: globalSearch } = parsePagination(query);
     const effectiveUserId = systemOnly === "true" ? null : userId;
-    return OutfitRepo.findByUserId(
+    const result = await OutfitRepo.findByUserId(
       effectiveUserId,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20
+      page,
+      limit,
+      { includeSystem: systemOnly !== "true" }, // include system outfits unless viewing system-only
+      globalSearch || searchOutfit,
+      {
+        category: metaCategory,
+        gender: metaGender,
+        silhouette: metaSilhouette,
+        tags: metaTags,
+        garmentType: metaGarmentType,
+      }
     );
+    const { sortBy, sortOrder, search, filters } = parsePagination(query);
+    return { ...result, sortBy, sortOrder, search, filters };
+  }
+
+  /**
+   * Returns every distinct metaData key and its deduplicated values across the
+   * caller's outfits (+ system outfits). Powers search facets / filter UIs.
+   * Pass `?systemOnly=true` to restrict to system outfits.
+   */
+  static async getMetaDataFields(
+    userId?: string | null,
+    query: Record<string, string | undefined> = {}
+  ) {
+    const { systemOnly } = query;
+    const effectiveUserId = systemOnly === "true" ? null : userId;
+    const fields = await OutfitRepo.getMetaDataFields(effectiveUserId);
+    return { fields };
   }
 
   /**
@@ -48,13 +84,12 @@ export default class OutfitService {
     userId?: string,
     query: Record<string, string | undefined> = {}
   ) {
-    const { page, limit } = query;
-    return OutfitRepo.findByUserId(
-      userId,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20,
-      { fileProvider: "EXTERNAL" }
-    );
+    const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
+    const result = await OutfitRepo.findByUserId(userId, page, limit, {
+      fileProvider: "EXTERNAL",
+      includeSystem: true,
+    });
+    return { ...result, sortBy, sortOrder, search, filters };
   }
 
   /**
@@ -65,13 +100,12 @@ export default class OutfitService {
     userId?: string,
     query: Record<string, string | undefined> = {}
   ) {
-    const { page, limit } = query;
-    return OutfitRepo.findByUserId(
-      userId,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20,
-      { fileProviderNot: "EXTERNAL" }
-    );
+    const { page, limit, sortBy, sortOrder, search, filters } = parsePagination(query);
+    const result = await OutfitRepo.findByUserId(userId, page, limit, {
+      fileProviderNot: "EXTERNAL",
+      includeSystem: true,
+    });
+    return { ...result, sortBy, sortOrder, search, filters };
   }
 
   static async getOutfitById(id: string, userId?: string) {

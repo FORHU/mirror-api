@@ -17,7 +17,6 @@ import { responseSuccess } from "../../helpers/response.helper";
 import { pageFromRepo } from "../../helpers/pagination.helper";
 
 const validationError = (message: string) => ({ status: 400, message });
-const unauthorizedError = () => ({ status: 401, message: "Authentication required" });
 
 const itemSchema = Joi.object({
   garmentId: Joi.string().required(),
@@ -27,7 +26,7 @@ const itemSchema = Joi.object({
   layerLevel: Joi.string()
     .valid(...Object.values(LAYER_LEVEL))
     .optional(),
-});
+}).unknown(true);
 
 const outfitSchema = Joi.object({
   name: Joi.string().required(),
@@ -39,7 +38,8 @@ const outfitSchema = Joi.object({
     .optional(),
   fileId: Joi.string().optional(),
   file: Joi.object().optional(), // Manual file metadata
-});
+  metaData: Joi.alternatives().try(Joi.object(), Joi.string()).optional(),
+}).unknown(true);
 
 // PATCH variant: every field optional, no defaults. `items` is only touched
 // when the caller explicitly sends it — otherwise the repo leaves the
@@ -54,7 +54,8 @@ const outfitUpdateSchema = Joi.object({
     .optional(),
   fileId: Joi.string().optional(),
   file: Joi.object().optional(),
-});
+  metaData: Joi.alternatives().try(Joi.object(), Joi.string()).optional(),
+}).unknown(true);
 
 // Shared "AI passthrough" fields the caller can pre-fill on the AI flows.
 // Whatever's supplied here is honored verbatim by `pickProvided`.
@@ -77,11 +78,11 @@ const aiProvidedFields = {
 const evaluateSchema = Joi.object({
   ...aiProvidedFields,
   items: Joi.array().items(itemSchema).default([]),
-});
+}).unknown(true);
 
 const evaluateHybridSchema = Joi.object({
   ...aiProvidedFields,
-});
+}).unknown(true);
 
 export default class OutfitController {
   static async index(req: Request, res: Response, next: NextFunction) {
@@ -92,6 +93,24 @@ export default class OutfitController {
         req.query as unknown as Record<string, string | undefined>
       );
       responseSuccess(res, 200, pageFromRepo(result));
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /outfits/meta-fields
+   * Distinct metaData keys and their deduplicated values across the caller's
+   * outfits (+ system outfits). Drives search facets / filter dropdowns.
+   */
+  static async metaFields(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as Request & { user?: { id: string } }).user?.id;
+      const data = await OutfitService.getMetaDataFields(
+        userId,
+        req.query as unknown as Record<string, string | undefined>
+      );
+      responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
     }
@@ -158,7 +177,7 @@ export default class OutfitController {
   private static prepareBody(body: Record<string, unknown>) {
     const cleaned = { ...body } as Record<string, unknown>;
 
-    const strictJsonFields = ["items", "file", "tags", "generate"];
+    const strictJsonFields = ["items", "file", "tags", "generate", "metaData"];
     for (const field of strictJsonFields) {
       if (typeof cleaned[field] === "string") {
         try {
@@ -310,8 +329,7 @@ export default class OutfitController {
    */
   static async evaluate(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as Request & { user?: { id: string } }).user?.id;
-      if (!userId) return next(unauthorizedError());
+      const userId = (req as Request & { user: { id: string } }).user.id;
 
       const cleaned = OutfitController.prepareBody(req.body);
       const { error, value } = evaluateSchema.validate(cleaned);
@@ -421,8 +439,7 @@ export default class OutfitController {
    */
   static async compose(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as Request & { user?: { id: string } }).user?.id;
-      if (!userId) return next(unauthorizedError());
+      const userId = (req as Request & { user: { id: string } }).user.id;
 
       const schema = Joi.object({
         prompt: Joi.string().min(2).max(500).required(),
@@ -461,8 +478,7 @@ export default class OutfitController {
    */
   static async evaluateHybrid(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as Request & { user?: { id: string } }).user?.id;
-      if (!userId) return next(unauthorizedError());
+      const userId = (req as Request & { user: { id: string } }).user.id;
 
       const cleaned = OutfitController.prepareBody(req.body);
       const { error, value } = evaluateHybridSchema.validate(cleaned);
@@ -548,8 +564,7 @@ export default class OutfitController {
    */
   static async recommend(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as Request & { user?: { id: string } }).user?.id;
-      if (!userId) return next(unauthorizedError());
+      const userId = (req as Request & { user: { id: string } }).user.id;
 
       const schema = Joi.object({
         category: Joi.string()
