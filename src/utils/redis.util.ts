@@ -20,7 +20,12 @@ export default class RedisUtil {
 
     this.client.on("error", (err) => logger.error(`Redis Client Error: ${(err as Error).message}`));
 
-    await this.client.connect();
+    await Promise.race([
+      this.client.connect(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Connection timed out after 10s")), 10000)
+      ),
+    ]);
     logger.info(`[Redis] Connected to ${REDIS_HOST}:${REDIS_PORT}`);
   }
 
