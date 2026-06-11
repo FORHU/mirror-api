@@ -6,14 +6,9 @@ import { createChatWonderSseCallbacks } from "../../utils/chat-wonder-sse-callba
 import { buildCatalogContext } from "../../utils/chat-wonder-cosmetics.util";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
-import { chatWonderBaseSchema, clearStaleSession } from "../../helpers/chat-wonder.helper";
+import { chatWonderBaseSchema, clearStaleSession, isCosmeticsLikely } from "../../helpers/chat-wonder.helper";
 import { weatherService, type WeatherData } from "../../services/shared/weather.service";
 
-function isCosmeticsLikely(input: string): boolean {
-  return /(cosmetic|makeup|make-up|skincare|skin care|foundation|moisturi|lipstick|sunscreen|serum|cleanser|toner|blush|concealer|spf|lotion|facial|eyeshadow|eye shadow|eyeliner|eye liner|lip gloss|lipgloss|lip balm|retinol|hyaluronic|niacinamide|exfoliat|acne|primer|essence|bb cream|cc cream|eye cream|face wash|face mask|face cream|sheet mask|clay mask|cream|mask|face oil|facial oil|skin oil|hair oil|body oil)\b/i.test(
-    input
-  );
-}
 
 export default class ChatWonderController {
   /**
@@ -31,6 +26,26 @@ export default class ChatWonderController {
       return res.json({ status: "success", data: { sessionId } });
     } catch (err) {
       logger.error(`[ChatWonderController] getSessionId error: ${(err as Error).message}`);
+      return responseError(res, 500, (err as Error).message || "Internal server error");
+    }
+  }
+
+  /**
+   * Read-only twin of getSessionId: returns the user's current ChatWonder
+   * session ID (creating one only if none exists). Never clears history —
+   * safe for display/debug UI.
+   */
+  static async getCurrentSessionId(req: Request, res: Response) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) {
+      return responseError(res, 401, "Unauthorized");
+    }
+
+    try {
+      const sessionId = await ChatWonderService.generateChatSessionId(userId, false);
+      return res.json({ status: "success", data: { sessionId } });
+    } catch (err) {
+      logger.error(`[ChatWonderController] getCurrentSessionId error: ${(err as Error).message}`);
       return responseError(res, 500, (err as Error).message || "Internal server error");
     }
   }
