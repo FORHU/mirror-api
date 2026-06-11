@@ -14,7 +14,7 @@ export const DATABASE_URL = process.env.DATABASE_URL;
 export const REDIS_HOST = process.env.REDIS_HOST || "localhost";
 export const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6380");
 export const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
-export const REDIS_TLS = process.env.REDIS_TLS === "false";
+export const REDIS_TLS = process.env.REDIS_TLS === "true";
 export const REDIS_TTL_SECONDS = parseInt(process.env.REDIS_TTL_SECONDS || "3600");
 
 export const AWS_REGION = process.env.AWS_REGION || "ap-southeast-1";

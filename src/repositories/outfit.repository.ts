@@ -100,6 +100,27 @@ export default class OutfitRepo {
 
     if (andClauses.length) where.AND = andClauses;
 
+    // When filtering by metaCategory (AI-driven fetch), randomise the pool so
+    // the same query never returns the same order twice.
+    if (metaCategoryIn) {
+      const allIds = await prisma.outfit.findMany({ where, select: { id: true } });
+      const shuffled = allIds.map((r) => r.id).sort(() => Math.random() - 0.5);
+      const selectedIds = shuffled.slice(skip, skip + limit);
+
+      const unordered = await prisma.outfit.findMany({
+        where: { id: { in: selectedIds } },
+        include: {
+          file: true,
+          items: { include: { garment: { include: { file: true } } } },
+        },
+      });
+      // Re-apply the shuffled order (findMany with `in` doesn't preserve it).
+      const byId = new Map(unordered.map((o) => [o.id, o]));
+      const data = selectedIds.map((id) => byId.get(id)).filter(Boolean) as typeof unordered;
+
+      return { data, total: allIds.length, page, limit };
+    }
+
     const [data, total] = await Promise.all([
       prisma.outfit.findMany({
         where,
