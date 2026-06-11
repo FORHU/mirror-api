@@ -12,6 +12,17 @@ const router = express.Router();
 router.get("/session-id", authenticate, ChatWonderController.getSessionId);
 
 /**
+ * @route GET /api/mirror/chat-wonder/session-id/current
+ * @desc Read-only: current ChatWonder session ID (no history reset).
+ * @access Private
+ */
+router.get(
+  "/session-id/current",
+  authenticate,
+  ChatWonderController.getCurrentSessionId
+);
+
+/**
  * @route POST /api/mirror/chat-wonder/restart
  * @desc Full restart: null the user's gender + force a new ChatWonder session.
  *       Does not clear the itinerary (see POST /api/mirror/outlines/reset).

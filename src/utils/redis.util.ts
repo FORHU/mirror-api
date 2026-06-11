@@ -2,17 +2,20 @@ import { createClient, RedisClientType } from "redis";
 import { REDIS_HOST, REDIS_PASSWORD, REDIS_PORT, REDIS_TLS } from "../config";
 import logger from "./logger";
 
+const redisSocket = () => ({
+  host: REDIS_HOST,
+  port: REDIS_PORT,
+  connectTimeout: 5000,
+  ...(REDIS_TLS ? { tls: true as const } : {}),
+});
+
 export default class RedisUtil {
   static client: RedisClientType;
 
   static async initialize() {
     this.client = createClient({
       ...(REDIS_PASSWORD ? { password: REDIS_PASSWORD } : {}),
-      socket: {
-        host: REDIS_HOST,
-        port: REDIS_PORT,
-        ...(REDIS_TLS ? { tls: true as const } : {}),
-      },
+      socket: redisSocket(),
     }) as RedisClientType;
 
     this.client.on("error", (err) => logger.error(`Redis Client Error: ${(err as Error).message}`));
@@ -27,11 +30,7 @@ export default class RedisUtil {
   static getAdapterClients() {
     const pubClient = createClient({
       ...(REDIS_PASSWORD ? { password: REDIS_PASSWORD } : {}),
-      socket: {
-        host: REDIS_HOST,
-        port: REDIS_PORT,
-        ...(REDIS_TLS ? { tls: true as const } : {}),
-      },
+      socket: redisSocket(),
     });
     const subClient = pubClient.duplicate();
     return { pubClient, subClient };
