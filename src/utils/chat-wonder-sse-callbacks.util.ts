@@ -207,15 +207,25 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       }
 
       const isGreeting = input.includes(MIRROR_GREETING);
+      const cosmeticsQuery =
+        cosmetics_data && typeof cosmetics_data === "object"
+          ? (cosmetics_data as Record<string, unknown>).query
+          : undefined;
       const wantsCosmetics =
         !isGreeting &&
         (cosmetics_data != null || parsed.intent === "COSMETIC" || !!parsed.cosmetics_suggestion || isCosmeticsLikely(input));
       if (wantsCosmetics) {
-        let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics_data);
-        if (!resolved.length) {
-          resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
+        if (typeof cosmeticsQuery === "string") {
+          // New flow: AI sent a query — frontend fetches products itself.
+          cosmetics_data = { query: cosmeticsQuery };
+        } else {
+          // Legacy flow: AI sent product IDs — resolve and send inline.
+          let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics_data);
+          if (!resolved.length) {
+            resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
+          }
+          if (resolved.length) cosmetics_data = { recommendations: resolved };
         }
-        if (resolved.length) cosmetics_data = { recommendations: resolved };
       }
 
       const message = stripMarkdownFormatting(

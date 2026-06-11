@@ -14,7 +14,7 @@ const splitSearchTerms = (value: string) =>
 
 export default class CosmeticProductService {
   static async getProducts(query: Record<string, string | undefined | string[]>) {
-    const { type, brand, category, tags } = query;
+    const { type, brand, category, tags, metaCategory } = query;
     const {
       page,
       limit,
@@ -36,6 +36,7 @@ export default class CosmeticProductService {
       category?: COSMETIC_CATEGORY;
       tags?: string[];
       searchTerms?: string[];
+      skinType?: string;
     } = {};
     if (
       type &&
@@ -57,6 +58,10 @@ export default class CosmeticProductService {
     }
     if (rawSearch?.trim()) {
       filters.searchTerms = splitSearchTerms(rawSearch);
+    }
+
+    if (typeof metaCategory === "string" && metaCategory.trim()) {
+      filters.skinType = metaCategory.trim().toLowerCase();
     }
 
     const result = await CosmeticProductRepo.findAll(filters, page, limit);

@@ -9,6 +9,7 @@ export default class CosmeticProductRepo {
       category?: COSMETIC_CATEGORY;
       tags?: string[];
       searchTerms?: string[];
+      skinType?: string;
     } = {},
     page: number = 1,
     limit: number = 20
@@ -46,6 +47,16 @@ export default class CosmeticProductRepo {
         ...(ingredientIds.length ? [{ id: { in: ingredientIds } }] : []),
       ];
       where.OR = searchWhere;
+    }
+
+    if (filters.skinType) {
+      const skinFilter = buildSkinTypeFilter(filters.skinType);
+      if (skinFilter) {
+        const andClauses = Array.isArray(where.AND)
+          ? (where.AND as Prisma.CosmeticProductWhereInput[])
+          : [];
+        where.AND = [...andClauses, skinFilter];
+      }
     }
 
     const [data, total] = await Promise.all([
@@ -94,5 +105,35 @@ export default class CosmeticProductRepo {
 
   static async delete(id: string) {
     return prisma.cosmeticProduct.delete({ where: { id } });
+  }
+}
+
+function buildSkinTypeFilter(skinType: string): Prisma.CosmeticProductWhereInput | null {
+  switch (skinType.toLowerCase()) {
+    case "dry":
+      return {
+        OR: [
+          { hydrating: true },
+          { tags: { hasSome: ["dry", "dry skin", "hydrating", "moisturizing", "nourishing", "rich"] } },
+        ],
+      };
+    case "oily":
+      return {
+        OR: [
+          { oilFree: true },
+          { tags: { hasSome: ["oily", "oily skin", "oil-free", "oil free", "oil control", "mattifying"] } },
+        ],
+      };
+    case "sensitive":
+      return {
+        tags: { hasSome: ["sensitive", "sensitive skin", "gentle", "hypoallergenic", "calming", "soothing"] },
+      };
+    case "combination":
+      return {
+        tags: { hasSome: ["combination", "balancing", "balance", "dual action"] },
+      };
+    case "normal":
+    default:
+      return null;
   }
 }
