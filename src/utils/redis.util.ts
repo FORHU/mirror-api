@@ -11,7 +11,7 @@ export default class RedisUtil {
       socket: {
         host: REDIS_HOST,
         port: REDIS_PORT,
-        tls: REDIS_TLS,
+        ...(REDIS_TLS ? { tls: true as const } : {}),
       },
     }) as RedisClientType;
 
@@ -30,7 +30,7 @@ export default class RedisUtil {
       socket: {
         host: REDIS_HOST,
         port: REDIS_PORT,
-        tls: REDIS_TLS,
+        ...(REDIS_TLS ? { tls: true as const } : {}),
       },
     });
     const subClient = pubClient.duplicate();
