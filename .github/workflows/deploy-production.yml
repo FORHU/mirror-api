@@ -48,6 +48,13 @@ jobs:
             --policy-name mirror-api-cloudwatch-logs \
             --policy-document file://infra/ec2-cloudwatch-logs-policy.json
 
+      - name: Grant EC2 role ECR pull access
+        run: |
+          aws iam put-role-policy \
+            --role-name "${{ env.EC2_IAM_ROLE_NAME }}" \
+            --policy-name mirror-api-ecr-pull \
+            --policy-document file://infra/ec2-ecr-pull-policy.json
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
