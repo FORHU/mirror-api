@@ -49,7 +49,6 @@ export default class OutfitService {
       { includeSystem: systemOnly !== "true" }, // include system outfits unless viewing system-only
       globalSearch || searchOutfit,
       {
-        category: metaCategory,
         gender: metaGender,
         silhouette: metaSilhouette,
         tags: metaTags,
