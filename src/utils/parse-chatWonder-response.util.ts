@@ -180,13 +180,54 @@ function stripDataBlocks(text: string): string {
 }
 
 /**
+ * Remove ALL bare JSON objects that contain "tool_name" from anywhere in the
+ * text. ChatWonder emits tool-call status blobs like:
+ *   {"status":"pending_approval","tool_name":"recommend_garments","arguments":{...}}
+ * These must never reach the user-facing message regardless of where they appear.
+ */
+function stripToolCallBlocks(text: string): string {
+  let result = "";
+  let remaining = text;
+  for (;;) {
+    const brace = remaining.indexOf("{");
+    if (brace === -1) {
+      result += remaining;
+      break;
+    }
+    const end = matchBracket(remaining, brace);
+    if (end === -1) {
+      // Incomplete block (still streaming). If the fragment already looks like a
+      // tool-call status block, suppress from here so partial JSON never leaks.
+      const fragment = remaining.slice(brace);
+      if (/^\{"(status|tool_name)"/.test(fragment) || /"tool_name"\s*:/.test(fragment)) {
+        result += remaining.slice(0, brace).trimEnd();
+      } else {
+        result += remaining;
+      }
+      break;
+    }
+    const block = remaining.slice(brace, end + 1);
+    if (/"tool_name"\s*:/.test(block)) {
+      result += remaining.slice(0, brace).trimEnd();
+      remaining = remaining.slice(end + 1).trimStart();
+    } else {
+      result += remaining.slice(0, end + 1);
+      remaining = remaining.slice(end + 1);
+    }
+  }
+  return result;
+}
+
+/**
  * Reduce a raw response to the user-facing message: strip the structured data
- * blocks (anywhere they appear) and the redundant per-set breakdown. Does NOT
- * trim, so callers that stream incrementally can track emitted length; trim at
- * the final use site.
+ * blocks (anywhere they appear), tool-call status blobs, and the redundant
+ * per-set breakdown. Does NOT trim, so callers that stream incrementally can
+ * track emitted length; trim at the final use site.
  */
 export function cutToMessage(text: string): string {
-  return stripDataBlocks(text).replace(DATA_BLOCK_TAIL, "").replace(SET_BREAKDOWN_TAIL, "");
+  return stripToolCallBlocks(
+    stripDataBlocks(text).replace(DATA_BLOCK_TAIL, "").replace(SET_BREAKDOWN_TAIL, ""),
+  );
 }
 
 /**
