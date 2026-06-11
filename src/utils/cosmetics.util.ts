@@ -50,7 +50,7 @@ export type ScoredProduct = {
 
 const MIN_SCORE = 10; // products below this drop out
 const MAX_RESULTS = 10;
-const FALLBACK_RESULTS = 5; // if nothing passes MIN_SCORE, show top N anyway
+const FALLBACK_RESULTS = 10; // if nothing passes MIN_SCORE, show top N anyway
 
 // Concern keyword → preference. Match is substring, case-insensitive.
 const CONCERN_RULES: Array<{
@@ -147,6 +147,11 @@ export function scoreProduct(
     add("skin_hydrating", skinPref.hydrating, input.skinType);
   if (skinPref.oilFree && product.oilFree) add("skin_oilFree", skinPref.oilFree, input.skinType);
   if (skinPref.finish && product.finish === skinPref.finish) add("skin_finish", 10, input.skinType);
+
+  // Baseline boost for any profile lacking specific concerns to ensure candidates survive
+  if (input.concerns.length === 0) {
+    add("baseline_general", 15, "Good for daily maintenance");
+  }
 
   // 2. Concern rules
   for (const rule of CONCERN_RULES) {

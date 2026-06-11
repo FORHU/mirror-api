@@ -21,6 +21,7 @@ import {
   checkAndFinalizeOutline,
   cleanDisplayPrefix,
   clearStaleSession,
+  isCosmeticsLikely,
 } from "../helpers/chat-wonder.helper";
 
 const MIRROR_GREETING = "[SYSTEM] The user just walked up to the mirror.";
@@ -208,7 +209,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       const isGreeting = input.includes(MIRROR_GREETING);
       const wantsCosmetics =
         !isGreeting &&
-        (cosmetics_data != null || parsed.intent === "COSMETIC" || !!parsed.cosmetics_suggestion);
+        (cosmetics_data != null || parsed.intent === "COSMETIC" || !!parsed.cosmetics_suggestion || isCosmeticsLikely(input));
       if (wantsCosmetics) {
         let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics_data);
         if (!resolved.length) {
