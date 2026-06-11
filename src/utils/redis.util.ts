@@ -1,5 +1,5 @@
 import { createClient, RedisClientType } from "redis";
-import { REDIS_HOST, REDIS_PASSWORD, REDIS_PORT } from "../config";
+import { REDIS_HOST, REDIS_PASSWORD, REDIS_PORT, REDIS_TLS } from "../config";
 import logger from "./logger";
 
 export default class RedisUtil {
@@ -11,6 +11,7 @@ export default class RedisUtil {
       socket: {
         host: REDIS_HOST,
         port: REDIS_PORT,
+        tls: REDIS_TLS,
       },
     }) as RedisClientType;
 
@@ -29,6 +30,7 @@ export default class RedisUtil {
       socket: {
         host: REDIS_HOST,
         port: REDIS_PORT,
+        tls: REDIS_TLS,
       },
     });
     const subClient = pubClient.duplicate();
