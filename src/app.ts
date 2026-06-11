@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import { healthCheck } from "./controllers/health.controller";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import cors from "cors";
@@ -52,9 +53,7 @@ const limiter = rateLimit({
 
 if (!isDev) app.use(limiter);
 
-app.get("/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok" });
-});
+app.get("/health", healthCheck);
 
 app.use("/api", router);
 
