@@ -49,12 +49,12 @@ export default class OutfitService {
       { includeSystem: systemOnly !== "true" }, // include system outfits unless viewing system-only
       globalSearch || searchOutfit,
       {
-        category: metaCategory,
         gender: metaGender,
         silhouette: metaSilhouette,
         tags: metaTags,
         garmentType: metaGarmentType,
-      }
+      },
+      metaCategory
     );
     const { sortBy, sortOrder, search, filters } = parsePagination(query);
     return { ...result, sortBy, sortOrder, search, filters };

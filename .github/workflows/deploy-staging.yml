@@ -70,6 +70,7 @@ jobs:
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PORT: ${{ secrets.REDIS_PORT }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_TLS: ${{ secrets.REDIS_TLS }}
           REDIS_TTL_SECONDS: ${{ secrets.REDIS_TTL_SECONDS }}
           ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
           ACCESS_TOKEN_EXPIRY: ${{ secrets.ACCESS_TOKEN_EXPIRY }}
@@ -106,6 +107,7 @@ jobs:
           REDIS_HOST=${REDIS_HOST}
           REDIS_PORT=${REDIS_PORT}
           REDIS_PASSWORD=${REDIS_PASSWORD}
+          REDIS_TLS=${REDIS_TLS}
           REDIS_TTL_SECONDS=${REDIS_TTL_SECONDS}
           ACCESS_TOKEN_SECRET=${ACCESS_TOKEN_SECRET}
           ACCESS_TOKEN_EXPIRY=${ACCESS_TOKEN_EXPIRY}
