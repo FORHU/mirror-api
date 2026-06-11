@@ -31,6 +31,26 @@ export default class ChatWonderController {
   }
 
   /**
+   * Read-only twin of getSessionId: returns the user's current ChatWonder
+   * session ID (creating one only if none exists). Never clears history —
+   * safe for display/debug UI.
+   */
+  static async getCurrentSessionId(req: Request, res: Response) {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    if (!userId) {
+      return responseError(res, 401, "Unauthorized");
+    }
+
+    try {
+      const sessionId = await ChatWonderService.generateChatSessionId(userId, false);
+      return res.json({ status: "success", data: { sessionId } });
+    } catch (err) {
+      logger.error(`[ChatWonderController] getCurrentSessionId error: ${(err as Error).message}`);
+      return responseError(res, 500, (err as Error).message || "Internal server error");
+    }
+  }
+
+  /**
    * RESTART — gender + ChatWonder session only:
    *   1. Null the user's stored gender (app will re-ask).
    *   2. Force a brand-new ChatWonder session (clears conversation history).
