@@ -54,7 +54,8 @@ export default class OutfitService {
         silhouette: metaSilhouette,
         tags: metaTags,
         garmentType: metaGarmentType,
-      }
+      },
+      metaCategory
     );
     const { sortBy, sortOrder, search, filters } = parsePagination(query);
     return { ...result, sortBy, sortOrder, search, filters };

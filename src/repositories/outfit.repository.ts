@@ -15,7 +15,8 @@ export default class OutfitRepo {
     limit: number = 20,
     filters: { fileProvider?: string; fileProviderNot?: string; includeSystem?: boolean } = {},
     searchOutfit?: string,
-    metaFilters: Partial<Record<MetaTextField, string>> = {}
+    metaFilters: Partial<Record<MetaTextField, string>> = {},
+    metaCategoryIn?: string
   ) {
     const skip = (page - 1) * limit;
 
@@ -79,6 +80,22 @@ export default class OutfitRepo {
         `
       );
       andClauses.push({ id: { in: metaDataRows.map((row) => row.id) } });
+    }
+
+    if (metaCategoryIn) {
+      const categories = metaCategoryIn.split(",").map((c) => c.trim()).filter(Boolean);
+      if (categories.length > 0) {
+        // Build a regex pattern like '(?i)Casual|Streetwear|Vintage'
+        const regexPattern = `(?i)${categories.join("|")}`;
+        const metaDataRows = await prisma.$queryRaw<{ id: string }[]>(
+          Prisma.sql`
+            SELECT "id"
+            FROM "Outfit"
+            WHERE "metaData"->>'category' ~ ${regexPattern}
+          `
+        );
+        andClauses.push({ id: { in: metaDataRows.map((row) => row.id) } });
+      }
     }
 
     if (andClauses.length) where.AND = andClauses;
