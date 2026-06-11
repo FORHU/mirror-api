@@ -5,13 +5,13 @@
       "Sid": "MirrorApiLogGroups",
       "Effect": "Allow",
       "Action": ["logs:CreateLogGroup", "logs:DescribeLogStreams"],
-      "Resource": "arn:aws:logs:ap-southeast-1:*:log-group:/mirror-api/*"
+      "Resource": "arn:aws:logs:*:*:log-group:/mirror-api/*"
     },
     {
       "Sid": "MirrorApiLogStreams",
       "Effect": "Allow",
       "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
-      "Resource": "arn:aws:logs:ap-southeast-1:*:log-group:/mirror-api/*:log-stream:*"
+      "Resource": "arn:aws:logs:*:*:log-group:/mirror-api/*:log-stream:*"
     }
   ]
 }
