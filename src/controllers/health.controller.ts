@@ -3,12 +3,7 @@ import { HeadBucketCommand } from "@aws-sdk/client-s3";
 import RedisUtil from "../utils/redis.util";
 import { prisma } from "../utils/prisma";
 import { s3Client } from "../utils/s3";
-import {
-  S3_BUCKET_NAME,
-  FASHN_BASE_URL,
-  FASHN_API_KEY,
-  CHAT_WONDER_API_URL,
-} from "../config";
+import { S3_BUCKET_NAME, FASHN_BASE_URL, FASHN_API_KEY, CHAT_WONDER_API_URL } from "../config";
 
 type ServiceStatus = "ok" | "degraded" | "unavailable";
 
@@ -18,10 +13,7 @@ interface ServiceCheck {
   error?: string;
 }
 
-async function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number
-): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>
@@ -55,10 +47,7 @@ async function checkS3(): Promise<ServiceCheck> {
   const start = Date.now();
   try {
     if (!S3_BUCKET_NAME) throw new Error("S3_BUCKET_NAME not configured");
-    await withTimeout(
-      s3Client.send(new HeadBucketCommand({ Bucket: S3_BUCKET_NAME })),
-      3000
-    );
+    await withTimeout(s3Client.send(new HeadBucketCommand({ Bucket: S3_BUCKET_NAME })), 3000);
     return { status: "ok", latencyMs: Date.now() - start };
   } catch (err) {
     return { status: "unavailable", error: (err as Error).message };
@@ -75,8 +64,7 @@ async function checkFashn(): Promise<ServiceCheck> {
       }),
       3000
     );
-    if (!res.ok && res.status !== 401)
-      throw new Error(`HTTP ${res.status}`);
+    if (!res.ok && res.status !== 401) throw new Error(`HTTP ${res.status}`);
     return { status: "ok", latencyMs: Date.now() - start };
   } catch (err) {
     return { status: "unavailable", error: (err as Error).message };
@@ -87,10 +75,7 @@ async function checkChatWonder(): Promise<ServiceCheck> {
   const start = Date.now();
   try {
     if (!CHAT_WONDER_API_URL) throw new Error("CHAT_WONDER_API_URL not configured");
-    const res = await withTimeout(
-      fetch(`${CHAT_WONDER_API_URL}/health`, { method: "GET" }),
-      3000
-    );
+    const res = await withTimeout(fetch(`${CHAT_WONDER_API_URL}/health`, { method: "GET" }), 3000);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return { status: "ok", latencyMs: Date.now() - start };
   } catch (err) {
@@ -109,9 +94,7 @@ export async function healthCheck(_req: Request, res: Response): Promise<void> {
 
   const services = { redis, database, s3, fashn, chatWonder };
 
-  const isCriticalDown = [redis, database, s3].some(
-    (s) => s.status === "unavailable"
-  );
+  const isCriticalDown = [redis, database, s3].some((s) => s.status === "unavailable");
 
   res.status(isCriticalDown ? 503 : 200).json({
     status: isCriticalDown ? "degraded" : "ok",

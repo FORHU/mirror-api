@@ -272,7 +272,13 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         ...(history && history.length ? { history } : {}),
         // ChatWonder expects category as { meta: "Cat1,Cat2" }. "ALL" means no filter — omit it.
         ...(category && category !== "ALL"
-          ? { category: { meta: category.startsWith("metaCategory=") ? category.slice("metaCategory=".length) : category } }
+          ? {
+              category: {
+                meta: category.startsWith("metaCategory=")
+                  ? category.slice("metaCategory=".length)
+                  : category,
+              },
+            }
           : {}),
       };
 

@@ -83,7 +83,10 @@ export default class OutfitRepo {
     }
 
     if (metaCategoryIn) {
-      const categories = metaCategoryIn.split(",").map((c) => c.trim()).filter(Boolean);
+      const categories = metaCategoryIn
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean);
       if (categories.length > 0) {
         // Build a regex pattern like '(?i)Casual|Streetwear|Vintage'
         const regexPattern = `(?i)${categories.join("|")}`;
