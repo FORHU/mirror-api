@@ -8,7 +8,13 @@ import {
   resolveAndPersistOutlineCosmetics,
   resolveOutlineCosmeticsByIds,
 } from "./chat-wonder-cosmetics.util";
-import { persistOutlineOutfits, resolveOutfitsFromQuery, extractFashionMetaCategory, extractCosmeticsMetaCategory } from "./chat-wonder-outfits.util";
+import {
+  persistOutlineOutfits,
+  resolveOutfitsByIds,
+  resolveOutfitsFromQuery,
+  extractFashionMetaCategory,
+  extractCosmeticsMetaCategory,
+} from "./chat-wonder-outfits.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
@@ -144,20 +150,82 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       ]);
       let [garment_data, cosmetics_data, stylist_data] = allData;
       const tailor_data = allData[3];
-      let maps_data: unknown = null;
+      const maps_data: unknown = null;
+
+      // ChatWonder's fast path (category dict sent) bypasses the LLM and returns
+      // [OUTFIT_IDS][id1,id2,...] instead of [GARMENT_DATA]. Resolve those IDs
+      // to full outfit data so the frontend gets the same garment_data shape.
+      let outfitIdsSpokeMessage = "";
+      const outfitIdsMatch = fullResponse.match(/\[OUTFIT_IDS\](\[[\s\S]*?\])/);
+      if (outfitIdsMatch && !garment_data) {
+        try {
+          const ids: string[] = JSON.parse(outfitIdsMatch[1]);
+          const resolved = await resolveOutfitsByIds(ids);
+          if (resolved) {
+            garment_data = {
+              success: true,
+              sets: (resolved.outfits as Record<string, unknown>[]).map((o, i) => ({
+                set_number: i + 1,
+                outfit_id: o.id,
+                outfit_name: o.name ?? "",
+                outfit_description: o.description ?? "",
+                outfit_imageUrl: (o.file as Record<string, unknown> | null)?.fileUrl ?? "",
+                vibe: "",
+                reason: "",
+                recommendations: ((o.items as Record<string, unknown>[]) ?? []).map((item) => {
+                  const g = item.garment as Record<string, unknown> | null;
+                  return {
+                    id: g?.id,
+                    name: g?.name ?? "",
+                    description: g?.description ?? "",
+                    imageUrl: g?.imageUrl ?? "",
+                    fittingSlot: g?.fittingSlot ?? [],
+                    garmentType: g?.garmentType ?? [],
+                    category: g?.category ?? [],
+                    layerLevel: g?.layerLevel ?? "",
+                    silhouette: g?.silhouette ?? "",
+                  };
+                }),
+              })),
+            };
+            stylist_data = stylist_data ?? {
+              target_url: "/ai-recommendation-fashion",
+              confidence: 1.0,
+              extracted_entities: null,
+              system_message: "",
+            };
+            outfitIdsSpokeMessage = "Here are your outfit picks.";
+            processSentence(outfitIdsSpokeMessage);
+            logger.info(`[ChatWonderController] Resolved [OUTFIT_IDS] → ${ids.length} outfits`);
+          }
+        } catch (e) {
+          logger.warn(
+            `[ChatWonderController] Failed to parse [OUTFIT_IDS]: ${(e as Error).message}`
+          );
+        }
+      }
 
       // ChatWonder classifies FASHION intents correctly but doesn't always emit
       // a [GARMENT_DATA] block with a query. Synthesise one from the input so
       // the resolution block below can fetch matching outfits from the DB.
-      if (parsed.intent === "FASHION" && (!garment_data || !(garment_data as Record<string, unknown>).query)) {
+      if (
+        parsed.intent === "FASHION" &&
+        (!garment_data || !(garment_data as Record<string, unknown>).query)
+      ) {
         const metaCategory = extractFashionMetaCategory(input);
         if (metaCategory) {
           garment_data = { query: `metaCategory=${metaCategory}&limit=4` };
-          logger.info(`[ChatWonderController] Synthesised garment_data query: metaCategory=${metaCategory}`);
+          logger.info(
+            `[ChatWonderController] Synthesised garment_data query: metaCategory=${metaCategory}`
+          );
         }
       }
 
-      if (garment_data && typeof garment_data === "object" && (garment_data as Record<string, unknown>).query) {
+      if (
+        garment_data &&
+        typeof garment_data === "object" &&
+        (garment_data as Record<string, unknown>).query
+      ) {
         const queryStr = (garment_data as Record<string, unknown>).query as string;
         const category = new URLSearchParams(queryStr).get("metaCategory") ?? "";
         const resolved = await resolveOutfitsFromQuery(garment_data, userId);
@@ -223,11 +291,17 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       // ChatWonder classifies COSMETIC intents correctly but doesn't always emit
       // a [COSMETICS_DATA] block with a query. Synthesise one from the input (or
       // the user's skin profile) so the new query flow runs instead of legacy IDs.
-      if (!isGreeting && parsed.intent === "COSMETIC" && (!cosmetics_data || !(cosmetics_data as Record<string, unknown>).query)) {
+      if (
+        !isGreeting &&
+        parsed.intent === "COSMETIC" &&
+        (!cosmetics_data || !(cosmetics_data as Record<string, unknown>).query)
+      ) {
         const skinCategory = extractCosmeticsMetaCategory(input, skinAnalysis);
         if (skinCategory) {
           cosmetics_data = { query: `metaCategory=${skinCategory}&limit=4` };
-          logger.info(`[ChatWonderController] Synthesised cosmetics_data query: metaCategory=${skinCategory}`);
+          logger.info(
+            `[ChatWonderController] Synthesised cosmetics_data query: metaCategory=${skinCategory}`
+          );
         }
       }
 
@@ -237,7 +311,10 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
           : undefined;
       const wantsCosmetics =
         !isGreeting &&
-        (cosmetics_data != null || parsed.intent === "COSMETIC" || !!parsed.cosmetics_suggestion || isCosmeticsLikely(input));
+        (cosmetics_data != null ||
+          parsed.intent === "COSMETIC" ||
+          !!parsed.cosmetics_suggestion ||
+          isCosmeticsLikely(input));
       if (wantsCosmetics) {
         if (typeof cosmeticsQuery === "string") {
           // New flow: AI sent a query — frontend fetches products itself.
@@ -252,12 +329,15 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         }
       }
 
-      const message = stripMarkdownFormatting(
-        parsed.message
-          .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
-          .split(/\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE|TAILOR_DATA)\]/)[0]
-          .trim()
-      );
+      const message =
+        stripMarkdownFormatting(
+          parsed.message
+            .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
+            .split(
+              /\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE|TAILOR_DATA|OUTFIT_IDS)\]/
+            )[0]
+            .trim()
+        ) || outfitIdsSpokeMessage;
 
       writeSseEvent({
         type: "complete",

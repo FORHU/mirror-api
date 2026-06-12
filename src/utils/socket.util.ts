@@ -22,7 +22,9 @@ export const initSocketServer = async (httpServer: HttpServer) => {
     io.adapter(createAdapter(pubClient, subClient));
     logger.info("Redis adapter initialized for Socket.IO");
   } catch (err) {
-    logger.warn(`[Socket.IO] Redis adapter unavailable, running without it: ${(err as Error).message}`);
+    logger.warn(
+      `[Socket.IO] Redis adapter unavailable, running without it: ${(err as Error).message}`
+    );
   }
 
   io.on("connection", (socket: Socket) => {
