@@ -123,6 +123,8 @@ export interface StreamChatOptions {
   /** Compact product/document context injected into ChatWonder for grounded recommendations. */
   documentContext?: string;
   history?: { role: "user" | "assistant"; content: string }[];
+  /** Fashion category filter from the catalog page (e.g. "metaCategory=Winterwear,Summerwear" or "ALL"). */
+  category?: string;
 }
 
 const DEFAULT_WS_CONNECT_TIMEOUT_MS = 10000;
@@ -191,6 +193,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     sitemapContext,
     documentContext,
     history,
+    category,
   } = options;
 
   return new Promise((resolve, reject) => {
@@ -265,9 +268,12 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         ...(location ? { location } : {}),
         ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
         ...(gender ? { gender } : {}),
-        ...(sitemapContext && sitemapContext.length ? { sitemap_context: sitemapContext } : {}),
         ...(documentContext ? { document_context: documentContext } : {}),
         ...(history && history.length ? { history } : {}),
+        // ChatWonder expects category as { meta: "Cat1,Cat2" }. "ALL" means no filter — omit it.
+        ...(category && category !== "ALL"
+          ? { category: { meta: category.startsWith("metaCategory=") ? category.slice("metaCategory=".length) : category } }
+          : {}),
       };
 
       const sendPayload = () => {

@@ -103,7 +103,7 @@ function repairJson(input: string): string {
  * the first such marker onward is structured data, not user-facing message text.
  */
 const DATA_BLOCK_TAIL =
-  /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|DONE)\][\s\S]*$/;
+  /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|OUTFIT_IDS|DONE)\][\s\S]*$/;
 
 /**
  * The per-set markdown breakdown ChatWonder writes after the conversational

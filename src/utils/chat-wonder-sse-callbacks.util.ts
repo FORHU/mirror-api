@@ -8,7 +8,7 @@ import {
   resolveAndPersistOutlineCosmetics,
   resolveOutlineCosmeticsByIds,
 } from "./chat-wonder-cosmetics.util";
-import { persistOutlineOutfits, resolveOutfitsFromQuery, extractFashionMetaCategory, extractCosmeticsMetaCategory } from "./chat-wonder-outfits.util";
+import { persistOutlineOutfits, resolveOutfitsByIds, resolveOutfitsFromQuery, extractFashionMetaCategory, extractCosmeticsMetaCategory } from "./chat-wonder-outfits.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
@@ -146,6 +146,57 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       const tailor_data = allData[3];
       let maps_data: unknown = null;
 
+      // ChatWonder's fast path (category dict sent) bypasses the LLM and returns
+      // [OUTFIT_IDS][id1,id2,...] instead of [GARMENT_DATA]. Resolve those IDs
+      // to full outfit data so the frontend gets the same garment_data shape.
+      let outfitIdsSpokeMessage = "";
+      const outfitIdsMatch = fullResponse.match(/\[OUTFIT_IDS\](\[[\s\S]*?\])/);
+      if (outfitIdsMatch && !garment_data) {
+        try {
+          const ids: string[] = JSON.parse(outfitIdsMatch[1]);
+          const resolved = await resolveOutfitsByIds(ids);
+          if (resolved) {
+            garment_data = {
+              success: true,
+              sets: (resolved.outfits as Record<string, unknown>[]).map((o, i) => ({
+                set_number: i + 1,
+                outfit_id: o.id,
+                outfit_name: o.name ?? "",
+                outfit_description: o.description ?? "",
+                outfit_imageUrl: (o.file as Record<string, unknown> | null)?.fileUrl ?? "",
+                vibe: "",
+                reason: "",
+                recommendations: ((o.items as Record<string, unknown>[]) ?? []).map((item) => {
+                  const g = item.garment as Record<string, unknown> | null;
+                  return {
+                    id: g?.id,
+                    name: g?.name ?? "",
+                    description: g?.description ?? "",
+                    imageUrl: g?.imageUrl ?? "",
+                    fittingSlot: g?.fittingSlot ?? [],
+                    garmentType: g?.garmentType ?? [],
+                    category: g?.category ?? [],
+                    layerLevel: g?.layerLevel ?? "",
+                    silhouette: g?.silhouette ?? "",
+                  };
+                }),
+              })),
+            };
+            stylist_data = stylist_data ?? {
+              target_url: "/ai-recommendation-fashion",
+              confidence: 1.0,
+              extracted_entities: null,
+              system_message: "",
+            };
+            outfitIdsSpokeMessage = "Here are your outfit picks.";
+            processSentence(outfitIdsSpokeMessage);
+            logger.info(`[ChatWonderController] Resolved [OUTFIT_IDS] → ${ids.length} outfits`);
+          }
+        } catch (e) {
+          logger.warn(`[ChatWonderController] Failed to parse [OUTFIT_IDS]: ${(e as Error).message}`);
+        }
+      }
+
       // ChatWonder classifies FASHION intents correctly but doesn't always emit
       // a [GARMENT_DATA] block with a query. Synthesise one from the input so
       // the resolution block below can fetch matching outfits from the DB.
@@ -257,7 +308,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
           .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
           .split(/\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE|TAILOR_DATA)\]/)[0]
           .trim()
-      );
+      ) || outfitIdsSpokeMessage;
 
       writeSseEvent({
         type: "complete",

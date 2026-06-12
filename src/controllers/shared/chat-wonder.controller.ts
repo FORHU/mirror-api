@@ -128,6 +128,7 @@ export default class ChatWonderController {
 
     const frontendLocation = value.location;
     const skinAnalysis = value.skin_analysis;
+    const category: string | undefined = value.category || undefined;
 
     logger.info(
       `[ChatWonderController.chat] page_mode=${pageMode ?? "none"} | input=${input.slice(0, 80)}...`
@@ -212,6 +213,7 @@ export default class ChatWonderController {
         sitemapContext,
         documentContext,
         history,
+        category,
       });
     } catch (err) {
       const message = (err as Error).message || "Internal server error";
