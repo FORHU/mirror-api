@@ -51,6 +51,9 @@ function evictWS(sessionId: string) {
   if (entry) {
     if (entry.pingTimer) clearInterval(entry.pingTimer);
     try {
+      // Attach a dummy error listener to prevent Node.js from crashing 
+      // if ws.terminate() emits an 'error' event during the CONNECTING phase.
+      entry.ws.on("error", () => {});
       entry.ws.terminate();
     } catch {
       // Ignore termination errors while evicting sockets.
