@@ -314,9 +314,7 @@ export async function resolveOutfitsByIds(ids: string[]): Promise<{ outfits: unk
       },
     });
     // Preserve the order ChatWonder selected
-    const ordered = ids
-      .map((id) => outfits.find((o) => o.id === id))
-      .filter(Boolean);
+    const ordered = ids.map((id) => outfits.find((o) => o.id === id)).filter(Boolean);
     logger.info(`[resolveOutfitsByIds] Resolved ${ordered.length}/${ids.length} outfits`);
     return { outfits: ordered };
   } catch (err) {
@@ -344,7 +342,9 @@ export async function resolveOutfitsFromQuery(
 
   try {
     const result = await OutfitService.getUserOutfits(userId, params);
-    logger.info(`[resolveOutfitsFromQuery] Resolved ${result.data.length} outfits for query: ${queryStr}`);
+    logger.info(
+      `[resolveOutfitsFromQuery] Resolved ${result.data.length} outfits for query: ${queryStr}`
+    );
     return { outfits: result.data, reason };
   } catch (err) {
     logger.error(`[resolveOutfitsFromQuery] ${(err as Error).message}`);
@@ -418,10 +418,17 @@ export async function persistOutlineOutfits(
       const set = rawSet as any;
       const outfitName: string = set.outfit_name || "AI Outfit";
       const outfitImageUrl: string = set.outfit_imageUrl ?? "";
-      const recommendations: unknown[] = Array.isArray(set.recommendations) ? set.recommendations : [];
+      const recommendations: unknown[] = Array.isArray(set.recommendations)
+        ? set.recommendations
+        : [];
 
       const outfitFile = await prisma.file.create({
-        data: { filename: outfitName, fileUrl: outfitImageUrl, mimeType: "image/jpeg", provider: "External" },
+        data: {
+          filename: outfitName,
+          fileUrl: outfitImageUrl,
+          mimeType: "image/jpeg",
+          provider: "External",
+        },
       });
 
       const items: Array<{ garmentId: string; slot: string; layerLevel: string }> = [];
@@ -450,7 +457,9 @@ export async function persistOutlineOutfits(
           } as any,
         });
 
-        const slot: string = Array.isArray(rec.fittingSlot) ? (rec.fittingSlot[0] ?? "None") : "None";
+        const slot: string = Array.isArray(rec.fittingSlot)
+          ? (rec.fittingSlot[0] ?? "None")
+          : "None";
         items.push({ garmentId: garment.id, slot, layerLevel: rec.layerLevel ?? "BASE" });
       }
 
@@ -464,7 +473,13 @@ export async function persistOutlineOutfits(
           userOutlineId: outline.id,
           fileId: outfitFile.id,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          items: { create: items.map(({ garmentId, slot, layerLevel }) => ({ garmentId, slot, layerLevel })) as any },
+          items: {
+            create: items.map(({ garmentId, slot, layerLevel }) => ({
+              garmentId,
+              slot,
+              layerLevel,
+            })) as any,
+          },
         },
       });
       created++;

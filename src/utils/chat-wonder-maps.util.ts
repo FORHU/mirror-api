@@ -10,7 +10,7 @@ import type { ChatWonderEvent } from "./parse-chatWonder-response.util";
  * Disabled: map service removed.
  */
 export async function resolveItineraryLocations(
-  events: ChatWonderEvent[],
+  events: ChatWonderEvent[]
 ): Promise<ChatWonderEvent[]> {
   // Map service disabled — return events unmodified
   return events;
@@ -22,7 +22,7 @@ export async function resolveItineraryLocations(
  */
 export async function persistOutlineMaps(
   _conversationId: string,
-  _mapsData: unknown,
+  _mapsData: unknown
 ): Promise<void> {
   // Map service disabled — no-op
 }

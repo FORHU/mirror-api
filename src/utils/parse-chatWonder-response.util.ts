@@ -226,7 +226,7 @@ function stripToolCallBlocks(text: string): string {
  */
 export function cutToMessage(text: string): string {
   return stripToolCallBlocks(
-    stripDataBlocks(text).replace(DATA_BLOCK_TAIL, "").replace(SET_BREAKDOWN_TAIL, ""),
+    stripDataBlocks(text).replace(DATA_BLOCK_TAIL, "").replace(SET_BREAKDOWN_TAIL, "")
   );
 }
 
@@ -344,7 +344,14 @@ function buildFromParsed(
  */
 export function extractChatWonderDataBlock(
   rawResponse: string,
-  block: "GARMENT_DATA" | "COSMETICS_DATA" | "MAPS_DATA" | "NAV_DATA" | "GENDER_UPDATE" | "STYLIST" | "TAILOR_DATA"
+  block:
+    | "GARMENT_DATA"
+    | "COSMETICS_DATA"
+    | "MAPS_DATA"
+    | "NAV_DATA"
+    | "GENDER_UPDATE"
+    | "STYLIST"
+    | "TAILOR_DATA"
 ): Record<string, unknown> | unknown[] | null {
   const marker = `[${block}]`;
   const idx = rawResponse.indexOf(marker);
