@@ -3,6 +3,7 @@ dotenv.config();
 
 export const PORT = process.env.PORT || 3007;
 export const NODE_ENV = process.env.NODE_ENV || "development";
+export const BASE_URL = process.env.BASE_URL || "http://localhost:3007";
 
 export const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "access-secret";
 export const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "refresh-secret";

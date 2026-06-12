@@ -2,10 +2,11 @@ import dotenv from "dotenv";
 dotenv.config({ override: true });
 
 import http from "http";
+import { URL } from "url";
 import app from "./app";
 import logger from "./utils/logger";
 import setup from "./setup";
-import { PORT, NODE_ENV, S3_CDN_URL, S3_BUCKET_NAME } from "./config";
+import { PORT, NODE_ENV, S3_CDN_URL, S3_BUCKET_NAME, BASE_URL } from "./config";
 import { initSocketServer } from "./utils/socket.util";
 
 async function start() {
@@ -14,8 +15,17 @@ async function start() {
   const server = http.createServer(app);
   await initSocketServer(server);
 
-  server.listen(PORT, () => {
-    logger.info(`Server is running on port ${PORT} in ${NODE_ENV} mode`);
+  let host = "0.0.0.0";
+  if (NODE_ENV !== "production") {
+    try {
+      host = new URL(BASE_URL).hostname;
+    } catch (err) {
+      logger.warn(`Invalid BASE_URL format: ${BASE_URL}. Falling back to 0.0.0.0`);
+    }
+  }
+
+  server.listen(Number(PORT), host, () => {
+    logger.info(`Server is running on port ${PORT} (bound to ${host}) in ${NODE_ENV} mode`);
     logger.info(
       `[boot] S3_BUCKET_NAME=${S3_BUCKET_NAME || "(empty)"}  S3_CDN_URL=${S3_CDN_URL || "(empty)"}`
     );

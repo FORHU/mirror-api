@@ -6,9 +6,12 @@ import { createChatWonderSseCallbacks } from "../../utils/chat-wonder-sse-callba
 import { buildCatalogContext } from "../../utils/chat-wonder-cosmetics.util";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
-import { chatWonderBaseSchema, clearStaleSession, isCosmeticsLikely } from "../../helpers/chat-wonder.helper";
+import {
+  chatWonderBaseSchema,
+  clearStaleSession,
+  isCosmeticsLikely,
+} from "../../helpers/chat-wonder.helper";
 import { weatherService, type WeatherData } from "../../services/shared/weather.service";
-
 
 export default class ChatWonderController {
   /**
@@ -158,10 +161,7 @@ export default class ChatWonderController {
       temperature_c: Number(d.temperature),
     });
 
-    const needsWeather = !!(
-      location &&
-      (isGarment || isOverview || isCosmetics || !pageMode)
-    );
+    const needsWeather = !!(location && (isGarment || isOverview || isCosmetics || !pageMode));
 
     try {
       // Fix 2: Run weather fetch IN PARALLEL with DB setup instead of sequentially before it

@@ -33,7 +33,7 @@ export const googlePlacesService = {
     _lat: number,
     _lng: number,
     _radiusM?: number,
-    _category?: string,
+    _category?: string
   ): Promise<PlacePOI[]> => {
     throw new Error("Google Places service disabled");
   },
