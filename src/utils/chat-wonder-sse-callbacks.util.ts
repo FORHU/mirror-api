@@ -3,7 +3,7 @@ import ChatWonderService from "../services/shared/chat-wonder.service";
 import UserService from "../services/shared/user.service";
 import { type StreamCallbacks } from "./chat-wonder-stream";
 import { stripSourcesPrefix } from "./source-metadata.util";
-import { resolveItineraryLocations, persistOutlineMaps } from "./chat-wonder-maps.util";
+// import { resolveItineraryLocations, persistOutlineMaps } from "./chat-wonder-maps.util";
 import {
   resolveAndPersistOutlineCosmetics,
   resolveOutlineCosmeticsByIds,
@@ -130,20 +130,21 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
 
       const { cleaned } = stripSourcesPrefix(fullResponse);
       const parsed = parseChatWonderResponse(cleaned);
-      if (parsed.events.length > 0) {
-        parsed.events = await resolveItineraryLocations(parsed.events);
-      }
+      // if (parsed.events.length > 0) {
+      //   parsed.events = await resolveItineraryLocations(parsed.events);
+      // }
 
       const allData = await Promise.all([
         extractChatWonderDataBlock(fullResponse, "GARMENT_DATA"),
         extractChatWonderDataBlock(fullResponse, "COSMETICS_DATA"),
-        extractChatWonderDataBlock(fullResponse, "MAPS_DATA"),
+        // extractChatWonderDataBlock(fullResponse, "MAPS_DATA"),
         extractChatWonderDataBlock(fullResponse, "STYLIST") ??
           extractChatWonderDataBlock(fullResponse, "NAV_DATA"),
         extractChatWonderDataBlock(fullResponse, "TAILOR_DATA"),
       ]);
-      let [garment_data, cosmetics_data, maps_data, stylist_data] = allData;
-      const tailor_data = allData[4];
+      let [garment_data, cosmetics_data, stylist_data] = allData;
+      const tailor_data = allData[3];
+      let maps_data: unknown = null;
 
       // ChatWonder classifies FASHION intents correctly but doesn't always emit
       // a [GARMENT_DATA] block with a query. Synthesise one from the input so
@@ -196,7 +197,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       if (input.includes(MIRROR_GREETING)) {
         garment_data = null;
         cosmetics_data = null;
-        maps_data = null;
+        // maps_data = null; // already null
         stylist_data = null;
         logger.info(
           "[ChatWonderController] Intercepted and stripped data blocks from greeting (buffered)."
@@ -289,9 +290,9 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       persistOutlineOutfits(conversationId, garment_data).catch((err) =>
         logger.error(`[onComplete] persistOutlineOutfits failed: ${(err as Error).message}`)
       );
-      persistOutlineMaps(conversationId, maps_data).catch((err) =>
-        logger.error(`[onComplete] persistOutlineMaps failed: ${(err as Error).message}`)
-      );
+      // persistOutlineMaps(conversationId, maps_data).catch((err) =>
+      //   logger.error(`[onComplete] persistOutlineMaps failed: ${(err as Error).message}`)
+      // );
     } catch (err) {
       logger.error(`[ChatWonderController.chat] onComplete error: ${(err as Error).message}`);
       writeSseEvent({ type: "error", message: "Failed to parse final response" });
