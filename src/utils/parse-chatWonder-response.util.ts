@@ -96,7 +96,6 @@ function repairJson(input: string): string {
       .replace(/,(\s*[}\]])/g, "$1")
   );
 }
-1;
 
 /**
  * The trailing metadata blocks ChatWonder appends after the prose. Anything from
