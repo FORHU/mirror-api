@@ -8,7 +8,7 @@ import {
   resolveAndPersistOutlineCosmetics,
   resolveOutlineCosmeticsByIds,
 } from "./chat-wonder-cosmetics.util";
-import { persistOutlineOutfits, resolveOutfitsFromQuery } from "./chat-wonder-outfits.util";
+import { persistOutlineOutfits, resolveOutfitsFromQuery, extractFashionMetaCategory, extractCosmeticsMetaCategory } from "./chat-wonder-outfits.util";
 import {
   parseChatWonderResponse,
   extractChatWonderDataBlock,
@@ -145,6 +145,17 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       let [garment_data, cosmetics_data, maps_data, stylist_data] = allData;
       const tailor_data = allData[4];
 
+      // ChatWonder classifies FASHION intents correctly but doesn't always emit
+      // a [GARMENT_DATA] block with a query. Synthesise one from the input so
+      // the resolution block below can fetch matching outfits from the DB.
+      if (parsed.intent === "FASHION" && (!garment_data || !(garment_data as Record<string, unknown>).query)) {
+        const metaCategory = extractFashionMetaCategory(input);
+        if (metaCategory) {
+          garment_data = { query: `metaCategory=${metaCategory}&limit=4` };
+          logger.info(`[ChatWonderController] Synthesised garment_data query: metaCategory=${metaCategory}`);
+        }
+      }
+
       if (garment_data && typeof garment_data === "object" && (garment_data as Record<string, unknown>).query) {
         const queryStr = (garment_data as Record<string, unknown>).query as string;
         const category = new URLSearchParams(queryStr).get("metaCategory") ?? "";
@@ -207,6 +218,18 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       }
 
       const isGreeting = input.includes(MIRROR_GREETING);
+
+      // ChatWonder classifies COSMETIC intents correctly but doesn't always emit
+      // a [COSMETICS_DATA] block with a query. Synthesise one from the input (or
+      // the user's skin profile) so the new query flow runs instead of legacy IDs.
+      if (!isGreeting && parsed.intent === "COSMETIC" && (!cosmetics_data || !(cosmetics_data as Record<string, unknown>).query)) {
+        const skinCategory = extractCosmeticsMetaCategory(input, skinAnalysis);
+        if (skinCategory) {
+          cosmetics_data = { query: `metaCategory=${skinCategory}&limit=4` };
+          logger.info(`[ChatWonderController] Synthesised cosmetics_data query: metaCategory=${skinCategory}`);
+        }
+      }
+
       const cosmeticsQuery =
         cosmetics_data && typeof cosmetics_data === "object"
           ? (cosmetics_data as Record<string, unknown>).query

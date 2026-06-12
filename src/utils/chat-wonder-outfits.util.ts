@@ -220,6 +220,66 @@ export async function resolveSetOutfits(sets: OutfitSet[] | undefined): Promise<
   return resolved;
 }
 
+const FASHION_CATEGORY_PATTERNS: Array<[RegExp, string]> = [
+  [/smart.?casual/i, "SmartCasual"],
+  [/streetwear|trendy|stylish/i, "Streetwear"],
+  [/athleisure|comfortable|weekend/i, "Athleisure"],
+  [/activewear/i, "Activewear"],
+  [/sportswear|sport(?:ing|swear)?|training/i, "Sportswear"],
+  [/winterwear|winter/i, "Winterwear"],
+  [/summerwear|summer/i, "Summerwear"],
+  [/springwear|spring/i, "Springwear"],
+  [/autumnwear|autumn|fall/i, "Autumnwear"],
+  [/business/i, "Business"],
+  [/formal|professional/i, "Formal"],
+  [/casual|everyday/i, "Casual"],
+];
+
+/**
+ * Maps a user input string to the closest metaCategory value.
+ * Returns null if no known category keyword is found.
+ */
+export function extractFashionMetaCategory(input: string): string | null {
+  for (const [pattern, category] of FASHION_CATEGORY_PATTERNS) {
+    if (pattern.test(input)) return category;
+  }
+  return null;
+}
+
+const COSMETICS_SKIN_PATTERNS: Array<[RegExp, string]> = [
+  [/dry\s+skin|dryness/i, "dry"],
+  [/oily\s+skin|oiliness/i, "oily"],
+  [/sensitive\s+skin/i, "sensitive"],
+  [/combination\s+skin/i, "combination"],
+  [/normal\s+skin/i, "normal"],
+];
+
+const SKIN_TYPE_TO_COSMETIC_CATEGORY: Record<string, string> = {
+  DRY: "dry",
+  OILY: "oily",
+  SENSITIVE: "sensitive",
+  NORMAL: "normal",
+  COMBINATION: "combination",
+};
+
+/**
+ * Maps a user input string (or skin analysis) to a cosmetics metaCategory value.
+ * Input keywords are checked first; falls back to the skin profile skinType.
+ * Returns null if neither yields a known category.
+ */
+export function extractCosmeticsMetaCategory(
+  input: string,
+  skinAnalysis?: Record<string, unknown> | null
+): string | null {
+  for (const [pattern, category] of COSMETICS_SKIN_PATTERNS) {
+    if (pattern.test(input)) return category;
+  }
+  if (skinAnalysis?.skinType) {
+    return SKIN_TYPE_TO_COSMETIC_CATEGORY[String(skinAnalysis.skinType).toUpperCase()] ?? null;
+  }
+  return null;
+}
+
 /**
  * Parses the query string ChatWonder puts in GARMENT_DATA and fetches matching
  * outfits from the DB. Returns { outfits, reason } ready to forward to the
