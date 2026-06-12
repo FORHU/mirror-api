@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
 import OutlineRepo, { MapStop } from "../../repositories/outline.repository";
 import { responseSuccess, responseError } from "../../helpers/response.helper";
+import logger from "../../utils/logger";
 
 const createSchema = Joi.object({
   userPrompt: Joi.array().items(Joi.string()).default([]),
@@ -13,16 +14,26 @@ const createSchema = Joi.object({
 
 export default class OutlineController {
   static async create(req: Request, res: Response, next: NextFunction) {
+    logger.info(`[OutlineController] POST /outlines hit. Body: ${JSON.stringify(req.body)}`);
     const userId = (req as Request & { user?: { id: string } }).user?.id;
-    if (!userId) return responseError(res, 401, "Unauthorized");
+    if (!userId) {
+      logger.warn("[OutlineController] POST /outlines unauthorized. Missing user.");
+      return responseError(res, 401, "Unauthorized");
+    }
 
     const { error, value } = createSchema.validate(req.body, { abortEarly: false });
-    if (error) return responseError(res, 400, error.message);
+    if (error) {
+      logger.warn(`[OutlineController] POST /outlines validation error: ${error.message}`);
+      return responseError(res, 400, error.message);
+    }
 
     try {
+      logger.info(`[OutlineController] POST /outlines creating outline for user: ${userId}`);
       const outline = await OutlineRepo.create({ userId, ...value });
+      logger.info(`[OutlineController] POST /outlines created successfully: ${outline.id}`);
       return responseSuccess(res, 201, outline, "Outline created");
     } catch (err) {
+      logger.error(`[OutlineController] POST /outlines FATAL ERROR: ${(err as Error).message}`, err);
       next(err);
     }
   }
