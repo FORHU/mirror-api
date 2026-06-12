@@ -124,6 +124,7 @@ export default class ChatWonderController {
 
     const isGarment = pageMode === "garment";
     const isOverview = pageMode === "overview";
+    const isCosmetics = pageMode === "cosmetics";
 
     const frontendLocation = value.location;
     const skinAnalysis = value.skin_analysis;
@@ -156,7 +157,10 @@ export default class ChatWonderController {
       temperature_c: Number(d.temperature),
     });
 
-    const needsWeather = !!(location && (isGarment || isOverview || !pageMode));
+    const needsWeather = !!(
+      location &&
+      (isGarment || isOverview || isCosmetics || !pageMode)
+    );
 
     try {
       // Fix 2: Run weather fetch IN PARALLEL with DB setup instead of sequentially before it
