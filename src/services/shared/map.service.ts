@@ -17,17 +17,23 @@
 //   getDirectionsFormatted: async (origin, destination, profile) => { ... },
 // };
 
+interface GeocodingFeature {
+  center: [number, number];
+  place_name: string;
+  [key: string]: unknown;
+}
+
 export const mapService = {
   reverseGeocode: async (_lat: number, _lng: number): Promise<string> => {
     throw new Error("Map service disabled");
   },
-  search: async (_query: string): Promise<never[]> => {
+  search: async (_query: string): Promise<GeocodingFeature[]> => {
     throw new Error("Map service disabled");
   },
   getDirections: async (_origin: string, _destination: string): Promise<never> => {
     throw new Error("Map service disabled");
   },
-  geocodeAddress: async (_query: string): Promise<never[]> => {
+  geocodeAddress: async (_query: string): Promise<GeocodingFeature[]> => {
     throw new Error("Map service disabled");
   },
   getDirectionsFormatted: async (): Promise<never> => {
