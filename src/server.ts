@@ -15,15 +15,7 @@ async function start() {
   const server = http.createServer(app);
   await initSocketServer(server);
 
-  let host = "0.0.0.0";
-  if (NODE_ENV !== "production") {
-    try {
-      host = new URL(BASE_URL).hostname;
-    } catch (err) {
-      logger.warn(`Invalid BASE_URL format: ${BASE_URL}. Falling back to 0.0.0.0`);
-    }
-  }
-
+  const host = "0.0.0.0";
   server.listen(Number(PORT), host, () => {
     logger.info(`Server is running on port ${PORT} (bound to ${host}) in ${NODE_ENV} mode`);
     logger.info(
