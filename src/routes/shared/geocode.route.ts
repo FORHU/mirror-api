@@ -1,5 +1,5 @@
 import express from "express";
-import MapController from "../../controllers/mirror/map.controller";
+// import MapController from "../../controllers/mirror/map.controller";
 
 const router = express.Router();
 
@@ -8,6 +8,6 @@ const router = express.Router();
  * @desc Get geocode exact coordinates for a given query
  * @access Public (or protected depending on usage)
  */
-router.post("/", MapController.geocode);
+// router.post("/", MapController.geocode);
 
 export default router;
