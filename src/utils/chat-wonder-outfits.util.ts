@@ -281,6 +281,51 @@ export function extractCosmeticsMetaCategory(
 }
 
 /**
+ * Fetches full outfit data for an array of outfit UUIDs returned by ChatWonder's
+ * [OUTFIT_IDS] fast path. Returns { outfits } ready to build garment_data from, or null.
+ */
+export async function resolveOutfitsByIds(ids: string[]): Promise<{ outfits: unknown[] } | null> {
+  if (!ids.length) return null;
+  try {
+    const outfits = await prisma.outfit.findMany({
+      where: { id: { in: ids }, isDeleted: false },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        file: { select: { fileUrl: true } },
+        items: {
+          select: {
+            garment: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                imageUrl: true,
+                fittingSlot: true,
+                garmentType: true,
+                category: true,
+                layerLevel: true,
+                silhouette: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    // Preserve the order ChatWonder selected
+    const ordered = ids
+      .map((id) => outfits.find((o) => o.id === id))
+      .filter(Boolean);
+    logger.info(`[resolveOutfitsByIds] Resolved ${ordered.length}/${ids.length} outfits`);
+    return { outfits: ordered };
+  } catch (err) {
+    logger.error(`[resolveOutfitsByIds] ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
  * Parses the query string ChatWonder puts in GARMENT_DATA and fetches matching
  * outfits from the DB. Returns { outfits, reason } ready to forward to the
  * frontend as garment_data, or null if the block is in the old sets[] format.

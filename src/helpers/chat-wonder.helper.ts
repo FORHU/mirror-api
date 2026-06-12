@@ -34,6 +34,8 @@ export const chatWonderBaseSchema = Joi.object({
     )
     .max(10)
     .optional(),
+  /** Fashion category filter forwarded from the catalog page (e.g. "metaCategory=Winterwear,Summerwear" or "ALL"). */
+  category: Joi.string().allow(null, "").optional(),
 }).or("input", "user_input");
 
 export async function checkAndFinalizeOutline(
