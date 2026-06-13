@@ -41,6 +41,9 @@
     "winston": "^3.11.0",
     "zod": "^4.4.3"
   },
+  "resolutions": {
+    "@types/express-serve-static-core": "4.19.8"
+  },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.161",
     "@types/cors": "^2.8.19",
