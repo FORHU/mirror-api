@@ -102,7 +102,7 @@ function repairJson(input: string): string {
  * the first such marker onward is structured data, not user-facing message text.
  */
 const DATA_BLOCK_TAIL =
-  /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|OUTFIT_IDS|DONE)\][\s\S]*$/;
+  /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|COSMETICS_IDS|MAPS_DATA|NAV_DATA|OUTFIT_IDS|DONE)\][\s\S]*$/;
 
 /**
  * The per-set markdown breakdown ChatWonder writes after the conversational
@@ -297,7 +297,7 @@ function buildFromParsed(
   if (intent === "NONE") {
     if (rawResponse.includes("[GARMENT_DATA]")) {
       intent = "FASHION";
-    } else if (rawResponse.includes("[COSMETICS_DATA]")) {
+    } else if (rawResponse.includes("[COSMETICS_DATA]") || rawResponse.includes("[COSMETICS_IDS]")) {
       intent = "COSMETIC";
     } else if (rawResponse.includes("[MAPS_DATA]")) {
       intent = "MAP";
@@ -436,7 +436,7 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
             let intent: AIIntent = "NONE";
             if (rawResponse.includes("[GARMENT_DATA]")) {
               intent = "FASHION";
-            } else if (rawResponse.includes("[COSMETICS_DATA]")) {
+            } else if (rawResponse.includes("[COSMETICS_DATA]") || rawResponse.includes("[COSMETICS_IDS]")) {
               intent = "COSMETIC";
             } else if (rawResponse.includes("[MAPS_DATA]")) {
               intent = "MAP";
@@ -472,7 +472,7 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
     let intent: AIIntent = "NONE";
     if (trimmed.includes("[GARMENT_DATA]")) {
       intent = "FASHION";
-    } else if (trimmed.includes("[COSMETICS_DATA]")) {
+    } else if (trimmed.includes("[COSMETICS_DATA]") || trimmed.includes("[COSMETICS_IDS]")) {
       intent = "COSMETIC";
     } else if (trimmed.includes("[MAPS_DATA]")) {
       intent = "MAP";

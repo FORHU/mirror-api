@@ -205,6 +205,27 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         }
       }
 
+      // ChatWonder fast path for cosmetics: emits [COSMETICS_IDS]["id1","id2",...]END
+      // instead of [COSMETICS_DATA]. Pass IDs straight through — no DB resolution needed.
+      const cosmeticsIdsMatch = fullResponse.match(/\[COSMETICS_IDS\](\[[\s\S]*?\])(?:END)?/);
+      if (cosmeticsIdsMatch && !cosmetics_data) {
+        try {
+          const ids: string[] = JSON.parse(cosmeticsIdsMatch[1]);
+          if (ids.length) {
+            cosmetics_data = { ids };
+            stylist_data = stylist_data ?? {
+              target_url: "/ai-recommendation-cosmetic",
+              confidence: 1.0,
+              extracted_entities: null,
+              system_message: "",
+            };
+            logger.info(`[ChatWonderController] Parsed [COSMETICS_IDS] → ${ids.length} ids`);
+          }
+        } catch (e) {
+          logger.warn(`[ChatWonderController] Failed to parse [COSMETICS_IDS]: ${(e as Error).message}`);
+        }
+      }
+
       // ChatWonder classifies FASHION intents correctly but doesn't always emit
       // a [GARMENT_DATA] block with a query. Synthesise one from the input so
       // the resolution block below can fetch matching outfits from the DB.
@@ -294,7 +315,9 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       if (
         !isGreeting &&
         parsed.intent === "COSMETIC" &&
-        (!cosmetics_data || !(cosmetics_data as Record<string, unknown>).query)
+        (!cosmetics_data ||
+          (!(cosmetics_data as Record<string, unknown>).query &&
+            !(cosmetics_data as Record<string, unknown>).ids))
       ) {
         const skinCategory = extractCosmeticsMetaCategory(input, skinAnalysis);
         if (skinCategory) {
@@ -316,9 +339,16 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
           !!parsed.cosmetics_suggestion ||
           isCosmeticsLikely(input));
       if (wantsCosmetics) {
+        const cosmeticsIds =
+          cosmetics_data && typeof cosmetics_data === "object"
+            ? (cosmetics_data as Record<string, unknown>).ids
+            : undefined;
+
         if (typeof cosmeticsQuery === "string") {
           // New flow: AI sent a query — frontend fetches products itself.
           cosmetics_data = { query: cosmeticsQuery };
+        } else if (Array.isArray(cosmeticsIds) && cosmeticsIds.length) {
+          // New flow: AI sent IDs via [COSMETICS_IDS] — pass through, frontend batch-fetches.
         } else {
           // Legacy flow: AI sent product IDs — resolve and send inline.
           let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics_data);
