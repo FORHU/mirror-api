@@ -74,6 +74,10 @@ export default class CosmeticProductService {
     return product;
   }
 
+  static async getByIds(ids: string[]) {
+    return CosmeticProductRepo.findByIds(ids);
+  }
+
   static async createProduct(data: {
     name: string;
     brand?: string;
