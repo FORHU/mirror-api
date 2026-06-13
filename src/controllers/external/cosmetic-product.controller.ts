@@ -53,4 +53,17 @@ export default class ExternalCosmeticProductController {
       next(err);
     }
   }
+
+  static async batch(req: Request, res: Response, next: NextFunction) {
+    try {
+      const ids = req.body?.ids;
+      if (!Array.isArray(ids) || ids.length === 0 || ids.some((id) => typeof id !== "string")) {
+        return res.status(400).json({ message: "ids must be a non-empty array of strings" });
+      }
+      const products = await CosmeticProductService.getProductsByIds(ids);
+      responseSuccess(res, 200, products.map(mapCosmeticProductForAI));
+    } catch (err) {
+      next(err);
+    }
+  }
 }

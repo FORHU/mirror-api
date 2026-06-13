@@ -182,6 +182,10 @@ export default class CosmeticProductService {
     return CosmeticProductRepo.update(id, updateInput);
   }
 
+  static async getProductsByIds(ids: string[]) {
+    return CosmeticProductRepo.findByIds(ids);
+  }
+
   static async deleteProduct(id: string) {
     await this.getProductById(id);
     await CosmeticProductRepo.delete(id);

@@ -4,6 +4,7 @@ import ExternalCosmeticProductController from "../../controllers/external/cosmet
 const router = express.Router();
 
 router.get("/", ExternalCosmeticProductController.index);
+router.post("/batch", ExternalCosmeticProductController.batch);
 router.get("/:id", ExternalCosmeticProductController.show);
 
 export default router;
