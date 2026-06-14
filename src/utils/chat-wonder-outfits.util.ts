@@ -477,7 +477,7 @@ export async function persistOutlineOutfits(
               garmentId,
               slot,
               layerLevel,
-            })),
+            })) as any,
           },
         },
       });

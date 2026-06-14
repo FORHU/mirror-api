@@ -18,7 +18,7 @@ export default class ChatWonderService {
       });
 
       return response.data;
-    } catch {
+    } catch (error) {
       const err = error as { response?: { data?: unknown; status?: number }; message: string };
       logger.error("Chat Wonder Error:", err.response?.data || err.message);
       throw { status: err.response?.status || 500, message: "Chat Wonder request failed" };
@@ -32,7 +32,7 @@ export default class ChatWonderService {
     try {
       await axios.get(`${CHAT_WONDER_API_URL}/health`);
       return true;
-    } catch {
+    } catch (error) {
       return false;
     }
   }

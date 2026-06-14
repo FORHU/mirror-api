@@ -391,13 +391,13 @@ export function extractChatWonderDataBlock(
       unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
     }
     return JSON.parse(unescaped);
-  } catch {
+  } catch (error) {
     try {
       if (unescaped.includes('\\"')) {
         unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
       }
       return JSON.parse(repairJson(unescaped));
-    } catch {
+    } catch (error) {
       return null;
     }
   }
@@ -423,13 +423,13 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
       let parsed: Record<string, any> | null = null;
       try {
         parsed = JSON.parse(jsonMatch[0]);
-      } catch {
+      } catch (error) {
         // Model emitted slightly-malformed JSON (empty values, trailing commas).
         // Repair and retry before giving up so we don't lose `sets`/suggestions.
         try {
           parsed = JSON.parse(repairJson(jsonMatch[0]));
           logger.warn(`[Parser] Recovered malformed JSON via repair pass.`);
-        } catch {
+        } catch (error) {
           logger.warn(
             `[Parser] JSON parse failed (even after repair), falling back to markdown. Raw response was: ${rawResponse}`
           );
@@ -495,7 +495,7 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
       events: [],
       raw: rawResponse,
     };
-  } catch {
+  } catch (error) {
     logger.error(
       `[Parser] Failed to parse response: ${(error as Error).message}. Raw: ${rawResponse}`
     );

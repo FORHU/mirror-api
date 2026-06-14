@@ -40,7 +40,7 @@ export const registerTryOnEvents = (socket: Socket) => {
         try {
           const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET) as { userId: string };
           userId = decoded.userId;
-        } catch {
+        } catch (err) {
           socket.emit("tryon_failed", { error: "Invalid authentication token" });
           return;
         }
@@ -75,7 +75,7 @@ export const registerTryOnEvents = (socket: Socket) => {
 
         // 4. Notify requester of success (optional, as they will also get tryon_progress via the room)
         socket.emit("tryon_requested", { predictionId: result.predictionId });
-      } catch {
+      } catch (err) {
         logger.error(`[Socket] Try-on request failed: ${(err as Error).message}`);
         socket.emit("tryon_failed", {
           error: (err as Error).message || "Failed to start try-on process",

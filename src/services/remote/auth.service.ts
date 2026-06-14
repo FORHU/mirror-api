@@ -82,7 +82,7 @@ export default class AuthSvc {
 
       // Complete OAuth login flow
       return this.generateAuthResponse(user, "google", payload.sub, payload.picture);
-    } catch {
+    } catch (error) {
       logger.error("[AuthSvc] Google SSO verification failed:", error);
       throw { status: 401, message: "Failed to verify Google token: " + (error as Error).message };
     }
@@ -114,7 +114,7 @@ export default class AuthSvc {
           avatar: user.avatar?.fileUrl ?? null,
         },
       };
-    } catch {
+    } catch (error) {
       throw { status: 401, message: "Invalid refresh token" };
     }
   }
@@ -187,7 +187,7 @@ export default class AuthSvc {
       // Always clear the cached user data to prevent stale profile details
       await CacheUtil.del(`user:${userId}`);
       return user;
-    } catch {
+    } catch (error) {
       throw { status: 500, message: "Failed to update profile: " + (error as Error).message };
     }
   }
