@@ -5,6 +5,7 @@ import FileService from "./file.service";
 import logger from "../../utils/logger";
 import { s3Client } from "../../utils/s3";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import CacheUtil from "../../utils/cache.util";
 import { parsePagination } from "../../helpers/pagination.helper";
 import {
   CATEGORY,
@@ -42,20 +43,37 @@ export default class OutfitService {
     } = query;
     const { page, limit, search: globalSearch } = parsePagination(query);
     const effectiveUserId = systemOnly === "true" ? null : userId;
-    const result = await OutfitRepo.findByUserId(
-      effectiveUserId,
-      page,
-      limit,
-      { includeSystem: systemOnly !== "true" }, // include system outfits unless viewing system-only
-      globalSearch || searchOutfit,
-      {
-        gender: metaGender,
-        silhouette: metaSilhouette,
-        tags: metaTags,
-        garmentType: metaGarmentType,
-      },
-      metaCategory
+
+    // Sort query keys to ensure consistent cache keys regardless of param order
+    const sortedQuery = Object.keys(query)
+      .sort()
+      .reduce(
+        (acc, key) => {
+          acc[key] = query[key];
+          return acc;
+        },
+        {} as Record<string, string | undefined>
+      );
+    const queryKey = new URLSearchParams(sortedQuery as Record<string, string>).toString();
+    const cacheKey = `outfits:index:user:${effectiveUserId || "system"}:query:${queryKey}`;
+
+    const result = await CacheUtil.remember(cacheKey, 300, () =>
+      OutfitRepo.findByUserId(
+        effectiveUserId,
+        page,
+        limit,
+        { includeSystem: systemOnly !== "true" }, // include system outfits unless viewing system-only
+        globalSearch || searchOutfit,
+        {
+          gender: metaGender,
+          silhouette: metaSilhouette,
+          tags: metaTags,
+          garmentType: metaGarmentType,
+        },
+        metaCategory
+      )
     );
+
     const { sortBy, sortOrder, search, filters } = parsePagination(query);
     return { ...result, sortBy, sortOrder, search, filters };
   }
@@ -163,7 +181,7 @@ export default class OutfitService {
       };
     }
 
-    return OutfitRepo.create({
+    const newOutfit = await OutfitRepo.create({
       userId,
       name: data.name || "Untitled Outfit",
       description: data.description,
@@ -173,6 +191,9 @@ export default class OutfitService {
       items: data.items || [],
       metaData: data.metaData,
     });
+
+    await CacheUtil.delByPattern(`outfits:index:user:${userId || "system"}:*`);
+    return newOutfit;
   }
 
   static async updateOutfit(
@@ -216,6 +237,7 @@ export default class OutfitService {
       }
     }
 
+    await CacheUtil.delByPattern(`outfits:index:user:${userId || "system"}:*`);
     return updated;
   }
 
@@ -241,6 +263,7 @@ export default class OutfitService {
       }
     }
 
+    await CacheUtil.delByPattern(`outfits:index:user:${userId || "system"}:*`);
     return { message: "Outfit deleted successfully" };
   }
 

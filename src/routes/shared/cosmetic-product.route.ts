@@ -8,6 +8,7 @@ const router = Router();
 // the garment routes. Add `authenticate` inline to any route that needs to be
 // gated (see garment.route.ts "/evaluate").
 router.get("/", CosmeticProductController.index);
+router.post("/batch", CosmeticProductController.batchGet);
 router.get("/:id", CosmeticProductController.show);
 router.post("/", handleSingleUpload, CosmeticProductController.create);
 router.patch("/:id", handleSingleUpload, CosmeticProductController.update);

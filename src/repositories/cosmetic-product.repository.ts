@@ -114,19 +114,36 @@ function buildSkinTypeFilter(skinType: string): Prisma.CosmeticProductWhereInput
       return {
         OR: [
           { hydrating: true },
-          { tags: { hasSome: ["dry", "dry skin", "hydrating", "moisturizing", "nourishing", "rich"] } },
+          {
+            tags: {
+              hasSome: ["dry", "dry skin", "hydrating", "moisturizing", "nourishing", "rich"],
+            },
+          },
         ],
       };
     case "oily":
       return {
         OR: [
           { oilFree: true },
-          { tags: { hasSome: ["oily", "oily skin", "oil-free", "oil free", "oil control", "mattifying"] } },
+          {
+            tags: {
+              hasSome: ["oily", "oily skin", "oil-free", "oil free", "oil control", "mattifying"],
+            },
+          },
         ],
       };
     case "sensitive":
       return {
-        tags: { hasSome: ["sensitive", "sensitive skin", "gentle", "hypoallergenic", "calming", "soothing"] },
+        tags: {
+          hasSome: [
+            "sensitive",
+            "sensitive skin",
+            "gentle",
+            "hypoallergenic",
+            "calming",
+            "soothing",
+          ],
+        },
       };
     case "combination":
       return {

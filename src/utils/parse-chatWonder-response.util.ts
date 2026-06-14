@@ -96,14 +96,13 @@ function repairJson(input: string): string {
       .replace(/,(\s*[}\]])/g, "$1")
   );
 }
-1;
 
 /**
  * The trailing metadata blocks ChatWonder appends after the prose. Anything from
  * the first such marker onward is structured data, not user-facing message text.
  */
 const DATA_BLOCK_TAIL =
-  /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|MAPS_DATA|NAV_DATA|DONE)\][\s\S]*$/;
+  /\[(?:Sources|GARMENT_DATA|COSMETICS_DATA|COSMETICS_IDS|MAPS_DATA|NAV_DATA|OUTFIT_IDS|DONE)\][\s\S]*$/;
 
 /**
  * The per-set markdown breakdown ChatWonder writes after the conversational
@@ -226,7 +225,7 @@ function stripToolCallBlocks(text: string): string {
  */
 export function cutToMessage(text: string): string {
   return stripToolCallBlocks(
-    stripDataBlocks(text).replace(DATA_BLOCK_TAIL, "").replace(SET_BREAKDOWN_TAIL, ""),
+    stripDataBlocks(text).replace(DATA_BLOCK_TAIL, "").replace(SET_BREAKDOWN_TAIL, "")
   );
 }
 
@@ -298,7 +297,10 @@ function buildFromParsed(
   if (intent === "NONE") {
     if (rawResponse.includes("[GARMENT_DATA]")) {
       intent = "FASHION";
-    } else if (rawResponse.includes("[COSMETICS_DATA]")) {
+    } else if (
+      rawResponse.includes("[COSMETICS_DATA]") ||
+      rawResponse.includes("[COSMETICS_IDS]")
+    ) {
       intent = "COSMETIC";
     } else if (rawResponse.includes("[MAPS_DATA]")) {
       intent = "MAP";
@@ -344,7 +346,14 @@ function buildFromParsed(
  */
 export function extractChatWonderDataBlock(
   rawResponse: string,
-  block: "GARMENT_DATA" | "COSMETICS_DATA" | "MAPS_DATA" | "NAV_DATA" | "GENDER_UPDATE" | "STYLIST" | "TAILOR_DATA"
+  block:
+    | "GARMENT_DATA"
+    | "COSMETICS_DATA"
+    | "MAPS_DATA"
+    | "NAV_DATA"
+    | "GENDER_UPDATE"
+    | "STYLIST"
+    | "TAILOR_DATA"
 ): Record<string, unknown> | unknown[] | null {
   const marker = `[${block}]`;
   const idx = rawResponse.indexOf(marker);
@@ -382,13 +391,13 @@ export function extractChatWonderDataBlock(
       unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
     }
     return JSON.parse(unescaped);
-  } catch {
+  } catch (error) {
     try {
       if (unescaped.includes('\\"')) {
         unescaped = unescaped.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
       }
       return JSON.parse(repairJson(unescaped));
-    } catch {
+    } catch (error) {
       return null;
     }
   }
@@ -414,13 +423,13 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
       let parsed: Record<string, any> | null = null;
       try {
         parsed = JSON.parse(jsonMatch[0]);
-      } catch (err) {
+      } catch (error) {
         // Model emitted slightly-malformed JSON (empty values, trailing commas).
         // Repair and retry before giving up so we don't lose `sets`/suggestions.
         try {
           parsed = JSON.parse(repairJson(jsonMatch[0]));
           logger.warn(`[Parser] Recovered malformed JSON via repair pass.`);
-        } catch (repairErr) {
+        } catch (error) {
           logger.warn(
             `[Parser] JSON parse failed (even after repair), falling back to markdown. Raw response was: ${rawResponse}`
           );
@@ -430,7 +439,10 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
             let intent: AIIntent = "NONE";
             if (rawResponse.includes("[GARMENT_DATA]")) {
               intent = "FASHION";
-            } else if (rawResponse.includes("[COSMETICS_DATA]")) {
+            } else if (
+              rawResponse.includes("[COSMETICS_DATA]") ||
+              rawResponse.includes("[COSMETICS_IDS]")
+            ) {
               intent = "COSMETIC";
             } else if (rawResponse.includes("[MAPS_DATA]")) {
               intent = "MAP";
@@ -466,7 +478,7 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
     let intent: AIIntent = "NONE";
     if (trimmed.includes("[GARMENT_DATA]")) {
       intent = "FASHION";
-    } else if (trimmed.includes("[COSMETICS_DATA]")) {
+    } else if (trimmed.includes("[COSMETICS_DATA]") || trimmed.includes("[COSMETICS_IDS]")) {
       intent = "COSMETIC";
     } else if (trimmed.includes("[MAPS_DATA]")) {
       intent = "MAP";

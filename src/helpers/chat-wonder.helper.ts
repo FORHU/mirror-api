@@ -25,6 +25,7 @@ export const chatWonderBaseSchema = Joi.object({
     .valid("garment", "cosmetics", "map", "overview")
     .allow(null, "")
     .optional(),
+  gender: Joi.string().valid("MALE", "FEMALE", "UNISEX").allow(null, "").optional(),
   history: Joi.array()
     .items(
       Joi.object({
@@ -34,6 +35,10 @@ export const chatWonderBaseSchema = Joi.object({
     )
     .max(10)
     .optional(),
+  /** Fashion category filter forwarded from the catalog page (e.g. "metaCategory=Winterwear,Summerwear" or "ALL"). */
+  category: Joi.string().allow(null, "").optional(),
+  /** Number of cosmetic product IDs to return. */
+  set: Joi.number().integer().min(1).optional(),
 }).or("input", "user_input");
 
 export async function checkAndFinalizeOutline(

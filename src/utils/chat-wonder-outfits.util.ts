@@ -220,6 +220,109 @@ export async function resolveSetOutfits(sets: OutfitSet[] | undefined): Promise<
   return resolved;
 }
 
+const FASHION_CATEGORY_PATTERNS: Array<[RegExp, string]> = [
+  [/smart.?casual/i, "SmartCasual"],
+  [/streetwear|trendy|stylish/i, "Streetwear"],
+  [/athleisure|comfortable|weekend/i, "Athleisure"],
+  [/activewear/i, "Activewear"],
+  [/sportswear|sport(?:ing|swear)?|training/i, "Sportswear"],
+  [/winterwear|winter/i, "Winterwear"],
+  [/summerwear|summer/i, "Summerwear"],
+  [/springwear|spring/i, "Springwear"],
+  [/autumnwear|autumn|fall/i, "Autumnwear"],
+  [/business/i, "Business"],
+  [/formal|professional/i, "Formal"],
+  [/casual|everyday/i, "Casual"],
+];
+
+/**
+ * Maps a user input string to the closest metaCategory value.
+ * Returns null if no known category keyword is found.
+ */
+export function extractFashionMetaCategory(input: string): string | null {
+  for (const [pattern, category] of FASHION_CATEGORY_PATTERNS) {
+    if (pattern.test(input)) return category;
+  }
+  return null;
+}
+
+const COSMETICS_SKIN_PATTERNS: Array<[RegExp, string]> = [
+  [/dry\s+skin|dryness/i, "dry"],
+  [/oily\s+skin|oiliness/i, "oily"],
+  [/sensitive\s+skin/i, "sensitive"],
+  [/combination\s+skin/i, "combination"],
+  [/normal\s+skin/i, "normal"],
+];
+
+const SKIN_TYPE_TO_COSMETIC_CATEGORY: Record<string, string> = {
+  DRY: "dry",
+  OILY: "oily",
+  SENSITIVE: "sensitive",
+  NORMAL: "normal",
+  COMBINATION: "combination",
+};
+
+/**
+ * Maps a user input string (or skin analysis) to a cosmetics metaCategory value.
+ * Input keywords are checked first; falls back to the skin profile skinType.
+ * Returns null if neither yields a known category.
+ */
+export function extractCosmeticsMetaCategory(
+  input: string,
+  skinAnalysis?: Record<string, unknown> | null
+): string | null {
+  for (const [pattern, category] of COSMETICS_SKIN_PATTERNS) {
+    if (pattern.test(input)) return category;
+  }
+  if (skinAnalysis?.skinType) {
+    return SKIN_TYPE_TO_COSMETIC_CATEGORY[String(skinAnalysis.skinType).toUpperCase()] ?? null;
+  }
+  return null;
+}
+
+/**
+ * Fetches full outfit data for an array of outfit UUIDs returned by ChatWonder's
+ * [OUTFIT_IDS] fast path. Returns { outfits } ready to build garment_data from, or null.
+ */
+export async function resolveOutfitsByIds(ids: string[]): Promise<{ outfits: unknown[] } | null> {
+  if (!ids.length) return null;
+  try {
+    const outfits = await prisma.outfit.findMany({
+      where: { id: { in: ids }, isDeleted: false },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        file: { select: { fileUrl: true } },
+        items: {
+          select: {
+            garment: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                imageUrl: true,
+                fittingSlot: true,
+                garmentType: true,
+                category: true,
+                layerLevel: true,
+                silhouette: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    // Preserve the order ChatWonder selected
+    const ordered = ids.map((id) => outfits.find((o) => o.id === id)).filter(Boolean);
+    logger.info(`[resolveOutfitsByIds] Resolved ${ordered.length}/${ids.length} outfits`);
+    return { outfits: ordered };
+  } catch (err) {
+    logger.error(`[resolveOutfitsByIds] ${(err as Error).message}`);
+    return null;
+  }
+}
+
 /**
  * Parses the query string ChatWonder puts in GARMENT_DATA and fetches matching
  * outfits from the DB. Returns { outfits, reason } ready to forward to the
@@ -239,7 +342,9 @@ export async function resolveOutfitsFromQuery(
 
   try {
     const result = await OutfitService.getUserOutfits(userId, params);
-    logger.info(`[resolveOutfitsFromQuery] Resolved ${result.data.length} outfits for query: ${queryStr}`);
+    logger.info(
+      `[resolveOutfitsFromQuery] Resolved ${result.data.length} outfits for query: ${queryStr}`
+    );
     return { outfits: result.data, reason };
   } catch (err) {
     logger.error(`[resolveOutfitsFromQuery] ${(err as Error).message}`);
@@ -313,10 +418,17 @@ export async function persistOutlineOutfits(
       const set = rawSet as any;
       const outfitName: string = set.outfit_name || "AI Outfit";
       const outfitImageUrl: string = set.outfit_imageUrl ?? "";
-      const recommendations: unknown[] = Array.isArray(set.recommendations) ? set.recommendations : [];
+      const recommendations: unknown[] = Array.isArray(set.recommendations)
+        ? set.recommendations
+        : [];
 
       const outfitFile = await prisma.file.create({
-        data: { filename: outfitName, fileUrl: outfitImageUrl, mimeType: "image/jpeg", provider: "External" },
+        data: {
+          filename: outfitName,
+          fileUrl: outfitImageUrl,
+          mimeType: "image/jpeg",
+          provider: "External",
+        },
       });
 
       const items: Array<{ garmentId: string; slot: string; layerLevel: string }> = [];
@@ -345,7 +457,9 @@ export async function persistOutlineOutfits(
           } as any,
         });
 
-        const slot: string = Array.isArray(rec.fittingSlot) ? (rec.fittingSlot[0] ?? "None") : "None";
+        const slot: string = Array.isArray(rec.fittingSlot)
+          ? (rec.fittingSlot[0] ?? "None")
+          : "None";
         items.push({ garmentId: garment.id, slot, layerLevel: rec.layerLevel ?? "BASE" });
       }
 
@@ -358,8 +472,13 @@ export async function persistOutlineOutfits(
           ...(outline.userId && { userId: outline.userId }),
           userOutlineId: outline.id,
           fileId: outfitFile.id,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          items: { create: items.map(({ garmentId, slot, layerLevel }) => ({ garmentId, slot, layerLevel })) as any },
+          items: {
+            create: items.map(({ garmentId, slot, layerLevel }) => ({
+              garmentId,
+              slot,
+              layerLevel,
+            })) as any,
+          },
         },
       });
       created++;
