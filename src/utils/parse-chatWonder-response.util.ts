@@ -297,7 +297,10 @@ function buildFromParsed(
   if (intent === "NONE") {
     if (rawResponse.includes("[GARMENT_DATA]")) {
       intent = "FASHION";
-    } else if (rawResponse.includes("[COSMETICS_DATA]") || rawResponse.includes("[COSMETICS_IDS]")) {
+    } else if (
+      rawResponse.includes("[COSMETICS_DATA]") ||
+      rawResponse.includes("[COSMETICS_IDS]")
+    ) {
       intent = "COSMETIC";
     } else if (rawResponse.includes("[MAPS_DATA]")) {
       intent = "MAP";
@@ -436,7 +439,10 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
             let intent: AIIntent = "NONE";
             if (rawResponse.includes("[GARMENT_DATA]")) {
               intent = "FASHION";
-            } else if (rawResponse.includes("[COSMETICS_DATA]") || rawResponse.includes("[COSMETICS_IDS]")) {
+            } else if (
+              rawResponse.includes("[COSMETICS_DATA]") ||
+              rawResponse.includes("[COSMETICS_IDS]")
+            ) {
               intent = "COSMETIC";
             } else if (rawResponse.includes("[MAPS_DATA]")) {
               intent = "MAP";

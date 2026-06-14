@@ -222,7 +222,9 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
             logger.info(`[ChatWonderController] Parsed [COSMETICS_IDS] → ${ids.length} ids`);
           }
         } catch (e) {
-          logger.warn(`[ChatWonderController] Failed to parse [COSMETICS_IDS]: ${(e as Error).message}`);
+          logger.warn(
+            `[ChatWonderController] Failed to parse [COSMETICS_IDS]: ${(e as Error).message}`
+          );
         }
       }
 

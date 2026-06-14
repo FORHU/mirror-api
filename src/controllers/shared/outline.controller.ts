@@ -33,7 +33,10 @@ export default class OutlineController {
       logger.info(`[OutlineController] POST /outlines created successfully: ${outline.id}`);
       return responseSuccess(res, 201, outline, "Outline created");
     } catch (err) {
-      logger.error(`[OutlineController] POST /outlines FATAL ERROR: ${(err as Error).message}`, err);
+      logger.error(
+        `[OutlineController] POST /outlines FATAL ERROR: ${(err as Error).message}`,
+        err
+      );
       next(err);
     }
   }
