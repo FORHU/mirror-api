@@ -9,7 +9,7 @@ import {
   type ProductForScoring,
 } from "./cosmetics.util";
 
-const CATALOG_CACHE_KEY = "cosmetics:catalog_context";
+const CATALOG_CACHE_KEY = "mirror:cosmetics:catalog:v2";
 const CATALOG_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 
 /**
@@ -297,10 +297,9 @@ export async function buildCatalogContext(
       "Recommend ONLY products from this catalog. Do not invent product names, brands, images, or IDs.",
       "Keep the visible assistant reply concise and organized: one short intro, then at most 3 bullet points with product names and brief reasons.",
       "Do not include long ingredient essays, full product dumps, or repeated details in the visible reply.",
-      "Return a [COSMETICS_DATA] JSON block with ONLY a query param — do NOT include product IDs or recommendations:",
-      '{"query":"metaCategory=dry&limit=4"}',
-      "metaCategory must be one of: dry, oily, sensitive, normal, combination — pick the one that best matches the user's skin profile.",
-      "limit should be 4–10.",
+      "Return a [COSMETICS_IDS] block containing exactly 4-10 product IDs from the catalog that best match the user's skin profile:",
+      '[COSMETICS_IDS]["id1", "id2"]END',
+      "NEVER use the [OUTFIT_IDS] tag. ONLY use [COSMETICS_IDS].",
       `User skin profile: type=${profile.skinType}; hydration=${profile.hydrationPct}; oiliness=${profile.oilinessPct}; concerns=${concerns}.`,
       "Candidate products, one JSON object per line:",
       ...lines,
