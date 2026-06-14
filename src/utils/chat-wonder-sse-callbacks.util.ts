@@ -7,6 +7,7 @@ import { stripSourcesPrefix } from "./source-metadata.util";
 import {
   resolveAndPersistOutlineCosmetics,
   resolveOutlineCosmeticsByIds,
+  resolveCosmeticIdsByQuery,
 } from "./chat-wonder-cosmetics.util";
 import {
   persistOutlineOutfits,
@@ -326,11 +327,19 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
           cosmetics_data && typeof cosmetics_data === "object"
             ? (cosmetics_data as Record<string, unknown>).ids
             : undefined;
+        const cosmeticsQuery =
+          cosmetics_data && typeof cosmetics_data === "object"
+            ? (cosmetics_data as Record<string, unknown>).query
+            : undefined;
 
         if (Array.isArray(cosmeticsIds) && cosmeticsIds.length) {
           // Fast path: ChatWonder returned [COSMETICS_IDS] — already set, pass through.
+        } else if (typeof cosmeticsQuery === "string") {
+          // Query path: ChatWonder returned { query } — resolve to IDs via DB.
+          const ids = await resolveCosmeticIdsByQuery(cosmeticsQuery, conversationId);
+          cosmetics_data = ids.length ? { ids } : null;
         } else {
-          // Fallback: ChatWonder didn't emit IDs — resolve via skin-rank engine.
+          // Fallback: ChatWonder didn't emit anything — resolve via skin-rank engine.
           let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics_data);
           if (!resolved.length) {
             resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
