@@ -13,7 +13,6 @@ import {
   resolveOutfitsByIds,
   resolveOutfitsFromQuery,
   extractFashionMetaCategory,
-  extractCosmeticsMetaCategory,
 } from "./chat-wonder-outfits.util";
 import {
   parseChatWonderResponse,
@@ -311,29 +310,11 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
 
       const isGreeting = input.includes(MIRROR_GREETING);
 
-      // ChatWonder classifies COSMETIC intents correctly but doesn't always emit
-      // a [COSMETICS_DATA] block with a query. Synthesise one from the input (or
-      // the user's skin profile) so the new query flow runs instead of legacy IDs.
-      if (
-        !isGreeting &&
-        parsed.intent === "COSMETIC" &&
-        (!cosmetics_data ||
-          (!(cosmetics_data as Record<string, unknown>).query &&
-            !(cosmetics_data as Record<string, unknown>).ids))
-      ) {
-        const skinCategory = extractCosmeticsMetaCategory(input, skinAnalysis);
-        if (skinCategory) {
-          cosmetics_data = { query: `metaCategory=${skinCategory}&limit=4` };
-          logger.info(
-            `[ChatWonderController] Synthesised cosmetics_data query: metaCategory=${skinCategory}`
-          );
-        }
-      }
-
-      const cosmeticsQuery =
-        cosmetics_data && typeof cosmetics_data === "object"
-          ? (cosmetics_data as Record<string, unknown>).query
-          : undefined;
+      // ChatWonder now returns [COSMETICS_IDS]["id1","id2"]END directly.
+      // The fast path above (line ~210) already parsed those into { ids }.
+      // Legacy fallback: if ChatWonder didn't emit [COSMETICS_IDS], resolve
+      // via outline/skin-rank engine and return { ids } so the frontend path
+      // stays consistent.
       const wantsCosmetics =
         !isGreeting &&
         (cosmetics_data != null ||
@@ -346,18 +327,15 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
             ? (cosmetics_data as Record<string, unknown>).ids
             : undefined;
 
-        if (typeof cosmeticsQuery === "string") {
-          // New flow: AI sent a query — frontend fetches products itself.
-          cosmetics_data = { query: cosmeticsQuery };
-        } else if (Array.isArray(cosmeticsIds) && cosmeticsIds.length) {
-          // New flow: AI sent IDs via [COSMETICS_IDS] — pass through, frontend batch-fetches.
+        if (Array.isArray(cosmeticsIds) && cosmeticsIds.length) {
+          // Fast path: ChatWonder returned [COSMETICS_IDS] — already set, pass through.
         } else {
-          // Legacy flow: AI sent product IDs — resolve and send inline.
+          // Fallback: ChatWonder didn't emit IDs — resolve via skin-rank engine.
           let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics_data);
           if (!resolved.length) {
             resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
           }
-          if (resolved.length) cosmetics_data = { recommendations: resolved };
+          if (resolved.length) cosmetics_data = { ids: resolved.map((r) => r.id) };
         }
       }
 

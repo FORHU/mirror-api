@@ -8,6 +8,7 @@ import {
   type AnalysisInput,
   type ProductForScoring,
 } from "./cosmetics.util";
+import CosmeticProductRepo from "../repositories/cosmetic-product.repository";
 
 const CATALOG_CACHE_KEY = "cosmetics:catalog_context";
 const CATALOG_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
@@ -397,6 +398,53 @@ export async function resolveOutlineCosmeticsByIds(
     return resolved;
   } catch (error) {
     logger.error(`[resolveCosmeticsByIds] ${(error as Error).message}`);
+    return [];
+  }
+}
+
+/**
+ * Resolves a ChatWonder cosmetics query string (e.g. "metaCategory=dry&limit=6")
+ * to an array of CosmeticProduct IDs, persisting them to the outline.
+ * Always returns IDs so the frontend can do a single targeted batch fetch.
+ */
+export async function resolveCosmeticIdsByQuery(
+  queryString: string,
+  conversationId: string
+): Promise<string[]> {
+  try {
+    const params = new URLSearchParams(queryString);
+    const skinType = params.get("metaCategory") ?? undefined;
+    const limit = Math.min(parseInt(params.get("limit") ?? "6", 10), 20);
+
+    const result = await CosmeticProductRepo.findAll({ skinType }, 1, limit);
+    const ids = result.data.map((p) => p.id);
+    if (!ids.length) return [];
+
+    const outline = await prisma.userOutline.findUnique({
+      where: { conversationId },
+      select: { id: true },
+    });
+
+    if (outline) {
+      await prisma.$transaction([
+        prisma.cosmeticRecommendation.deleteMany({ where: { userOutlineId: outline.id } }),
+        prisma.cosmeticRecommendation.createMany({
+          data: ids.map((id, index) => ({
+            userOutlineId: outline.id,
+            cosmeticProductId: id,
+            rank: index + 1,
+            score: 0,
+            reason: "Matched by skin category.",
+            signals: { source: "chatwonder_query" },
+          })),
+        }),
+      ]);
+      logger.info(`[resolveCosmeticIdsByQuery] Persisted ${ids.length} ids to outline ${outline.id}`);
+    }
+
+    return ids;
+  } catch (error) {
+    logger.error(`[resolveCosmeticIdsByQuery] ${(error as Error).message}`);
     return [];
   }
 }
