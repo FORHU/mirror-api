@@ -4,10 +4,7 @@ import UserService from "../services/shared/user.service";
 import { type StreamCallbacks } from "./chat-wonder-stream";
 import { stripSourcesPrefix } from "./source-metadata.util";
 // import { resolveItineraryLocations, persistOutlineMaps } from "./chat-wonder-maps.util";
-import {
-  resolveAndPersistOutlineCosmetics,
-  resolveOutlineCosmeticsByIds,
-} from "./chat-wonder-cosmetics.util";
+
 import {
   persistOutlineOutfits,
   resolveOutfitsByIds,
@@ -351,13 +348,6 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
           cosmetics_data = { query: cosmeticsQuery };
         } else if (Array.isArray(cosmeticsIds) && cosmeticsIds.length) {
           // New flow: AI sent IDs via [COSMETICS_IDS] — pass through, frontend batch-fetches.
-        } else {
-          // Legacy flow: AI sent product IDs — resolve and send inline.
-          let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics_data);
-          if (!resolved.length) {
-            resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
-          }
-          if (resolved.length) cosmetics_data = { recommendations: resolved };
         }
       }
 
