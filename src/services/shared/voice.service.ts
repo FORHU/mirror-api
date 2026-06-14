@@ -80,7 +80,7 @@ async function getChatWonderSession(sessionId?: string): Promise<string> {
     const sid = res.data?.session_id;
     if (!sid) logger.warn("[VoiceService] /session returned no session_id, response:", res.data);
     return sid || "";
-  } catch (err) {
+  } catch {
     logger.error(`[VoiceService] Failed to create ChatWonder session: ${(err as Error).message}`);
     return "";
   }
@@ -102,7 +102,7 @@ async function buildConversationHistory(userOutlineId?: string): Promise<string>
       .join("\n");
     logger.info(`[VoiceService] Conversation history injected: ${messages.length} messages`);
     return history;
-  } catch (err) {
+  } catch {
     logger.warn(`[VoiceService] Failed to fetch conversation history: ${(err as Error).message}`);
     return "";
   }
@@ -152,7 +152,7 @@ async function askChatWonder(
         },
       },
     });
-  } catch (err) {
+  } catch {
     logger.error(`[VoiceService] ChatWonder failed: ${(err as Error).message}`);
     return {
       response: parseChatWonderResponse(
@@ -316,7 +316,7 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
   if (isFallbackText) {
     try {
       return fs.readFileSync(path.join(__dirname, "../../assets/error-fallback.mp3"));
-    } catch (e) {
+    } catch {
       logger.error(`[VoiceService] Failed to read local fallback MP3: ${(e as Error).message}`);
     }
   }
@@ -457,11 +457,11 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
     const total = Date.now() - synthStart;
     logger.info(`[VoiceService] TTS synthesis total time: ${total}ms, chunks=${textChunks.length}`);
     return Buffer.concat(audioBuffers);
-  } catch (err) {
+  } catch {
     logger.error(`[VoiceService] AWS Polly failed: ${(err as Error).message}`);
     try {
       return fs.readFileSync(path.join(__dirname, "../../assets/error-fallback.mp3"));
-    } catch (e) {
+    } catch {
       throw new Error(`TTS synthesis failed, and fallback audio not found`);
     }
   }
@@ -490,7 +490,7 @@ export const voiceService = {
       try {
         const w = await weatherService.getWeather(ctx.lat, ctx.lng);
         weatherInfo = `${Math.round(w.temperature)}°C, ${w.condition}, wind ${Math.round(w.windspeed)} km/h, humidity ${w.humidity}%`;
-      } catch (err) {
+      } catch {
         logger.warn(
           `[VoiceService] Failed to fetch weather info for suggestAI: ${(err as Error).message}`
         );

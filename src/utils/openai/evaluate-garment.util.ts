@@ -83,7 +83,7 @@ export async function evaluateGarmentImage(imageUrl: string): Promise<GarmentEva
   let parsed: GarmentEvaluation;
   try {
     parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-  } catch (err) {
+  } catch {
     throw { status: 502, message: "Failed to parse OpenAI JSON response" };
   }
 

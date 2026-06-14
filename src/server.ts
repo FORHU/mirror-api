@@ -2,11 +2,10 @@ import dotenv from "dotenv";
 dotenv.config({ override: true });
 
 import http from "http";
-import { URL } from "url";
 import app from "./app";
 import logger from "./utils/logger";
 import setup from "./setup";
-import { PORT, NODE_ENV, S3_CDN_URL, S3_BUCKET_NAME, BASE_URL } from "./config";
+import { PORT, NODE_ENV, S3_CDN_URL, S3_BUCKET_NAME } from "./config";
 import { initSocketServer } from "./utils/socket.util";
 
 async function start() {

@@ -166,7 +166,7 @@ export default class ChatWonderController {
 
     try {
       // Fix 2: Run weather fetch IN PARALLEL with DB setup instead of sequentially before it
-      const [conversationId, sessionId, gender, frontendWeather] = await Promise.all([
+      const [conversationId, sessionId, dbGender, frontendWeather] = await Promise.all([
         ChatWonderService.ensureConversation(userId, input.substring(0, 50), inputConversationId),
         ChatWonderService.generateChatSessionId(userId),
         ChatWonderService.getUserGender(userId),
@@ -177,6 +177,8 @@ export default class ChatWonderController {
               .catch(() => undefined as Record<string, unknown> | undefined)
           : Promise.resolve(undefined as Record<string, unknown> | undefined),
       ]);
+
+      const gender = value.gender || dbGender;
 
       // Fix 3: Fire saveUserMessage without blocking SSE headers — awaited in onComplete
       const userMessagePromise = ChatWonderService.saveUserMessage(userId, conversationId, input);

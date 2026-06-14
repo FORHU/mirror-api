@@ -251,7 +251,7 @@ export default class GarmentService {
     if (data.fileId && oldFileId && data.fileId !== oldFileId) {
       try {
         await FileService.discardIfUnreferenced(oldFileId);
-      } catch (err) {
+      } catch {
         // Already best-effort inside discardIfUnreferenced; this is belt-and-suspenders.
       }
     }
@@ -273,7 +273,7 @@ export default class GarmentService {
     if (fileId) {
       try {
         await FileService.discardIfUnreferenced(fileId);
-      } catch (err) {
+      } catch {
         // Best-effort cleanup; the delete itself already succeeded.
       }
     }

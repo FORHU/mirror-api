@@ -274,6 +274,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         ...(location ? { location } : {}),
         ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
         ...(gender ? { gender } : {}),
+        ...(sitemapContext ? { sitemap_context: sitemapContext } : {}),
         ...(documentContext ? { document_context: documentContext } : {}),
         ...(history && history.length ? { history } : {}),
         // ChatWonder expects category as { meta: "Cat1,Cat2" }. "ALL" means no filter — omit it.

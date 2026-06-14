@@ -472,13 +472,12 @@ export async function persistOutlineOutfits(
           ...(outline.userId && { userId: outline.userId }),
           userOutlineId: outline.id,
           fileId: outfitFile.id,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           items: {
             create: items.map(({ garmentId, slot, layerLevel }) => ({
               garmentId,
               slot,
               layerLevel,
-            })) as any,
+            })),
           },
         },
       });

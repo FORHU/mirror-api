@@ -24,7 +24,7 @@ export default async function devTokenHandler(req: Request, res: Response) {
     });
 
     res.status(200).json({ token, user });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Internal server error" });
   }
 }
