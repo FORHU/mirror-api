@@ -26,6 +26,17 @@ export default class FileService {
     try {
       const { originalname, mimetype, size, location, key, bucket } = file;
 
+      logger.info(
+        `[FileService.uploadFile] received file: ${JSON.stringify({
+          originalname,
+          mimetype,
+          size,
+          location,
+          key,
+          bucket,
+        })}`
+      );
+
       if (!bucket || !key) {
         throw new Error("uploadFile expects a multer-s3 file with bucket + key");
       }
@@ -73,6 +84,16 @@ export default class FileService {
         path: key,
         metaData: finalMetaData,
       });
+
+      logger.info(
+        `[FileService.uploadFile] created file record: ${JSON.stringify({
+          id: fileRecord?.id,
+          fileUrl: fileRecord?.fileUrl,
+          finalUrl,
+          s3DirectUrl,
+          metaData: finalMetaData,
+        })}`
+      );
 
       return fileRecord;
     } catch (error) {
