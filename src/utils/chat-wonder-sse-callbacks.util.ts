@@ -4,10 +4,7 @@ import UserService from "../services/shared/user.service";
 import { type StreamCallbacks } from "./chat-wonder-stream";
 import { stripSourcesPrefix } from "./source-metadata.util";
 // import { resolveItineraryLocations, persistOutlineMaps } from "./chat-wonder-maps.util";
-import {
-  resolveAndPersistOutlineCosmetics,
-  resolveOutlineCosmeticsByIds,
-} from "./chat-wonder-cosmetics.util";
+
 import {
   persistOutlineOutfits,
   resolveOutfitsByIds,
@@ -358,6 +355,11 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
           !!parsed.cosmetics_suggestion ||
           isCosmeticsLikely(input));
       if (wantsCosmetics) {
+        const cosmeticsIds =
+          cosmetics_data && typeof cosmetics_data === "object"
+            ? (cosmetics_data as Record<string, unknown>).ids
+            : undefined;
+
         if (typeof cosmeticsQuery === "string") {
           // New flow: AI sent a query — frontend fetches products itself.
           cosmetics_data = { query: cosmeticsQuery };

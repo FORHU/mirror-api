@@ -38,6 +38,10 @@ const createSchema = Joi.object({
   metaData: Joi.object().optional().allow(null),
 });
 
+const batchSchema = Joi.object({
+  ids: Joi.array().items(Joi.string().trim().min(1)).min(1).required(),
+});
+
 // PATCH: every field optional. `fileUrlId: null` clears the image link;
 // omit the field entirely to leave it alone.
 const updateSchema = Joi.object({
@@ -93,6 +97,18 @@ export default class CosmeticProductController {
 
     try {
       const data = await CosmeticProductService.getProductById(req.params.id);
+      return responseSuccess(res, 200, data);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async batchGet(req: Request, res: Response, next: NextFunction) {
+    const { error, value } = batchSchema.validate(req.body, { abortEarly: false });
+    if (error) return responseError(res, 400, error.message);
+
+    try {
+      const data = await CosmeticProductService.getByIds(value.ids);
       return responseSuccess(res, 200, data);
     } catch (err) {
       next(err);

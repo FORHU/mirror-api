@@ -88,7 +88,7 @@ export const registerKioskEvents = (socket: Socket) => {
       } else {
         socket.emit("room_joined", { status: "error", message: "Not paired with this kiosk" });
       }
-    } catch (err) {
+    } catch {
       socket.emit("room_joined", { status: "error", message: "Authentication failed" });
     }
   });

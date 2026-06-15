@@ -65,10 +65,28 @@ export default class OutfitRepo {
       });
     }
 
+    // Gender filter: exact match (ILIKE '%MALE%' falsely matches 'FEMALE').
+    // Also include UNISEX and null-gender outfits — they apply to everyone.
+    // Omitting metaGender entirely (null/undefined) returns all genders.
+    const genderTerm = metaFilters.gender?.trim().toUpperCase();
+    if (genderTerm) {
+      const genderRows = await prisma.$queryRaw<{ id: string }[]>(
+        Prisma.sql`
+          SELECT "id"
+          FROM "Outfit"
+          WHERE UPPER("metaData"->>'gender') = ${genderTerm}
+             OR UPPER("metaData"->>'gender') = 'UNISEX'
+             OR "metaData"->>'gender' IS NULL
+        `
+      );
+      andClauses.push({ id: { in: genderRows.map((row) => row.id) } });
+    }
+
     // Each supplied metadata filter narrows the result set independently (AND).
     // `"metaData"->>${field}` binds the whitelisted key as a parameter, so the
     // lookup is injection-safe. Array fields match against their stringified form.
     for (const field of META_TEXT_FIELDS) {
+      if (field === "gender") continue; // handled above
       const term = metaFilters[field]?.trim();
       if (!term) continue;
 

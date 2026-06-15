@@ -16,11 +16,7 @@ router.get("/session-id", authenticate, ChatWonderController.getSessionId);
  * @desc Read-only: current ChatWonder session ID (no history reset).
  * @access Private
  */
-router.get(
-  "/session-id/current",
-  authenticate,
-  ChatWonderController.getCurrentSessionId
-);
+router.get("/session-id/current", authenticate, ChatWonderController.getCurrentSessionId);
 
 /**
  * @route POST /api/mirror/chat-wonder/restart

@@ -6,9 +6,12 @@ import { createChatWonderSseCallbacks } from "../../utils/chat-wonder-sse-callba
 import { buildCatalogContext } from "../../utils/chat-wonder-cosmetics.util";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
-import { chatWonderBaseSchema, clearStaleSession, isCosmeticsLikely } from "../../helpers/chat-wonder.helper";
+import {
+  chatWonderBaseSchema,
+  clearStaleSession,
+  isCosmeticsLikely,
+} from "../../helpers/chat-wonder.helper";
 import { weatherService, type WeatherData } from "../../services/shared/weather.service";
-
 
 export default class ChatWonderController {
   /**
@@ -129,17 +132,21 @@ export default class ChatWonderController {
     const frontendLocation = value.location;
     const skinAnalysis = value.skin_analysis;
     const category: string | undefined = value.category || undefined;
+    const set: number | undefined = value.set ?? undefined;
 
     logger.info(
       `[ChatWonderController.chat] page_mode=${pageMode ?? "none"} | input=${input.slice(0, 80)}...`
     );
 
+    const parsedLat = frontendLocation ? Number(frontendLocation.lat) : NaN;
+    const parsedLng = frontendLocation ? Number(frontendLocation.lng) : NaN;
     const location =
-      frontendLocation &&
-      typeof frontendLocation.lat === "number" &&
-      typeof frontendLocation.lng === "number"
-        ? { lat: frontendLocation.lat, lng: frontendLocation.lng }
+      frontendLocation && !isNaN(parsedLat) && !isNaN(parsedLng)
+        ? { lat: parsedLat, lng: parsedLng }
         : null;
+    logger.info(
+      `[ChatWonderController.chat] location=${location ? `lat=${location.lat},lng=${location.lng}` : "none (no GPS or parse failed)"}`
+    );
 
     // Helper to build a weather object from the weatherService response
     const buildWeatherObj = (d: WeatherData, loc: { lat: number; lng: number }) => ({
@@ -158,14 +165,11 @@ export default class ChatWonderController {
       temperature_c: Number(d.temperature),
     });
 
-    const needsWeather = !!(
-      location &&
-      (isGarment || isOverview || isCosmetics || !pageMode)
-    );
+    const needsWeather = !!(location && (isGarment || isOverview || isCosmetics || !pageMode));
 
     try {
       // Fix 2: Run weather fetch IN PARALLEL with DB setup instead of sequentially before it
-      const [conversationId, sessionId, gender, frontendWeather] = await Promise.all([
+      const [conversationId, sessionId, dbGender, frontendWeather] = await Promise.all([
         ChatWonderService.ensureConversation(userId, input.substring(0, 50), inputConversationId),
         ChatWonderService.generateChatSessionId(userId),
         ChatWonderService.getUserGender(userId),
@@ -176,6 +180,8 @@ export default class ChatWonderController {
               .catch(() => undefined as Record<string, unknown> | undefined)
           : Promise.resolve(undefined as Record<string, unknown> | undefined),
       ]);
+
+      const gender = value.gender || dbGender;
 
       // Fix 3: Fire saveUserMessage without blocking SSE headers — awaited in onComplete
       const userMessagePromise = ChatWonderService.saveUserMessage(userId, conversationId, input);
@@ -214,6 +220,7 @@ export default class ChatWonderController {
         documentContext,
         history,
         category,
+        set,
       });
     } catch (err) {
       const message = (err as Error).message || "Internal server error";

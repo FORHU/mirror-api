@@ -316,8 +316,8 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
   if (isFallbackText) {
     try {
       return fs.readFileSync(path.join(__dirname, "../../assets/error-fallback.mp3"));
-    } catch (e) {
-      logger.error(`[VoiceService] Failed to read local fallback MP3: ${(e as Error).message}`);
+    } catch (err) {
+      logger.error(`[VoiceService] Failed to read local fallback MP3: ${(err as Error).message}`);
     }
   }
 
@@ -461,7 +461,7 @@ async function synthesize(text: string, language: string, emotion?: string): Pro
     logger.error(`[VoiceService] AWS Polly failed: ${(err as Error).message}`);
     try {
       return fs.readFileSync(path.join(__dirname, "../../assets/error-fallback.mp3"));
-    } catch (e) {
+    } catch (err) {
       throw new Error(`TTS synthesis failed, and fallback audio not found`);
     }
   }

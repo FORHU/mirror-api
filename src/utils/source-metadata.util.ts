@@ -36,7 +36,7 @@ export function stripSourcesPrefix(raw: string): {
       try {
         const sourceMetadata = JSON.parse(sourceJson);
         return { cleaned, sourceMetadata };
-      } catch (err) {
+      } catch {
         logger.warn("[SourceMetadata] Failed to parse sources JSON");
       }
     }

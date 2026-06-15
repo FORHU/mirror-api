@@ -51,6 +51,9 @@ function evictWS(sessionId: string) {
   if (entry) {
     if (entry.pingTimer) clearInterval(entry.pingTimer);
     try {
+      // Attach a dummy error listener to prevent Node.js from crashing
+      // if ws.terminate() emits an 'error' event during the CONNECTING phase.
+      entry.ws.on("error", () => {});
       entry.ws.terminate();
     } catch {
       // Ignore termination errors while evicting sockets.
@@ -125,6 +128,8 @@ export interface StreamChatOptions {
   history?: { role: "user" | "assistant"; content: string }[];
   /** Fashion category filter from the catalog page (e.g. "metaCategory=Winterwear,Summerwear" or "ALL"). */
   category?: string;
+  /** Number of cosmetic product IDs to return. */
+  set?: number;
 }
 
 const DEFAULT_WS_CONNECT_TIMEOUT_MS = 10000;
@@ -194,6 +199,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     documentContext,
     history,
     category,
+    set,
   } = options;
 
   return new Promise((resolve, reject) => {
@@ -268,6 +274,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
         ...(location ? { location } : {}),
         ...(skinAnalysis ? { skin_analysis: skinAnalysis } : {}),
         ...(gender ? { gender } : {}),
+        ...(sitemapContext ? { sitemap_context: sitemapContext } : {}),
         ...(documentContext ? { document_context: documentContext } : {}),
         ...(history && history.length ? { history } : {}),
         // ChatWonder expects category as { meta: "Cat1,Cat2" }. "ALL" means no filter — omit it.
@@ -280,6 +287,7 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
               },
             }
           : {}),
+        ...(set !== undefined ? { set } : {}),
       };
 
       const sendPayload = () => {
