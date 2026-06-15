@@ -144,6 +144,9 @@ export default class ChatWonderController {
       frontendLocation && !isNaN(parsedLat) && !isNaN(parsedLng)
         ? { lat: parsedLat, lng: parsedLng }
         : null;
+    logger.info(
+      `[ChatWonderController.chat] location=${location ? `lat=${location.lat},lng=${location.lng}` : "none (no GPS or parse failed)"}`
+    );
 
     // Helper to build a weather object from the weatherService response
     const buildWeatherObj = (d: WeatherData, loc: { lat: number; lng: number }) => ({
