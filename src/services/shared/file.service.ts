@@ -26,6 +26,17 @@ export default class FileService {
     try {
       const { originalname, mimetype, size, location, key, bucket } = file;
 
+      logger.info(
+        `[FileService.uploadFile] received file: ${JSON.stringify({
+          originalname,
+          mimetype,
+          size,
+          location,
+          key,
+          bucket,
+        })}`
+      );
+
       if (!bucket || !key) {
         throw new Error("uploadFile expects a multer-s3 file with bucket + key");
       }
@@ -40,10 +51,13 @@ export default class FileService {
       const metadata = await image.metadata();
       const stats = await image.stats();
 
+      // Grayscale images expose a single channel; fall back to it for G/B so
+      // non-RGB uploads (e.g. 1-channel camera captures) don't crash here.
+      const ch = stats.channels;
       const autoDominantColor = this.rgbToHex(
-        Math.round(stats.channels[0].mean),
-        Math.round(stats.channels[1].mean),
-        Math.round(stats.channels[2].mean)
+        Math.round(ch[0]?.mean ?? 0),
+        Math.round((ch[1] ?? ch[0])?.mean ?? 0),
+        Math.round((ch[2] ?? ch[0])?.mean ?? 0)
       );
 
       const finalMetaData = {
@@ -71,6 +85,16 @@ export default class FileService {
         metaData: finalMetaData,
       });
 
+      logger.info(
+        `[FileService.uploadFile] created file record: ${JSON.stringify({
+          id: fileRecord?.id,
+          fileUrl: fileRecord?.fileUrl,
+          finalUrl,
+          s3DirectUrl,
+          metaData: finalMetaData,
+        })}`
+      );
+
       return fileRecord;
     } catch (error) {
       logger.error("Error processing file upload:", error);
@@ -96,10 +120,13 @@ export default class FileService {
     const image = sharp(buffer);
     const metadata = await image.metadata();
     const stats = await image.stats();
+    // Grayscale images expose a single channel; fall back to it for G/B so
+    // non-RGB sources don't crash here.
+    const ch = stats.channels;
     const autoDominantColor = this.rgbToHex(
-      Math.round(stats.channels[0].mean),
-      Math.round(stats.channels[1].mean),
-      Math.round(stats.channels[2].mean)
+      Math.round(ch[0]?.mean ?? 0),
+      Math.round((ch[1] ?? ch[0])?.mean ?? 0),
+      Math.round((ch[2] ?? ch[0])?.mean ?? 0)
     );
 
     const key = `${opts.keyPrefix || "uploads"}/${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${extension}`;

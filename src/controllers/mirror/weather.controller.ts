@@ -1,13 +1,33 @@
 import { Request, Response } from "express";
+import axios from "axios";
 import { weatherService, WeatherData } from "../../services/shared/weather.service";
 
 interface CacheEntry {
-  data: WeatherData;
+  data: WeatherData & { city: string };
   expiry: number;
 }
 
 const weatherCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+async function reverseGeocode(lat: number, lon: number): Promise<string> {
+  try {
+    const res = await axios.get("https://nominatim.openstreetmap.org/reverse", {
+      params: { lat, lon, format: "json" },
+      headers: { "User-Agent": "mirror-app/1.0" },
+      timeout: 4000,
+    });
+    return (
+      res.data?.address?.city ||
+      res.data?.address?.town ||
+      res.data?.address?.village ||
+      res.data?.address?.county ||
+      "---"
+    );
+  } catch {
+    return "---";
+  }
+}
 
 export default class WeatherController {
   static async getWeather(req: Request, res: Response) {
@@ -33,11 +53,12 @@ export default class WeatherController {
     }
 
     try {
-      const data = await weatherService.getWeather(latitude, longitude);
-      weatherCache.set(cacheKey, {
-        data,
-        expiry: now + CACHE_TTL_MS,
-      });
+      const [weather, city] = await Promise.all([
+        weatherService.getWeather(latitude, longitude),
+        reverseGeocode(latitude, longitude),
+      ]);
+      const data = { ...weather, city };
+      weatherCache.set(cacheKey, { data, expiry: now + CACHE_TTL_MS });
       res.status(200).json(data);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message || "Weather service unavailable" });

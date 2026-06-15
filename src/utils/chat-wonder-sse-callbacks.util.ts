@@ -4,7 +4,10 @@ import UserService from "../services/shared/user.service";
 import { type StreamCallbacks } from "./chat-wonder-stream";
 import { stripSourcesPrefix } from "./source-metadata.util";
 // import { resolveItineraryLocations, persistOutlineMaps } from "./chat-wonder-maps.util";
-
+import {
+  resolveAndPersistOutlineCosmetics,
+  resolveOutlineCosmeticsByIds,
+} from "./chat-wonder-cosmetics.util";
 import {
   persistOutlineOutfits,
   resolveOutfitsByIds,
@@ -202,21 +205,54 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         }
       }
 
-      // ChatWonder fast path for cosmetics: emits [COSMETICS_IDS]["id1","id2",...]END
-      // instead of [COSMETICS_DATA]. Pass IDs straight through — no DB resolution needed.
-      const cosmeticsIdsMatch = fullResponse.match(/\[COSMETICS_IDS\](\[[\s\S]*?\])(?:END)?/);
+      // ChatWonder sometimes emits [COSMETICS_IDS][id1,id2,...] (the cosmetics
+      // analog of [OUTFIT_IDS]) instead of a [COSMETICS_DATA] query block.
+      // Resolve those IDs to full product data so the frontend renders the
+      // products and the marker never leaks into the visible message.
+      const cosmeticsIdsMatch = fullResponse.match(
+        /\[COSMETICS_IDS\]\s*(\[[\s\S]*?\])/
+      );
       if (cosmeticsIdsMatch && !cosmetics_data) {
         try {
-          const ids: string[] = JSON.parse(cosmeticsIdsMatch[1]);
-          if (ids.length) {
-            cosmetics_data = { ids };
-            stylist_data = stylist_data ?? {
-              target_url: "/ai-recommendation-cosmetic",
-              confidence: 1.0,
-              extracted_entities: null,
-              system_message: "",
-            };
-            logger.info(`[ChatWonderController] Parsed [COSMETICS_IDS] → ${ids.length} ids`);
+          const parsedIds: unknown = JSON.parse(cosmeticsIdsMatch[1]);
+          const idRecs = Array.isArray(parsedIds)
+            ? parsedIds.flatMap((value) => {
+                if (typeof value === "string") return [{ id: value }];
+                if (value && typeof value === "object") {
+                  const rec = value as Record<string, unknown>;
+                  const id =
+                    typeof rec.id === "string"
+                      ? rec.id
+                      : typeof rec.productId === "string"
+                        ? rec.productId
+                        : typeof rec.cosmeticProductId === "string"
+                          ? rec.cosmeticProductId
+                          : "";
+                  if (!id) return [];
+                  return [
+                    {
+                      id,
+                      reason: typeof rec.reason === "string" ? rec.reason : undefined,
+                      score: typeof rec.score === "number" ? rec.score : undefined,
+                      rank: typeof rec.rank === "number" ? rec.rank : undefined,
+                    },
+                  ];
+                }
+                return [];
+              })
+            : [];
+          if (idRecs.length) {
+            const resolved = await resolveOutlineCosmeticsByIds(
+              conversationId,
+              idRecs,
+              skinAnalysis
+            );
+            if (resolved.length) {
+              cosmetics_data = { recommendations: resolved };
+              logger.info(
+                `[ChatWonderController] Resolved [COSMETICS_IDS] → ${resolved.length} cosmetics`
+              );
+            }
           }
         } catch (e) {
           logger.warn(
@@ -316,7 +352,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         parsed.intent === "COSMETIC" &&
         (!cosmetics_data ||
           (!(cosmetics_data as Record<string, unknown>).query &&
-            !(cosmetics_data as Record<string, unknown>).ids))
+            !(cosmetics_data as Record<string, unknown>).recommendations))
       ) {
         const skinCategory = extractCosmeticsMetaCategory(input, skinAnalysis);
         if (skinCategory) {
@@ -331,6 +367,12 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         cosmetics_data && typeof cosmetics_data === "object"
           ? (cosmetics_data as Record<string, unknown>).query
           : undefined;
+      const cosmeticsHasRecs =
+        cosmetics_data &&
+        typeof cosmetics_data === "object" &&
+        Array.isArray((cosmetics_data as Record<string, unknown>).recommendations) &&
+        ((cosmetics_data as Record<string, unknown>).recommendations as unknown[])
+          .length > 0;
       const wantsCosmetics =
         !isGreeting &&
         (cosmetics_data != null ||
@@ -346,8 +388,18 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         if (typeof cosmeticsQuery === "string") {
           // New flow: AI sent a query — frontend fetches products itself.
           cosmetics_data = { query: cosmeticsQuery };
-        } else if (Array.isArray(cosmeticsIds) && cosmeticsIds.length) {
-          // New flow: AI sent IDs via [COSMETICS_IDS] — pass through, frontend batch-fetches.
+        } else if (!cosmeticsHasRecs) {
+          // Legacy flow: AI sent product IDs — resolve and send inline.
+          // Skipped when a [COSMETICS_IDS] block already resolved recommendations.
+          let resolved = await resolveOutlineCosmeticsByIds(
+            conversationId,
+            cosmetics_data,
+            skinAnalysis
+          );
+          if (!resolved.length) {
+            resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
+          }
+          if (resolved.length) cosmetics_data = { recommendations: resolved };
         }
       }
 
@@ -356,7 +408,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
           parsed.message
             .split(/\n\n\[\s*(?:garments?|cosmetics|maps?)\s*\]/)[0]
             .split(
-              /\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|GENDER_UPDATE|TAILOR_DATA|OUTFIT_IDS)\]/
+              /\[(?:MAPS_DATA|STYLIST|NAV_DATA|GARMENT_DATA|COSMETICS_DATA|COSMETICS_IDS|GENDER_UPDATE|TAILOR_DATA|OUTFIT_IDS)\]/
             )[0]
             .trim()
         ) || outfitIdsSpokeMessage;
