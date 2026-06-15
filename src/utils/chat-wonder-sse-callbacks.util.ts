@@ -216,14 +216,36 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         try {
           const parsedIds: unknown = JSON.parse(cosmeticsIdsMatch[1]);
           const idRecs = Array.isArray(parsedIds)
-            ? parsedIds
-                .filter((id): id is string => typeof id === "string")
-                .map((id) => ({ id }))
+            ? parsedIds.flatMap((value) => {
+                if (typeof value === "string") return [{ id: value }];
+                if (value && typeof value === "object") {
+                  const rec = value as Record<string, unknown>;
+                  const id =
+                    typeof rec.id === "string"
+                      ? rec.id
+                      : typeof rec.productId === "string"
+                        ? rec.productId
+                        : typeof rec.cosmeticProductId === "string"
+                          ? rec.cosmeticProductId
+                          : "";
+                  if (!id) return [];
+                  return [
+                    {
+                      id,
+                      reason: typeof rec.reason === "string" ? rec.reason : undefined,
+                      score: typeof rec.score === "number" ? rec.score : undefined,
+                      rank: typeof rec.rank === "number" ? rec.rank : undefined,
+                    },
+                  ];
+                }
+                return [];
+              })
             : [];
           if (idRecs.length) {
             const resolved = await resolveOutlineCosmeticsByIds(
               conversationId,
-              idRecs
+              idRecs,
+              skinAnalysis
             );
             if (resolved.length) {
               cosmetics_data = { recommendations: resolved };
@@ -369,7 +391,11 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         } else if (!cosmeticsHasRecs) {
           // Legacy flow: AI sent product IDs — resolve and send inline.
           // Skipped when a [COSMETICS_IDS] block already resolved recommendations.
-          let resolved = await resolveOutlineCosmeticsByIds(conversationId, cosmetics_data);
+          let resolved = await resolveOutlineCosmeticsByIds(
+            conversationId,
+            cosmetics_data,
+            skinAnalysis
+          );
           if (!resolved.length) {
             resolved = await resolveAndPersistOutlineCosmetics(conversationId, skinAnalysis);
           }

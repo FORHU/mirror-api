@@ -297,8 +297,9 @@ export async function buildCatalogContext(
       "Recommend ONLY products from this catalog. Do not invent product names, brands, images, or IDs.",
       "Keep the visible assistant reply concise and organized: one short intro, then at most 3 bullet points with product names and brief reasons.",
       "Do not include long ingredient essays, full product dumps, or repeated details in the visible reply.",
-      "Return a [COSMETICS_IDS] block containing exactly 4-10 product IDs from the catalog that best match the user's skin profile:",
-      '[COSMETICS_IDS]["id1", "id2"]END',
+      "Return a [COSMETICS_IDS] block containing exactly 4-10 recommendation objects from the catalog that best match the user's skin profile.",
+      "Each object must include id and a concise, user-specific reason. You may include score if useful.",
+      '[COSMETICS_IDS][{"id":"id1","reason":"Why this product fits the user in one short sentence.","score":92}]END',
       "NEVER use the [OUTFIT_IDS] tag. ONLY use [COSMETICS_IDS].",
       `User skin profile: type=${profile.skinType}; hydration=${profile.hydrationPct}; oiliness=${profile.oilinessPct}; concerns=${concerns}.`,
       "Candidate products, one JSON object per line:",
@@ -318,7 +319,8 @@ export async function buildCatalogContext(
 
 export async function resolveOutlineCosmeticsByIds(
   conversationId: string,
-  cosmeticsData: unknown
+  cosmeticsData: unknown,
+  requestSkinAnalysis?: unknown
 ): Promise<ResolvedCosmetic[]> {
   try {
     const recs = extractRecs(cosmeticsData);
@@ -331,6 +333,25 @@ export async function resolveOutlineCosmeticsByIds(
       return true;
     });
 
+    // Load the outline once — we need its linked skin profile so we can build a
+    // real per-product reason (the [COSMETICS_IDS] block carries IDs only), and
+    // we reuse the same record for persistence below.
+    const outline = await prisma.userOutline.findUnique({
+      where: { conversationId },
+      select: {
+        id: true,
+        skinAnalysis: {
+          select: {
+            skinType: true,
+            hydrationPct: true,
+            oilinessPct: true,
+            concerns: true,
+          },
+        },
+      },
+    });
+    const profile = buildProfile(outline?.skinAnalysis ?? null, requestSkinAnalysis);
+
     const products = (await prisma.cosmeticProduct.findMany({
       where: { id: { in: ordered.map((rec) => rec.id) } },
       select: {
@@ -338,6 +359,13 @@ export async function resolveOutlineCosmeticsByIds(
         name: true,
         brand: true,
         tags: true,
+        type: true,
+        spf: true,
+        waterproof: true,
+        transferProof: true,
+        hydrating: true,
+        oilFree: true,
+        finish: true,
         fileUrl: { select: { fileUrl: true } },
       },
     })) as Array<{
@@ -345,6 +373,13 @@ export async function resolveOutlineCosmeticsByIds(
       name: string;
       brand: string | null;
       tags: string[];
+      type: ProductForScoring["type"];
+      spf: number | null;
+      waterproof: boolean;
+      transferProof: boolean;
+      hydrating: boolean;
+      oilFree: boolean;
+      finish: ProductForScoring["finish"];
       fileUrl: { fileUrl: string | null } | null;
     }>;
 
@@ -354,13 +389,36 @@ export async function resolveOutlineCosmeticsByIds(
       if (!product) return [];
       const productImageUrl = product.fileUrl?.fileUrl ?? "";
       const rank = rec.rank && Number.isFinite(rec.rank) ? rec.rank : index + 1;
-      const score = rec.score && Number.isFinite(rec.score) ? rec.score : 0;
+
+      // The model only returns IDs, so score each chosen product against the
+      // user's skin profile to derive a meaningful, distinct reason instead of
+      // a single boilerplate caption shared by every product.
+      const scored = scoreProduct(profile, {
+        id: product.id,
+        type: product.type,
+        tags: product.tags,
+        spf: product.spf,
+        waterproof: product.waterproof,
+        transferProof: product.transferProof,
+        hydrating: product.hydrating,
+        oilFree: product.oilFree,
+        finish: product.finish,
+      });
+      const score =
+        rec.score && Number.isFinite(rec.score) ? rec.score : scored.score;
+      const reason =
+        rec.reason ??
+        (scored.reason.length
+          ? scored.reason.join(", ")
+          : product.tags.length
+            ? `Matches your skin profile · ${product.tags.slice(0, 3).join(", ")}`
+            : "Recommended for your skin profile.");
       return [
         {
           id: product.id,
           rank,
           score,
-          reason: rec.reason ?? "Selected by ChatWonder from the cosmetic catalog.",
+          reason,
           name: product.name,
           brand: product.brand ?? undefined,
           imageUrl: productImageUrl,
@@ -376,11 +434,6 @@ export async function resolveOutlineCosmeticsByIds(
     });
 
     if (!resolved.length) return [];
-
-    const outline = await prisma.userOutline.findUnique({
-      where: { conversationId },
-      select: { id: true },
-    });
 
     if (outline) {
       await persistOutlineCosmetics(outline.id, resolved);
