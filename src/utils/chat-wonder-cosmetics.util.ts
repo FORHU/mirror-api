@@ -360,7 +360,7 @@ export async function resolveOutlineCosmeticsByIds(
           id: product.id,
           rank,
           score,
-          reason: rec.reason ?? "Selected by ChatWonder from the cosmetic catalog.",
+          reason: rec.reason ?? "",
           name: product.name,
           brand: product.brand ?? undefined,
           imageUrl: productImageUrl,
