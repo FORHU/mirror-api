@@ -26,7 +26,10 @@ env:
 jobs:
   deploy:
     name: Build, Push & Deploy (staging)
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     environment: staging #temp only should be moved to staging
 
