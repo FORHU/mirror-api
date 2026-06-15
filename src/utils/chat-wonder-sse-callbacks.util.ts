@@ -4,7 +4,10 @@ import UserService from "../services/shared/user.service";
 import { type StreamCallbacks } from "./chat-wonder-stream";
 import { stripSourcesPrefix } from "./source-metadata.util";
 // import { resolveItineraryLocations, persistOutlineMaps } from "./chat-wonder-maps.util";
-
+import {
+  resolveAndPersistOutlineCosmetics,
+  resolveOutlineCosmeticsByIds,
+} from "./chat-wonder-cosmetics.util";
 import {
   persistOutlineOutfits,
   resolveOutfitsByIds,
