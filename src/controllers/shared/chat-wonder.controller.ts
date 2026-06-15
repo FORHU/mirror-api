@@ -138,11 +138,11 @@ export default class ChatWonderController {
       `[ChatWonderController.chat] page_mode=${pageMode ?? "none"} | input=${input.slice(0, 80)}...`
     );
 
+    const parsedLat = frontendLocation ? Number(frontendLocation.lat) : NaN;
+    const parsedLng = frontendLocation ? Number(frontendLocation.lng) : NaN;
     const location =
-      frontendLocation &&
-      typeof frontendLocation.lat === "number" &&
-      typeof frontendLocation.lng === "number"
-        ? { lat: frontendLocation.lat, lng: frontendLocation.lng }
+      frontendLocation && !isNaN(parsedLat) && !isNaN(parsedLng)
+        ? { lat: parsedLat, lng: parsedLng }
         : null;
 
     // Helper to build a weather object from the weatherService response
