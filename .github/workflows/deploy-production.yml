@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ECR_REPOSITORY: mirror-api
+  ECR_REPOSITORY: style-os-mirror-api-prod
   AWS_REGION: eu-west-3
   NODE_ENV: production
   IMAGE_TAG: ${{ github.sha }}
