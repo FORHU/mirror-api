@@ -3,14 +3,9 @@ import Joi from "joi";
 import ChatWonderService from "../../services/shared/chat-wonder.service";
 import { streamChat } from "../../utils/chat-wonder-stream";
 import { createChatWonderSseCallbacks } from "../../utils/chat-wonder-sse-callbacks.util";
-import { buildCatalogContext } from "../../utils/chat-wonder-cosmetics.util";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
-import {
-  chatWonderBaseSchema,
-  clearStaleSession,
-  isCosmeticsLikely,
-} from "../../helpers/chat-wonder.helper";
+import { chatWonderBaseSchema, clearStaleSession } from "../../helpers/chat-wonder.helper";
 import { weatherService, type WeatherData } from "../../services/shared/weather.service";
 
 export default class ChatWonderController {
@@ -192,10 +187,7 @@ export default class ChatWonderController {
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
 
-      const documentContext = (!isGarment && (isCosmeticsLikely(input) || isCosmetics))
-        ? await buildCatalogContext(skinAnalysis)
-        : undefined;
-      console.log({ skinAnalysis, documentContext });
+      const documentContext = undefined;
       const callbacks = createChatWonderSseCallbacks({
         res,
         userId,
