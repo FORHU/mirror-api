@@ -44,7 +44,7 @@ export default class WeatherController {
       return res.status(400).json({ error: "Invalid lat or lng" });
     }
 
-    const cacheKey = `${latitude.toFixed(4)},${longitude.toFixed(4)}`;
+    const cacheKey = `${latitude.toFixed(4)},${longitude.toFixed(4)}_v2`;
     const now = Date.now();
     const cached = weatherCache.get(cacheKey);
 
