@@ -209,9 +209,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
       // analog of [OUTFIT_IDS]) instead of a [COSMETICS_DATA] query block.
       // Resolve those IDs to full product data so the frontend renders the
       // products and the marker never leaks into the visible message.
-      const cosmeticsIdsMatch = fullResponse.match(
-        /\[COSMETICS_IDS\]\s*(\[[\s\S]*?\])/
-      );
+      const cosmeticsIdsMatch = fullResponse.match(/\[COSMETICS_IDS\]\s*(\[[\s\S]*?\])/);
       if (cosmeticsIdsMatch && !cosmetics_data) {
         try {
           const parsedIds: unknown = JSON.parse(cosmeticsIdsMatch[1]);
@@ -371,8 +369,7 @@ export function createChatWonderSseCallbacks(ctx: ChatWonderSseCallbacksContext)
         cosmetics_data &&
         typeof cosmetics_data === "object" &&
         Array.isArray((cosmetics_data as Record<string, unknown>).recommendations) &&
-        ((cosmetics_data as Record<string, unknown>).recommendations as unknown[])
-          .length > 0;
+        ((cosmetics_data as Record<string, unknown>).recommendations as unknown[]).length > 0;
       const wantsCosmetics =
         !isGreeting &&
         (cosmetics_data != null ||
