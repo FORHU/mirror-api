@@ -8,6 +8,7 @@ export interface WeatherData {
   temperature: number;
   condition: string;
   icon: string;
+  code: number;
   windspeed: number;
   humidity: number;
   uvIndex: number;
@@ -48,7 +49,7 @@ const weatherCodeMap: Record<number, { condition: string; icon: string }> = {
 
 function weatherCacheKey(lat: number, lng: number): string {
   // Round to 3 decimals (~110m precision) so nearby requests share the cache entry
-  return `weather:${lat.toFixed(3)},${lng.toFixed(3)}`;
+  return `weather:v2:${lat.toFixed(3)},${lng.toFixed(3)}`;
 }
 
 export const weatherService = {
@@ -87,6 +88,7 @@ export const weatherService = {
         temperature: current.temperature,
         condition: mapped.condition,
         icon: mapped.icon,
+        code: code,
         windspeed: current.windspeed,
         humidity,
         uvIndex,
@@ -111,6 +113,7 @@ export const weatherService = {
         temperature: 22,
         condition: "Clear sky",
         icon: "Sun",
+        code: 0,
         windspeed: 0,
         humidity: 50,
         uvIndex: 0,
