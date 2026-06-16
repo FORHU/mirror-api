@@ -128,8 +128,10 @@ export interface StreamChatOptions {
   history?: { role: "user" | "assistant"; content: string }[];
   /** Fashion category filter from the catalog page (e.g. "metaCategory=Winterwear,Summerwear" or "ALL"). */
   category?: string;
-  /** Number of cosmetic product IDs to return. */
-  set?: number;
+  /** Number of fashion sets to return. */
+  fsets?: number;
+  /** Number of cosmetic sets/products to return. */
+  csets?: number;
 }
 
 const DEFAULT_WS_CONNECT_TIMEOUT_MS = 10000;
@@ -199,7 +201,8 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
     documentContext,
     history,
     category,
-    set,
+    fsets,
+    csets,
   } = options;
 
   return new Promise((resolve, reject) => {
@@ -287,7 +290,8 @@ export async function streamChat(options: StreamChatOptions): Promise<void> {
               },
             }
           : {}),
-        ...(set !== undefined ? { set } : {}),
+        ...(fsets !== undefined ? { fsets } : {}),
+        ...(csets !== undefined ? { csets } : {}),
       };
 
       const sendPayload = () => {
