@@ -18,6 +18,7 @@ router.post("/evaluate", authenticate, handleSingleUpload, OutfitController.eval
 router.post("/compose", authenticate, OutfitController.compose); // composes outfits from the user's wardrobe via AI
 router.post("/evaluate-hybrid", authenticate, handleSingleUpload, OutfitController.evaluateHybrid); // AI evaluation + wardrobe matching
 router.post("/recommend", authenticate, OutfitController.recommend); // rule-based composer by CATEGORY (no AI, no file) — still needs userId for ownership
+router.patch("/:id/gender", OutfitController.patchGender); // patch only the gender field inside metaData
 router.patch("/:id", handleSingleUpload, OutfitController.update); // update can also handle file uploads for updating the outfit image
 router.delete("/:id", OutfitController.destroy);
 

@@ -310,6 +310,22 @@ export default class OutfitController {
     }
   }
 
+  static async patchGender(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schema = Joi.object({
+        gender: Joi.string()
+          .valid(...Object.values(GARMENT_GENDER))
+          .required(),
+      });
+      const { error, value } = schema.validate(req.body);
+      if (error) return next(validationError(error.message));
+      const data = await OutfitService.patchOutfitGender(req.params.id, value.gender);
+      responseSuccess(res, 200, data);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async destroy(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as Request & { user?: { id: string } }).user?.id;
