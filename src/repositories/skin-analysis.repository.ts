@@ -48,41 +48,48 @@ export default class SkinAnalysisRepo {
     analysis: CreateSkinAnalysisInput,
     recommendations: RecommendationSeed[]
   ) {
-    return prisma.$transaction(async (tx) => {
-      const created = await tx.skinAnalysis.create({
-        data: {
-          file: { connect: { id: analysis.fileId } },
-          skinType: analysis.skinType,
-          skinTone: analysis.skinTone ?? null,
-          hydrationPct: analysis.hydrationPct,
-          oilinessPct: analysis.oilinessPct,
-          concerns: analysis.concerns,
-          routineTip: analysis.routineTip,
-          ...(analysis.weatherSnapshotId && {
-            weatherSnapshot: { connect: { id: analysis.weatherSnapshotId } },
-          }),
-          rawSignals: analysis.rawSignals ?? Prisma.JsonNull,
-        },
-      });
-
-      if (recommendations.length) {
-        await tx.cosmeticRecommendation.createMany({
-          data: recommendations.map((r) => ({
-            skinAnalysisId: created.id,
-            cosmeticProductId: r.cosmeticProductId,
-            score: r.score,
-            rank: r.rank,
-            reason: r.reason,
-            signals: r.signals ?? Prisma.JsonNull,
-          })),
+    return prisma.$transaction(
+      async (tx) => {
+        const created = await tx.skinAnalysis.create({
+          data: {
+            file: { connect: { id: analysis.fileId } },
+            skinType: analysis.skinType,
+            skinTone: analysis.skinTone ?? null,
+            hydrationPct: analysis.hydrationPct,
+            oilinessPct: analysis.oilinessPct,
+            concerns: analysis.concerns,
+            routineTip: analysis.routineTip,
+            ...(analysis.weatherSnapshotId && {
+              weatherSnapshot: { connect: { id: analysis.weatherSnapshotId } },
+            }),
+            rawSignals: analysis.rawSignals ?? Prisma.JsonNull,
+          },
         });
-      }
 
-      return tx.skinAnalysis.findUniqueOrThrow({
-        where: { id: created.id },
-        include: includeFull,
-      });
-    });
+        if (recommendations.length) {
+          await tx.cosmeticRecommendation.createMany({
+            data: recommendations.map((r) => ({
+              skinAnalysisId: created.id,
+              cosmeticProductId: r.cosmeticProductId,
+              score: r.score,
+              rank: r.rank,
+              reason: r.reason,
+              signals: r.signals ?? Prisma.JsonNull,
+            })),
+          });
+        }
+
+        return tx.skinAnalysis.findUniqueOrThrow({
+          where: { id: created.id },
+          include: includeFull,
+        });
+      },
+      // The DB on the kiosk host can be slow/cold (cold pings ~2s), and this
+      // runs as a background job. Raise both windows above Prisma's defaults
+      // (maxWait 2s / timeout 5s) so a slow connection doesn't abort the
+      // transaction with P2028 "transaction not found".
+      { maxWait: 10_000, timeout: 20_000 }
+    );
   }
 
   static async findById(id: string) {
