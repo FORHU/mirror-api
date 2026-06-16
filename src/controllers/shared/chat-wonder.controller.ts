@@ -192,10 +192,10 @@ export default class ChatWonderController {
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
 
-      const documentContext = isCosmeticsLikely(input)
+      const documentContext = (!isGarment && (isCosmeticsLikely(input) || isCosmetics))
         ? await buildCatalogContext(skinAnalysis)
         : undefined;
-
+      console.log({ skinAnalysis, documentContext });
       const callbacks = createChatWonderSseCallbacks({
         res,
         userId,
