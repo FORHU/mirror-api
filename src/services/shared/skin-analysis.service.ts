@@ -247,7 +247,9 @@ async function callYouCamApi(
       }
 
       // Step 5: inline JSON scores → existing parser (output[].type matches our keys).
-      const output = (data?.results?.output ?? data?.result?.output ?? []) as PerfectCorpEntry["output"];
+      const output = (data?.results?.output ??
+        data?.result?.output ??
+        []) as PerfectCorpEntry["output"];
       // NOTE: PerfectCorp ui_scores run 1–100; verify their direction against the
       // first real run (high score = more vs. less of the concern) and flip the
       // thresholds in parsePerfectCorpEntry if the skinType/concerns look inverted.
