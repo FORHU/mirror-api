@@ -3,7 +3,6 @@ import SkinAnalysisRepo from "../../repositories/skin-analysis.repository";
 import FileRepo from "../../repositories/file.repository";
 import {
   rankProducts,
-  type AnalysisInput,
   type ProductForScoring,
   type WeatherContext,
 } from "../../utils/cosmetics.util";
@@ -11,7 +10,7 @@ import axios from "axios";
 import {
   SKIN_ANALYSIS_ENABLED,
   YOUCAM_API_KEY,
-  YOUCAM_API_URL,
+  YOUCAM_API_BASE,
   SKIN_ANALYSIS_MOCK_DATA,
   type SkinVision,
 } from "../../config";
@@ -28,7 +27,15 @@ type PerfectCorpEntry = {
   success: boolean;
   overallScore?: number;
   skinAge?: number;
-  output: Array<{ type: string; ui_score?: number; score?: number }>;
+  // Matches PerfectCorp's format:"json" result — data.results.output[].
+  output: Array<{
+    type: string;
+    region?: string;
+    ui_score?: number;
+    raw_score?: number;
+    score?: number;
+    skin_type?: string; // only on type:"skin_type" entries (e.g. "Normal", "Oily")
+  }>;
 };
 
 // Pick a random pre-built mock vision (from config) so each scan feels different.
@@ -38,40 +45,76 @@ function pickMockVision(): SkinVision {
 }
 
 function parsePerfectCorpEntry(entry: PerfectCorpEntry): SkinVision {
-  // Build score map from output array
-  const s: Record<string, number> = {};
+  // PerfectCorp ui_scores are SKIN-HEALTH scores: 1–100, HIGHER = HEALTHIER
+  // (e.g. acne:84 = clear skin, redness:90 = calm). Verified against real API
+  // output 2026-06-16. We therefore read `health` directly and derive a
+  // `severity = 100 - health` for concern/skin-type thresholds.
+  const health: Record<string, number> = {};
+  let apiSkinType: string | undefined; // PerfectCorp's own classification ("Normal", "Oily"…)
+  let overallScore = entry.overallScore;
+  let skinAge = entry.skinAge ?? null;
+
   for (const item of entry.output ?? []) {
-    s[item.type] = item.ui_score ?? item.score ?? 0;
+    if (item.type === "skin_type") {
+      // Prefer the whole-face classification; fall back to the first seen.
+      if (item.region === "whole" || apiSkinType === undefined) apiSkinType = item.skin_type;
+      continue;
+    }
+    if (item.type === "all") {
+      overallScore = item.score ?? item.ui_score ?? overallScore;
+      continue;
+    }
+    if (item.type === "skin_age") {
+      skinAge = item.score ?? skinAge;
+      continue;
+    }
+    if (item.type === "resize_image") continue;
+    const v = item.ui_score ?? item.score ?? item.raw_score;
+    if (typeof v === "number") health[item.type] = v;
   }
 
-  const oilinessPct = s["oiliness"] ?? 50;
-  // PerfectCorp "moisture" = moisture-issue severity; high → dry skin.
-  // When absent (some YouCam response shapes omit it), fall back based on oiliness:
-  // high oiliness → low moisture issue; low oiliness → neutral.
-  const hasMoisture = "moisture" in s;
-  const moistureIssue = hasMoisture ? s["moisture"] : oilinessPct >= 70 ? 30 : 50;
-  const hydrationPct = Math.round(100 - moistureIssue);
+  // severity(k): how bad the concern is (0 = perfect, 100 = severe). Defaults to
+  // `def` severity when the metric is absent.
+  const sev = (k: string, def = 50) => 100 - (k in health ? health[k] : 100 - def);
 
-  // Determine skin type
-  let skinType: "OILY" | "DRY" | "COMBINATION" | "NORMAL" | "SENSITIVE";
-  if (oilinessPct >= 70 && moistureIssue < 50) skinType = "OILY";
-  else if (oilinessPct < 30 && moistureIssue >= 55) skinType = "DRY";
-  else if (oilinessPct >= 55 && moistureIssue >= 50) skinType = "COMBINATION";
-  else if ((s["redness"] ?? 0) >= 70) skinType = "SENSITIVE";
+  // Hydration tracks moisture health directly; oiliness tracks oil severity.
+  const hydrationPct = Math.round("moisture" in health ? health["moisture"] : 50);
+  const oilinessPct = Math.round(sev("oiliness"));
+
+  // Skin type: trust PerfectCorp's classification when present, else derive.
+  const TYPE_MAP: Record<string, SkinVision["skinType"]> = {
+    normal: "NORMAL",
+    oily: "OILY",
+    dry: "DRY",
+    combination: "COMBINATION",
+    redness: "SENSITIVE",
+    "dry & redness": "SENSITIVE",
+    "oily & redness": "SENSITIVE",
+    "combination & redness": "SENSITIVE",
+  };
+  let skinType: SkinVision["skinType"];
+  const mapped = apiSkinType ? TYPE_MAP[apiSkinType.toLowerCase()] : undefined;
+  if (mapped) skinType = mapped;
+  else if (oilinessPct >= 70 && hydrationPct >= 50) skinType = "OILY";
+  else if (oilinessPct < 30 && hydrationPct < 45) skinType = "DRY";
+  else if (oilinessPct >= 55) skinType = "COMBINATION";
+  else if (sev("redness") >= 70) skinType = "SENSITIVE";
   else skinType = "NORMAL";
 
-  // Build concern list from thresholds
+  // Concerns surface where severity (100 - health) is high.
   const concerns: string[] = [];
-  if (oilinessPct >= 70) concerns.push("Oiliness");
-  if (moistureIssue >= 60) concerns.push("Mild dehydration");
-  if ((s["acne"] ?? 0) >= 60) concerns.push("Acne");
-  if ((s["wrinkle"] ?? 0) >= 60) concerns.push("Fine lines / wrinkles");
-  if ((s["dark_circle_v2"] ?? 0) >= 60) concerns.push("Dark circles");
-  if ((s["age_spot"] ?? 0) >= 60) concerns.push("Age spots / hyperpigmentation");
-  if ((s["pore"] ?? 0) >= 60) concerns.push("Enlarged pores");
-  if ((s["redness"] ?? 0) >= 70) concerns.push("Redness / sensitivity");
-  if ((s["droopy_lower_eyelid"] ?? 0) >= 65 || (s["eye_bag"] ?? 0) >= 65)
+  if (sev("oiliness") >= 65) concerns.push("Oiliness");
+  if (sev("moisture") >= 55) concerns.push("Dehydration");
+  if (sev("acne") >= 50) concerns.push("Acne");
+  if (sev("wrinkle") >= 50) concerns.push("Fine lines / wrinkles");
+  if (sev("dark_circle_v2") >= 50) concerns.push("Dark circles");
+  if (sev("age_spot") >= 50) concerns.push("Age spots / hyperpigmentation");
+  if (sev("pore") >= 50) concerns.push("Enlarged pores");
+  if (sev("redness") >= 55) concerns.push("Redness / sensitivity");
+  if (sev("droopy_lower_eyelid") >= 60 || sev("eye_bag") >= 55)
     concerns.push("Under-eye puffiness");
+  if (sev("radiance") >= 55) concerns.push("Dullness");
+  if (sev("firmness") >= 55) concerns.push("Loss of firmness");
   if (concerns.length === 0) concerns.push("General maintenance");
 
   const routineTips: Record<string, string> = {
@@ -91,13 +134,38 @@ function parsePerfectCorpEntry(entry: PerfectCorpEntry): SkinVision {
     oilinessPct,
     concerns,
     routineTip: routineTips[skinType],
-    overallScore: entry.overallScore ?? 75,
-    skinAge: entry.skinAge ?? null,
-    rawScores: s,
+    overallScore: overallScore ?? 75,
+    skinAge: skinAge ?? null,
+    rawScores: health,
   };
 }
 
 // ─── YouCam / PerfectCorp real API call ─────────────────────────────────────
+// Docs: https://docs.perfectcorp.com/reference/ai_skin_analysis
+// Flow: register file → PUT bytes to presigned URL → create task → poll → scores.
+// Auth is a plain `Bearer YOUCAM_API_KEY` header (no secret / RSA token).
+
+// Full SD ("standard definition") skincare metric set — we request everything so
+// ChatWonder gets the richest profile. HD and SD metrics CANNOT be mixed in one
+// task, and our 1280×720 captures satisfy the SD short-side ≥ 480px requirement.
+const SKIN_ANALYSIS_ACTIONS = [
+  "oiliness",
+  "moisture",
+  "acne",
+  "wrinkle",
+  "pore",
+  "texture",
+  "redness",
+  "age_spot",
+  "dark_circle_v2",
+  "eye_bag",
+  "radiance",
+  "firmness",
+  "droopy_upper_eyelid",
+  "droopy_lower_eyelid",
+  "tear_trough",
+  "skin_type",
+];
 
 async function callYouCamApi(
   imageUrl: string
@@ -107,53 +175,97 @@ async function callYouCamApi(
     return null;
   }
 
+  const auth = { Authorization: `Bearer ${YOUCAM_API_KEY}` };
+
   try {
-    // Step 1: submit async job
-    const submitRes = await axios.post(
-      YOUCAM_API_URL,
-      { image_url: imageUrl, effects: [{ id: "skin_analysis" }] },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${YOUCAM_API_KEY}`,
-        },
-        timeout: 15_000,
-      }
+    // Step 0: pull the captured image bytes (already persisted on our CDN/S3).
+    const imgRes = await axios.get<ArrayBuffer>(imageUrl, {
+      responseType: "arraybuffer",
+      timeout: 15_000,
+    });
+    const buffer = Buffer.from(imgRes.data);
+    const rawCt = imgRes.headers["content-type"];
+    const contentType = typeof rawCt === "string" && rawCt ? rawCt.split(";")[0] : "image/jpeg";
+    const fileName = `skin-capture.${contentType.split("/")[1] || "jpg"}`;
+
+    // Step 1: register the file → get file_id + a presigned PUT request.
+    const fileRes = await axios.post(
+      `${YOUCAM_API_BASE}/s2s/v2.0/file/skin-analysis`,
+      { files: [{ content_type: contentType, file_name: fileName, file_size: buffer.byteLength }] },
+      { headers: { ...auth, "Content-Type": "application/json" }, timeout: 15_000 }
     );
 
-    const jobId: string = submitRes.data?.job_id ?? submitRes.data?.request_id;
-    if (!jobId) {
-      logger.warn("[SkinAnalysis] YouCam did not return a job_id");
+    const fileEntry = fileRes.data?.data?.files?.[0] ?? fileRes.data?.result?.files?.[0];
+    const fileId: string | undefined = fileEntry?.file_id;
+    const uploadReq = fileEntry?.requests?.[0];
+    if (!fileId || !uploadReq?.url) {
+      logger.warn("[SkinAnalysis] YouCam File API did not return file_id / upload url");
       return null;
     }
 
-    logger.info(`[SkinAnalysis] YouCam job submitted: ${jobId}`);
+    // Step 2: upload the bytes to the presigned URL using the headers it dictated.
+    await axios.put(uploadReq.url, buffer, {
+      headers: {
+        "Content-Type": contentType,
+        "Content-Length": String(buffer.byteLength),
+        ...(uploadReq.headers ?? {}),
+      },
+      maxBodyLength: Infinity,
+      timeout: 30_000,
+    });
 
-    // Step 2: poll for result (max 30s)
-    const pollUrl = YOUCAM_API_URL.replace("/async/", "/result/") + `/${jobId}`;
-    for (let attempt = 0; attempt < 10; attempt++) {
-      await new Promise((r) => setTimeout(r, 3_000));
-      const pollRes = await axios.get(pollUrl, {
-        headers: { Authorization: `Bearer ${YOUCAM_API_KEY}` },
-        timeout: 10_000,
-      });
+    // Step 3: create the task. format:"json" returns scores inline (no ZIP to unzip).
+    const taskRes = await axios.post(
+      `${YOUCAM_API_BASE}/s2s/v2.0/task/skin-analysis`,
+      { src_file_id: fileId, dst_actions: SKIN_ANALYSIS_ACTIONS, format: "json" },
+      { headers: { ...auth, "Content-Type": "application/json" }, timeout: 15_000 }
+    );
 
-      const status: string = pollRes.data?.status ?? "processing";
-      if (status === "processing" || status === "queued") continue;
-      if (status !== "done" && status !== "success" && status !== "completed") {
-        logger.warn(`[SkinAnalysis] YouCam job failed with status: ${status}`);
+    const taskId: string | undefined =
+      taskRes.data?.data?.task_id ?? taskRes.data?.result?.task_id ?? taskRes.data?.task_id;
+    if (!taskId) {
+      logger.warn("[SkinAnalysis] YouCam did not return a task_id");
+      return null;
+    }
+    logger.info(`[SkinAnalysis] YouCam task submitted: ${taskId}`);
+
+    // Step 4: poll until success/error (≤ ~60s).
+    const pollUrl = `${YOUCAM_API_BASE}/s2s/v2.0/task/skin-analysis/${taskId}`;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await new Promise((r) => setTimeout(r, 2_000));
+      const pollRes = await axios.get(pollUrl, { headers: auth, timeout: 10_000 });
+      const data = pollRes.data?.data ?? pollRes.data;
+      const status: string = data?.task_status ?? "running";
+
+      if (status === "running" || status === "queued") continue;
+      if (status !== "success") {
+        logger.warn(
+          `[SkinAnalysis] YouCam task ${taskId} failed: status=${status} ` +
+            `error=${data?.error ?? ""} ${data?.error_message ?? ""}`
+        );
         return null;
       }
 
-      const result = pollRes.data?.result ?? pollRes.data;
-      logger.info(`[SkinAnalysis] YouCam result received for job ${jobId}`);
-      return parsePerfectCorpEntry(result as PerfectCorpEntry);
+      // Step 5: inline JSON scores → existing parser (output[].type matches our keys).
+      const output = (data?.results?.output ?? data?.result?.output ?? []) as PerfectCorpEntry["output"];
+      // NOTE: PerfectCorp ui_scores run 1–100; verify their direction against the
+      // first real run (high score = more vs. less of the concern) and flip the
+      // thresholds in parsePerfectCorpEntry if the skinType/concerns look inverted.
+      logger.info(
+        `[SkinAnalysis] YouCam result for task ${taskId}: ${output.length} metrics — ` +
+          output.map((o) => `${o.type}:${o.ui_score ?? o.score ?? o.raw_score}`).join(" ")
+      );
+      return parsePerfectCorpEntry({ success: true, output } as PerfectCorpEntry);
     }
 
-    logger.warn(`[SkinAnalysis] YouCam job ${jobId} timed out after 30s`);
+    logger.warn(`[SkinAnalysis] YouCam task ${taskId} timed out after 60s`);
     return null;
   } catch (err) {
-    logger.warn(`[SkinAnalysis] YouCam API call failed: ${(err as Error).message}`);
+    const ax = err as { response?: { status?: number; data?: unknown }; message?: string };
+    logger.warn(
+      `[SkinAnalysis] YouCam API call failed: ${ax.message ?? ""}` +
+        (ax.response ? ` (status ${ax.response.status}: ${JSON.stringify(ax.response.data)})` : "")
+    );
     return null;
   }
 }
@@ -470,62 +582,14 @@ export default class SkinAnalysisService {
         `hydration=${vision.hydrationPct} concerns=[${vision.concerns.join(", ")}]`
     );
 
-    // 5. Load catalog and run rule engine
-    const catalog = await prisma.cosmeticProduct.findMany({
-      where: { fileUrl: { is: { fileUrl: { not: "" } } } },
-      select: {
-        id: true,
-        type: true,
-        tags: true,
-        spf: true,
-        waterproof: true,
-        transferProof: true,
-        hydrating: true,
-        oilFree: true,
-        finish: true,
-      },
-    });
+    // 4. Product selection is delegated entirely to ChatWonder (the LLM). The
+    //    frontend, on skin_analysis_complete, kicks a cosmetics ChatWonder turn
+    //    with this analysis profile and ChatWonder writes its own picks against
+    //    the UserOutline. So we persist the SkinAnalysis WITHOUT rule-engine
+    //    recommendations — the vision profile (skinType / scores / concerns) is
+    //    all the frontend needs to drive ChatWonder.
 
-    logger.info(`[SkinAnalysis] Catalog loaded: ${catalog.length} products for scoring`);
-    if (catalog.length > 0) {
-      const sample = catalog[0];
-      logger.info(
-        `[SkinAnalysis] Sample product attributes — type:${sample.type} | tags:${JSON.stringify(sample.tags)} | oilFree:${sample.oilFree} | hydrating:${sample.hydrating} | spf:${sample.spf} | finish:${sample.finish}`
-      );
-    }
-
-    const engineInput: AnalysisInput = {
-      skinType: vision.skinType,
-      hydrationPct: vision.hydrationPct,
-      oilinessPct: vision.oilinessPct,
-      concerns: vision.concerns,
-      weather,
-    };
-
-    logger.info(
-      `[SkinAnalysis] Scoring input — skinType:${engineInput.skinType} | hydration:${engineInput.hydrationPct}% | oiliness:${engineInput.oilinessPct}% | concerns:[${engineInput.concerns.join(", ")}]`
-    );
-
-    const ranked = rankProducts(engineInput, catalog as ProductForScoring[]);
-
-    logger.info(
-      `[SkinAnalysis] Scoring result — ${catalog.length} products scored, ${ranked.length} passed MIN_SCORE threshold`
-    );
-    if (ranked.length === 0 && catalog.length > 0) {
-      logger.warn(
-        "[SkinAnalysis] All products scored below MIN_SCORE=25 — check that products have type, tags, oilFree, hydrating, spf, or finish set in the DB"
-      );
-    }
-    if (ranked.length > 0) {
-      logger.info(
-        `[SkinAnalysis] Top ranked: ${ranked
-          .slice(0, 3)
-          .map((r) => `score:${r.score} id:${r.productId}`)
-          .join(" | ")}`
-      );
-    }
-
-    // 5. Persist analysis + recommendations atomically
+    // 5. Persist analysis (recommendations come from ChatWonder, not here)
     const created = await SkinAnalysisRepo.createWithRecommendations(
       {
         fileId: file.id,
@@ -543,13 +607,7 @@ export default class SkinAnalysisService {
           perfectCorp: (vision as any).rawScores ?? null,
         },
       },
-      ranked.map((r) => ({
-        cosmeticProductId: r.productId,
-        score: r.score,
-        rank: r.rank,
-        reason: r.reason.join(", "),
-        signals: r.signals,
-      }))
+      []
     );
 
     // 6. Push result to FE via Socket.io before any further DB work
