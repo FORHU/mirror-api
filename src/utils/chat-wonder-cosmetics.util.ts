@@ -404,8 +404,7 @@ export async function resolveOutlineCosmeticsByIds(
         oilFree: product.oilFree,
         finish: product.finish,
       });
-      const score =
-        rec.score && Number.isFinite(rec.score) ? rec.score : scored.score;
+      const score = rec.score && Number.isFinite(rec.score) ? rec.score : scored.score;
       const reason =
         rec.reason ??
         (scored.reason.length
