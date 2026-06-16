@@ -36,8 +36,10 @@ export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 export const CHAT_WONDER_API_URL = process.env.CHAT_WONDER_API_URL || "";
 
 export const YOUCAM_API_KEY = process.env.YOUCAM_API_KEY || "";
-export const YOUCAM_API_URL =
-  process.env.YOUCAM_API_URL || "https://api.perfectcorp.com/s2b/v1.0/image/async/eai";
+// PerfectCorp / YouCam S2S API server. Auth is a simple `Bearer YOUCAM_API_KEY`
+// header (no secret/RSA). The skin-analysis flow lives under /s2s/v2.0/* on this
+// host — see callYouCamApi() in skin-analysis.service.ts.
+export const YOUCAM_API_BASE = process.env.YOUCAM_API_BASE || "https://yce-api-01.makeupar.com";
 
 // Shared secret kiosk devices must present when calling `register_kiosk` over the socket.
 export const KIOSK_DEVICE_SECRET = process.env.KIOSK_DEVICE_SECRET || "";
