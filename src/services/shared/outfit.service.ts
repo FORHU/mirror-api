@@ -241,6 +241,14 @@ export default class OutfitService {
     return updated;
   }
 
+  static async patchOutfitCategory(id: string, category: string[]) {
+    const existing = await OutfitRepo.findById(id);
+    if (!existing) throw { status: 404, message: "Outfit not found" };
+    const updated = await OutfitRepo.patchCategory(id, category);
+    await CacheUtil.delByPattern(`outfits:index:user:${existing.userId || "system"}:*`);
+    return updated;
+  }
+
   static async patchOutfitGender(id: string, gender: string) {
     const existing = await OutfitRepo.findById(id);
     if (!existing) throw { status: 404, message: "Outfit not found" };
