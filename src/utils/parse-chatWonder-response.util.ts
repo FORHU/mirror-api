@@ -329,7 +329,13 @@ function buildFromParsed(
     route_suggestion: routeSuggestion,
     images: Array.isArray(parsed.images) ? parsed.images : [],
     events: Array.isArray(parsed.events) ? parsed.events : [],
-    sets: Array.isArray(parsed.sets) ? parsed.sets : [],
+    sets: Array.isArray(parsed.sets)
+      ? parsed.sets
+      : Array.isArray(parsed.fsets)
+        ? parsed.fsets
+        : Array.isArray(parsed.csets)
+          ? parsed.csets
+          : [],
     raw: rawResponse,
   };
 }
@@ -464,7 +470,10 @@ export function parseChatWonderResponse(rawResponse: string): ChatWonderParsedRe
         }
       }
 
-      if (parsed && (parsed.message || parsed.sets || parsed.success)) {
+      if (
+        parsed &&
+        (parsed.message || parsed.sets || parsed.fsets || parsed.csets || parsed.success)
+      ) {
         return buildFromParsed(parsed, rawResponse);
       }
     }

@@ -373,7 +373,7 @@ export async function persistOutlineOutfits(
   try {
     if (!garmentData || typeof garmentData !== "object") return;
     const data = garmentData as Record<string, unknown>;
-    const sets = Array.isArray(data.sets) ? data.sets : [];
+    const sets = Array.isArray(data.sets) ? data.sets : Array.isArray(data.fsets) ? data.fsets : [];
     if (sets.length === 0) return;
 
     const outline = await prisma.userOutline.findUnique({

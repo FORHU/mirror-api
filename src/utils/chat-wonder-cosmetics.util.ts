@@ -175,8 +175,13 @@ function extractRecs(raw: unknown): ParsedCosmeticRec[] {
     if (Array.isArray(data.recommendations)) data.recommendations.forEach(push);
     if (Array.isArray(data.products)) data.products.forEach(push);
     if (Array.isArray(data.items)) data.items.forEach(push);
-    if (Array.isArray(data.sets)) {
-      for (const setValue of data.sets) {
+    const setsArray = Array.isArray(data.sets)
+      ? data.sets
+      : Array.isArray(data.csets)
+        ? data.csets
+        : null;
+    if (setsArray) {
+      for (const setValue of setsArray) {
         const set = setValue as Record<string, unknown> | null;
         if (set && Array.isArray(set.recommendations)) set.recommendations.forEach(push);
       }
