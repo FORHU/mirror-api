@@ -356,6 +356,32 @@ export default class OutfitRepo {
     });
   }
 
+  static async patchCategory(id: string, category: string[]) {
+    const existing = await prisma.outfit.findUnique({ where: { id }, select: { metaData: true } });
+    const existingMeta = (existing?.metaData as Record<string, unknown>) ?? {};
+    return prisma.outfit.update({
+      where: { id },
+      data: { metaData: { ...existingMeta, category } },
+      include: {
+        file: true,
+        items: { include: { garment: { include: { file: true } } } },
+      },
+    });
+  }
+
+  static async patchGender(id: string, gender: string) {
+    const existing = await prisma.outfit.findUnique({ where: { id }, select: { metaData: true } });
+    const existingMeta = (existing?.metaData as Record<string, unknown>) ?? {};
+    return prisma.outfit.update({
+      where: { id },
+      data: { metaData: { ...existingMeta, gender } },
+      include: {
+        file: true,
+        items: { include: { garment: { include: { file: true } } } },
+      },
+    });
+  }
+
   static async delete(id: string) {
     // Delete related GarmentInOutfit records first due to foreign keys
     await prisma.garmentInOutfit.deleteMany({

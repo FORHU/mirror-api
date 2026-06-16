@@ -3,14 +3,9 @@ import Joi from "joi";
 import ChatWonderService from "../../services/shared/chat-wonder.service";
 import { streamChat } from "../../utils/chat-wonder-stream";
 import { createChatWonderSseCallbacks } from "../../utils/chat-wonder-sse-callbacks.util";
-import { buildCatalogContext } from "../../utils/chat-wonder-cosmetics.util";
 import logger from "../../utils/logger";
 import { responseError } from "../../helpers/response.helper";
-import {
-  chatWonderBaseSchema,
-  clearStaleSession,
-  isCosmeticsLikely,
-} from "../../helpers/chat-wonder.helper";
+import { chatWonderBaseSchema, clearStaleSession } from "../../helpers/chat-wonder.helper";
 import { weatherService, type WeatherData } from "../../services/shared/weather.service";
 
 export default class ChatWonderController {
@@ -132,7 +127,8 @@ export default class ChatWonderController {
     const frontendLocation = value.location;
     const skinAnalysis = value.skin_analysis;
     const category: string | undefined = value.category || undefined;
-    const set: number | undefined = value.set ?? undefined;
+    const fsets: number | undefined = value.fsets ?? undefined;
+    const csets: number | undefined = value.csets ?? undefined;
 
     logger.info(
       `[ChatWonderController.chat] page_mode=${pageMode ?? "none"} | input=${input.slice(0, 80)}...`
@@ -191,10 +187,7 @@ export default class ChatWonderController {
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
 
-      const documentContext = isCosmeticsLikely(input)
-        ? await buildCatalogContext(skinAnalysis)
-        : undefined;
-
+      const documentContext = undefined;
       const callbacks = createChatWonderSseCallbacks({
         res,
         userId,
@@ -220,7 +213,8 @@ export default class ChatWonderController {
         documentContext,
         history,
         category,
-        set,
+        fsets,
+        csets,
       });
     } catch (err) {
       const message = (err as Error).message || "Internal server error";
