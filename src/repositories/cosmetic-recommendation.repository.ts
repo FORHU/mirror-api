@@ -84,4 +84,8 @@ export default class CosmeticRecommendationRepo {
   static async delete(id: string) {
     return prisma.cosmeticRecommendation.delete({ where: { id } });
   }
+
+  static async deleteByProductId(productId: string) {
+    return prisma.cosmeticRecommendation.deleteMany({ where: { cosmeticProductId: productId } });
+  }
 }
