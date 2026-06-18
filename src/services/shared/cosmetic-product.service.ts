@@ -1,5 +1,6 @@
 import CosmeticProductRepo from "../../repositories/cosmetic-product.repository";
 import FileRepo from "../../repositories/file.repository";
+import CosmeticRecommendationRepo from "../../repositories/cosmetic-recommendation.repository";
 import { COSMETIC_CATEGORY, COSMETIC_FINISH, COSMETIC_TYPE, Prisma } from "@prisma/client";
 
 import { parsePagination } from "../../helpers/pagination.helper";
@@ -188,6 +189,7 @@ export default class CosmeticProductService {
 
   static async deleteProduct(id: string) {
     await this.getProductById(id);
+    await CosmeticRecommendationRepo.deleteByProductId(id);
     await CosmeticProductRepo.delete(id);
     return { message: "Cosmetic product deleted successfully" };
   }
