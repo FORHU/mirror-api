@@ -38,6 +38,10 @@ const createSchema = Joi.object({
   metaData: Joi.object().optional().allow(null),
 });
 
+const nameSchema = Joi.object({
+  name: Joi.string().required(),
+});
+
 const batchSchema = Joi.object({
   ids: Joi.array().items(Joi.string().trim().min(1)).min(1).required(),
 });
@@ -155,6 +159,18 @@ export default class CosmeticProductController {
       }
 
       const data = await CosmeticProductService.updateProduct(req.params.id, finalValue);
+      return responseSuccess(res, 200, data);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async updateName(req: Request, res: Response, next: NextFunction) {
+    const { error, value } = nameSchema.validate(req.body, { abortEarly: false });
+    if (error) return responseError(res, 400, error.message);
+
+    try {
+      const data = await CosmeticProductService.updateProduct(req.params.id, { name: value.name });
       return responseSuccess(res, 200, data);
     } catch (err) {
       next(err);
